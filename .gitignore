@@ -1,0 +1,7 @@
+*.nsp
+*.xci
+*.ipa
+*prod.keys*
+*.key
+private/
+resultats/

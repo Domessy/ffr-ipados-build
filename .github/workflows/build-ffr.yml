@@ -1,0 +1,132 @@
+name: FFR - IPA iPadOS (nxnative)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ffr-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # macOS Apple Silicon standard: gratuit dans un depot public GitHub.
+    runs-on: macos-15
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Connecter le runner au PC CachyOS via Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          authkey: ${{ secrets.FFR_TS_AUTHKEY }}
+          ping: ${{ secrets.FFR_TS_HOST }}
+          use-cache: 'false'
+
+      - name: Configurer SSH avec cle d'hote epinglee
+        env:
+          SSH_KEY: ${{ secrets.FFR_SSH_KEY }}
+          HOSTKEY: ${{ secrets.FFR_SSH_KNOWN_HOSTS }}
+          PC_IP: ${{ secrets.FFR_TS_HOST }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$SSH_KEY" > "$RUNNER_TEMP/ffr_ssh_key"
+          printf '%s\n' "$HOSTKEY" > "$RUNNER_TEMP/ffr_known_hosts"
+          chmod 600 "$RUNNER_TEMP/ffr_ssh_key" "$RUNNER_TEMP/ffr_known_hosts"
+          {
+            echo 'Host ffr-cachyos'
+            printf '  HostName %s\n' "$PC_IP"
+            echo '  User syssy'
+            echo '  Port 22'
+            printf '  IdentityFile %s\n' "$RUNNER_TEMP/ffr_ssh_key"
+            printf '  UserKnownHostsFile %s\n' "$RUNNER_TEMP/ffr_known_hosts"
+            echo '  StrictHostKeyChecking yes'
+            echo '  IdentitiesOnly yes'
+            echo '  BatchMode yes'
+          } > "$HOME/.ssh/config"
+          chmod 600 "$HOME/.ssh/config"
+          ssh -o ConnectTimeout=15 ffr-cachyos 'printf "SSH OK\n"'
+
+      - name: Liberer de l'espace sur le Mac ephemere en conservant Xcode 26
+        run: |
+          set -euo pipefail
+          echo 'Espace initial :'
+          df -h "$RUNNER_TEMP"
+          # macos-15 contient plusieurs Xcode : garder le 26.x le plus recent.
+          KEEP=$(find /Applications -maxdepth 1 -type d -name 'Xcode_26*.app' | sort | tail -n 1)
+          if [ -z "$KEEP" ]; then
+            echo 'Aucun Xcode 26 disponible sur ce runner.' >&2
+            exit 1
+          fi
+          echo "Xcode conserve : $KEEP"
+          sudo xcode-select -s "$KEEP/Contents/Developer"
+          for app in /Applications/Xcode_*.app; do
+            [ -d "$app" ] || continue
+            [ "$app" = "$KEEP" ] && continue
+            [ -L "$app" ] && continue
+            echo "Suppression sur runner ephemere : $app"
+            sudo rm -rf -- "$app"
+          done
+          xcodebuild -version
+          df -h "$RUNNER_TEMP"
+          free_kb=$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')
+          if [ "$free_kb" -lt 30000000 ]; then
+            echo "Espace insuffisant pour ce jeu ($free_kb Ko libres, objectif 30000000 Ko)." >&2
+            echo 'Aucune donnee du jeu ne sera transferee.' >&2
+            exit 1
+          fi
+
+      - name: Installer les dependances nxnative
+        run: |
+          set -euo pipefail
+          export HOMEBREW_NO_AUTO_UPDATE=1
+          brew install xcodegen zstd spirv-cross glslang
+          dotnet --version
+          python3 -m venv "$RUNNER_TEMP/ffr-venv"
+          "$RUNNER_TEMP/ffr-venv/bin/python" -m pip install -q lz4 capstone fonttools
+          git clone --depth 1 https://github.com/seedds/nxnative.git "$RUNNER_TEMP/nxnative"
+
+      - name: Copier les 2 NSP et les cles depuis CachyOS (hors de GitHub)
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$RUNNER_TEMP/ffr-nsp"
+          ssh ffr-cachyos 'tar -C "/home/syssy/Documents/FF Resonance" -cf - "v-final_fantasy_resonance.nsp" "v-final_fantasy_resonance_v65536.nsp"' | tar -C "$RUNNER_TEMP/ffr-nsp" -xf -
+          ssh ffr-cachyos 'cat "$HOME/portage-ipados/ff-resonance/private/prod.keys"' > "$RUNNER_TEMP/ffr-prod.keys"
+          test -s "$RUNNER_TEMP/ffr-prod.keys"
+          df -h "$RUNNER_TEMP"
+
+      - name: Compiler l'IPA Final Fantasy Resonance 1.0.1
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/nxnative"
+          "$RUNNER_TEMP/ffr-venv/bin/python" scripts/build_ipa_from_nsp.py \
+            "$RUNNER_TEMP/ffr-nsp" \
+            -k "$RUNNER_TEMP/ffr-prod.keys" \
+            -o "$RUNNER_TEMP/FFR-iPadOS.ipa" \
+            --no-keep-extracted \
+            --show-fps 2>&1 | tee "$RUNNER_TEMP/ffr-build.log"
+          test -s "$RUNNER_TEMP/FFR-iPadOS.ipa"
+
+      - name: Renvoyer l'IPA directement sur CachyOS
+        run: |
+          set -euo pipefail
+          ssh ffr-cachyos 'mkdir -p "$HOME/portage-ipados/ff-resonance/resultats"'
+          ssh ffr-cachyos 'cat > "$HOME/portage-ipados/ff-resonance/resultats/FFR-iPadOS.ipa.part" && mv "$HOME/portage-ipados/ff-resonance/resultats/FFR-iPadOS.ipa.part" "$HOME/portage-ipados/ff-resonance/resultats/FFR-iPadOS.ipa"' \
+            < "$RUNNER_TEMP/FFR-iPadOS.ipa"
+          shasum -a 256 "$RUNNER_TEMP/FFR-iPadOS.ipa"
+          echo 'IPA transferee sur CachyOS.'
+
+      - name: Renvoyer le journal de compilation
+        if: always()
+        run: |
+          if [ -s "$RUNNER_TEMP/ffr-build.log" ]; then
+            ssh ffr-cachyos 'mkdir -p "$HOME/portage-ipados/ff-resonance/resultats" && cat > "$HOME/portage-ipados/ff-resonance/resultats/ffr-build.log"' \
+              < "$RUNNER_TEMP/ffr-build.log" || true
+          fi
+          rm -f "$RUNNER_TEMP/ffr-prod.keys" "$RUNNER_TEMP/ffr_ssh_key" || true
