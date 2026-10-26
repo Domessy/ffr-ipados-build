@@ -20,38 +20,6 @@ jobs:
         shell: bash
 
     steps:
-      - name: Connecter le runner au PC CachyOS via Tailscale
-        uses: tailscale/github-action@v4
-        with:
-          authkey: ${{ secrets.FFR_TS_AUTHKEY }}
-          ping: ${{ secrets.FFR_TS_HOST }}
-          use-cache: 'false'
-
-      - name: Configurer SSH avec cle d'hote epinglee
-        env:
-          SSH_KEY: ${{ secrets.FFR_SSH_KEY }}
-          HOSTKEY: ${{ secrets.FFR_SSH_KNOWN_HOSTS }}
-          PC_IP: ${{ secrets.FFR_TS_HOST }}
-        run: |
-          set -euo pipefail
-          install -d -m 700 "$HOME/.ssh"
-          printf '%s\n' "$SSH_KEY" > "$RUNNER_TEMP/ffr_ssh_key"
-          printf '%s\n' "$HOSTKEY" > "$RUNNER_TEMP/ffr_known_hosts"
-          chmod 600 "$RUNNER_TEMP/ffr_ssh_key" "$RUNNER_TEMP/ffr_known_hosts"
-          {
-            echo 'Host ffr-cachyos'
-            printf '  HostName %s\n' "$PC_IP"
-            echo '  User syssy'
-            echo '  Port 22'
-            printf '  IdentityFile %s\n' "$RUNNER_TEMP/ffr_ssh_key"
-            printf '  UserKnownHostsFile %s\n' "$RUNNER_TEMP/ffr_known_hosts"
-            echo '  StrictHostKeyChecking yes'
-            echo '  IdentitiesOnly yes'
-            echo '  BatchMode yes'
-          } > "$HOME/.ssh/config"
-          chmod 600 "$HOME/.ssh/config"
-          ssh -o ConnectTimeout=15 ffr-cachyos 'printf "SSH OK\n"'
-
       - name: Liberer de l'espace sur le Mac ephemere en conservant Xcode 26
         run: |
           set -euo pipefail
@@ -85,11 +53,57 @@ jobs:
         run: |
           set -euo pipefail
           export HOMEBREW_NO_AUTO_UPDATE=1
-          brew install xcodegen zstd spirv-cross glslang
+          # Homebrew passe par ghcr.io : attendre si le DNS est temporairement indisponible.
+          for attempt in 1 2 3 4; do
+            echo "Installation Homebrew, tentative ${attempt}/4"
+            if brew install xcodegen zstd spirv-cross glslang; then
+              break
+            fi
+            if [ "$attempt" -eq 4 ]; then
+              echo "Installation Homebrew impossible apres 4 tentatives." >&2
+              exit 1
+            fi
+            echo "Echec transitoire, nouvel essai dans 20 secondes."
+            sleep 20
+          done
           dotnet --version
           python3 -m venv "$RUNNER_TEMP/ffr-venv"
           "$RUNNER_TEMP/ffr-venv/bin/python" -m pip install -q lz4 capstone fonttools
           git clone --depth 1 https://github.com/seedds/nxnative.git "$RUNNER_TEMP/nxnative"
+
+      - name: Connecter le runner au PC CachyOS via Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          authkey: ${{ secrets.FFR_TS_AUTHKEY }}
+          ping: ${{ secrets.FFR_TS_HOST }}
+          use-cache: 'false'
+          # Ne pas remplacer les DNS du runner macOS.
+          args: --accept-dns=false
+
+      - name: Configurer SSH avec cle d'hote epinglee
+        env:
+          SSH_KEY: ${{ secrets.FFR_SSH_KEY }}
+          HOSTKEY: ${{ secrets.FFR_SSH_KNOWN_HOSTS }}
+          PC_IP: ${{ secrets.FFR_TS_HOST }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$SSH_KEY" > "$RUNNER_TEMP/ffr_ssh_key"
+          printf '%s\n' "$HOSTKEY" > "$RUNNER_TEMP/ffr_known_hosts"
+          chmod 600 "$RUNNER_TEMP/ffr_ssh_key" "$RUNNER_TEMP/ffr_known_hosts"
+          {
+            echo 'Host ffr-cachyos'
+            printf '  HostName %s\n' "$PC_IP"
+            echo '  User syssy'
+            echo '  Port 22'
+            printf '  IdentityFile %s\n' "$RUNNER_TEMP/ffr_ssh_key"
+            printf '  UserKnownHostsFile %s\n' "$RUNNER_TEMP/ffr_known_hosts"
+            echo '  StrictHostKeyChecking yes'
+            echo '  IdentitiesOnly yes'
+            echo '  BatchMode yes'
+          } > "$HOME/.ssh/config"
+          chmod 600 "$HOME/.ssh/config"
+          ssh -o ConnectTimeout=15 ffr-cachyos 'printf "SSH OK\n"'
 
       - name: Copier les 2 NSP et les cles depuis CachyOS (hors de GitHub)
         run: |
