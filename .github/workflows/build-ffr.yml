@@ -83,7 +83,7 @@ jobs:
         uses: tailscale/github-action@99a8333667fff04fdd6cffb46dfd409f8329a7bf
         with:
           authkey: ${{ secrets.FFR_TS_AUTHKEY }}
-          ping: ${{ secrets.FFR_TS_HOST }}
+          # SSH probe below performs the sole required connectivity check.
           use-cache: 'false'
           # Ne pas remplacer les DNS du runner macOS.
           args: --accept-dns=false
