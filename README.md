@@ -9,7 +9,7 @@ This PUBLIC repository contains only the build workflow and a restricted SSH gat
 - CachyOS `authorized_keys` forces that one key to execute only `security/ffr_ssh_gate.py`, restricted to Tailscale IPv4 peers (`100.64.0.0/10`).
 - The gateway permits six literal operations: `probe`, `read-base`, `read-update`, `read-keys`, `write-ipa`, and `write-log`. It has **no shell or arbitrary file access**. Transfers are direct from CachyOS to the ephemeral Mac and back.
 - Outputs are written atomically to `~/portage-ipados/ff-resonance/resultats/`. The old unrestricted SSH credential is removed from CachyOS and replaced in GitHub Secrets when the hardening script executes.
-- The Tailscale GitHub Action and nxnative are pinned to specific commit hashes. GitHub Actions, Homebrew, Python dependencies and the operating-system image remain external trust boundaries.
+- nxnative is pinned to a specific commit hash. The Tailscale CLI is installed through the Homebrew formula. GitHub Actions, Homebrew, Python dependencies and the operating-system image remain external trust boundaries.
 - Full nxnative console output is intentionally kept **out of public GitHub Actions logs**. The private build log is sent only to CachyOS.
 - No uploaded GitHub Actions artifacts contain the game, IPA or key files.
 - SSH secrets are still available to code running on the GitHub-hosted runner; the game decryption key material **must** be temporarily copied onto that runner. This is not a zero-trust solution.
@@ -39,7 +39,9 @@ It **does not start a build**. The SSH gateway always runs under your own CachyO
 
 The tag used by the ephemeral CI runner should be given access only to your CachyOS device on TCP port 22. Use Tailscale's admin console to constrain the tag's grants/ACL; the `from=100.64.0.0/10` restriction on the SSH key alone is **not** a complete Tailscale ACL. If the tag is not yet configured, adjust Tailscale policy before running.
 
-The Tailscale `authkey` input is deprecated in the current GitHub Action. Migrating to an OAuth/OIDC client is preferable for repeated use; the existing auth key works for a short-lived experimental build but should be revoked when finished.
+The Mac runner installs the `tailscale` Homebrew formula and starts `tailscaled` with an in-memory state. This intentionally replaces `tailscale/github-action@v4`: that action unconditionally calls macOS `networksetup` when MagicDNS is enabled, even if `--accept-dns=false` was supplied, and blocked earlier runs. The manual connection does not modify macOS DNS settings; SSH uses the Tailscale IPv4 address.
+
+The CI auth key should be revoked in the Tailscale admin console when finished. For repeated use, replace the reusable auth key with a scoped OAuth/OIDC credential.
 
 ## Build
 
