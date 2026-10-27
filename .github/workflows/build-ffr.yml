@@ -14,23 +14,23 @@ jobs:
   build:
     # Explicitly enabled only by security/harden-cachyos.sh on the user's PC.
     if: vars.FFR_SECURITY_READY == 'true'
-    # macOS Apple Silicon standard: gratuit dans un depot public GitHub.
-    runs-on: macos-15
+    # Apple Silicon standard, public repositories: GitHub Xcode 27 image.
+    runs-on: xcode-27
     timeout-minutes: 180
     defaults:
       run:
         shell: bash
 
     steps:
-      - name: Liberer de l'espace sur le Mac ephemere en conservant Xcode 26
+      - name: Preparer Xcode 27.1 et liberer de l'espace
         run: |
           set -euo pipefail
           echo 'Espace initial :'
           df -h "$RUNNER_TEMP"
-          # macos-15 contient plusieurs Xcode : garder le 26.x le plus recent.
-          KEEP=$(find /Applications -maxdepth 1 -type d -name 'Xcode_26*.app' | sort | tail -n 1)
-          if [ -z "$KEEP" ]; then
-            echo 'Aucun Xcode 26 disponible sur ce runner.' >&2
+          # nxnative/dmsh_chain.lock requires the Xcode 27.1 Metal compiler.
+          KEEP=/Applications/Xcode_27.1.app
+          if [ ! -d "$KEEP/Contents/Developer" ]; then
+            echo 'Xcode 27.1 indisponible sur cette image GitHub.' >&2
             exit 1
           fi
           echo "Xcode conserve : $KEEP"
@@ -43,6 +43,14 @@ jobs:
             sudo rm -rf -- "$app"
           done
           xcodebuild -version
+          # Since Xcode 26, the Metal toolchain is an optional component.
+          if ! xcodebuild -showComponent metalToolchain 2>/dev/null | grep -qi 'Status: installed'; then
+            echo 'Installation du Metal Toolchain correspondant a Xcode 27.1.'
+            xcodebuild -downloadComponent metalToolchain
+          fi
+          echo 'Compilateurs Metal selectionnes :'
+          xcrun -sdk macosx metal --version
+          xcrun -sdk iphoneos metal --version
           df -h "$RUNNER_TEMP"
           free_kb=$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')
           if [ "$free_kb" -lt 30000000 ]; then
@@ -78,6 +86,14 @@ jobs:
           git -C "$RUNNER_TEMP/nxnative" fetch -q --depth 1 origin "$NXNATIVE_SHA"
           git -C "$RUNNER_TEMP/nxnative" checkout -q --detach FETCH_HEAD
           test "$(git -C "$RUNNER_TEMP/nxnative" rev-parse HEAD)" = "$NXNATIVE_SHA"
+          # Do this BEFORE transferring 9 GB of private game data:
+          # reject Metal versions incompatible with the pinned nxnative shader chain.
+          "$RUNNER_TEMP/ffr-venv/bin/python" "$RUNNER_TEMP/nxnative/dm/gfx/tools/own_compilers.py" --check-metal
+          free_kb=$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')
+          if [ "$free_kb" -lt 30000000 ]; then
+            echo "Espace restant insuffisant apres installation ($free_kb Ko)." >&2
+            exit 1
+          fi
 
       - name: Installer Tailscale en ligne de commande (sans action DNS)
         run: |
