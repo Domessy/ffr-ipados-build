@@ -4,7 +4,7 @@ This PUBLIC repository contains only the build workflow and a restricted SSH gat
 
 ## Security model
 
-- GitHub-hosted `macos-15` builds are disabled by default: the job needs the repository variable `FFR_SECURITY_READY=true`.
+- GitHub-hosted `xcode-27` (Apple Silicon, Xcode 27.1) builds are disabled by default: the job needs the repository variable `FFR_SECURITY_READY=true`.
 - The runner connects using Tailscale and a dedicated, **rotated** SSH key.
 - CachyOS `authorized_keys` forces that one key to execute only `security/ffr_ssh_gate.py`, restricted to Tailscale IPv4 peers (`100.64.0.0/10`).
 - The gateway permits six literal operations: `probe`, `read-base`, `read-update`, `read-keys`, `write-ipa`, and `write-log`. It has **no shell or arbitrary file access**. Transfers are direct from CachyOS to the ephemeral Mac and back.
@@ -65,6 +65,6 @@ After final use, also revoke the FFR Tailscale auth key in the Tailscale admin c
 
 ## Limitations
 
-- This setup has not yet completed an end-to-end nxnative build; the build could fail on memory limits, toolchain compatibility or iPadOS signing.
+- Run #5 successfully transferred both NSPs and the Nintendo key file, then nxnative aborted because the older macos-15 image exposed Metal 32023.864 instead of the locked 32023.921 compiler. The workflow now uses `xcode-27` with Xcode 27.1; it checks the exact Metal compiler before transferring private files. End-to-end compilation and iPadOS 27 execution have not yet been validated.
 - The runner is temporary and external. An untrusted change to the workflow or build dependencies could still leak temporary inputs; review any future changes before use.
 - The build job lasts at most 180 minutes. The game has not yet been confirmed to launch on iPadOS 27.
