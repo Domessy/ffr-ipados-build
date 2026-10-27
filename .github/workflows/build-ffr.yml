@@ -79,14 +79,51 @@ jobs:
           git -C "$RUNNER_TEMP/nxnative" checkout -q --detach FETCH_HEAD
           test "$(git -C "$RUNNER_TEMP/nxnative" rev-parse HEAD)" = "$NXNATIVE_SHA"
 
-      - name: Connecter le runner au PC CachyOS via Tailscale
-        uses: tailscale/github-action@99a8333667fff04fdd6cffb46dfd409f8329a7bf
-        with:
-          authkey: ${{ secrets.FFR_TS_AUTHKEY }}
-          # SSH probe below performs the sole required connectivity check.
-          use-cache: 'false'
-          # Ne pas remplacer les DNS du runner macOS.
-          args: --accept-dns=false
+      - name: Installer Tailscale en ligne de commande (sans action DNS)
+        run: |
+          set -euo pipefail
+          export HOMEBREW_NO_AUTO_UPDATE=1
+          for attempt in 1 2 3; do
+            if brew install --formula tailscale; then break; fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep 15
+          done
+          command -v tailscale
+          command -v tailscaled
+
+      - name: Connecter Tailscale sans modifier les DNS macOS
+        env:
+          TS_AUTHKEY: ${{ secrets.FFR_TS_AUTHKEY }}
+        run: |
+          set -euo pipefail
+          test -n "$TS_AUTHKEY"
+          TS_CLI="$(command -v tailscale)"
+          TS_DAEMON="$(command -v tailscaled)"
+          TS_SOCKET="$RUNNER_TEMP/ffr-tailscaled.sock"
+          # Temporary daemon with in-memory state; no persistent login data.
+          nohup sudo -n "$TS_DAEMON" --state=mem: --socket="$TS_SOCKET" \
+            > "$RUNNER_TEMP/ffr-tailscaled.log" 2>&1 < /dev/null &
+          echo "$!" > "$RUNNER_TEMP/ffr-tailscaled.pid"
+          daemon_ready=0
+          for attempt in $(seq 1 30); do
+            if sudo -n "$TS_CLI" --socket="$TS_SOCKET" status --json > /dev/null 2>&1; then
+              daemon_ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$daemon_ready" -ne 1 ]; then
+            echo 'Tailscale daemon did not become ready.' >&2
+            exit 1
+          fi
+          # No MagicDNS required: the host is reached by its Tailscale IPv4 address.
+          sudo -n "$TS_CLI" --socket="$TS_SOCKET" up \
+            --authkey="$TS_AUTHKEY" \
+            --accept-dns=false \
+            --timeout=120s \
+            --hostname="ffr-ci-${GITHUB_RUN_ID}"
+          sudo -n "$TS_CLI" --socket="$TS_SOCKET" status --json \
+            | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("BackendState") == "Running"; print("Tailscale running; macOS system DNS unchanged.")'
 
       - name: Configurer SSH avec cle d'hote epinglee
         env:
@@ -154,5 +191,17 @@ jobs:
         run: |
           if [ -s "$RUNNER_TEMP/ffr-build.log" ]; then
             ssh ffr-cachyos write-log < "$RUNNER_TEMP/ffr-build.log" || true
+          fi
+          rm -f "$RUNNER_TEMP/ffr-prod.keys" "$RUNNER_TEMP/ffr_ssh_key" || true
+
+      - name: Fermer la connexion Tailscale ephemere
+        if: always()
+        run: |
+          TS_SOCKET="$RUNNER_TEMP/ffr-tailscaled.sock"
+          if command -v tailscale >/dev/null 2>&1; then
+            sudo -n tailscale --socket="$TS_SOCKET" logout > /dev/null 2>&1 || true
+          fi
+          if [ -s "$RUNNER_TEMP/ffr-tailscaled.pid" ]; then
+            sudo -n kill "$(cat "$RUNNER_TEMP/ffr-tailscaled.pid")" > /dev/null 2>&1 || true
           fi
           rm -f "$RUNNER_TEMP/ffr-prod.keys" "$RUNNER_TEMP/ffr_ssh_key" || true
