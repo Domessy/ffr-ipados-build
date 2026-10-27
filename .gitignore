@@ -1,7 +1,32 @@
+# Game data, archives and package payloads
 *.nsp
 *.xci
+*.nca
+*.tik
+*.cert
 *.ipa
+*.pak
+*.ucas
+*.utoc
+*.zip
+*.7z
+*.rar
+
+# Keys, credentials, temporary outputs
 *prod.keys*
 *.key
+*.pem
+*.p12
+*.p8
+*.mobileprovision
+*.env
+.env.*
 private/
 resultats/
+*.log
+*.part
+
+# Workstation caches
+__pycache__/
+*.pyc
+.DS_Store
