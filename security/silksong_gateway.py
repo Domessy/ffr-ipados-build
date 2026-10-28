@@ -9,12 +9,14 @@ from pathlib import Path
 
 BASE = Path.home() / "portage-ipados" / "hollow-knight-silksong"
 SOURCE = Path.home() / "Documents" / "Hollow Knight Silksong"
+KEYS = SOURCE / "prod.keys"
 CACHE = BASE / "shader-cache"
 CONFLICTS = BASE / "shader-cache-conflicts"
 OUTPUT = BASE / "resultats"
 
 COMMANDS = frozenset({
-    "silksong-probe-v1", "silksong-read-base", "silksong-read-update",
+    "silksong-probe-v2", "silksong-read-base", "silksong-read-update",
+    "silksong-read-keys",
     "silksong-read-cache", "silksong-write-cache",
     "silksong-write-ipa", "silksong-write-log",
 })
@@ -34,14 +36,30 @@ def identify_inputs():
     return nsp[0], nsp[1]
 
 
+def identify_keys():
+    """Only accept the private, named, non-symlink production key file."""
+    if SOURCE.is_symlink() or not SOURCE.is_dir():
+        raise ValueError("missing Silksong NSP folder")
+    if KEYS.is_symlink() or not KEYS.is_file():
+        raise ValueError("missing Silksong prod.keys")
+    size = KEYS.stat().st_size
+    if size <= 0 or size > 2 * 1024 * 1024:
+        raise ValueError("invalid Silksong prod.keys size")
+    return KEYS
+
+
 def dispatch(command, parent):
     if command not in COMMANDS:
         return 126
-    if command == "silksong-probe-v1":
+    if command == "silksong-probe-v2":
         base, update = identify_inputs()
+        identify_keys()
         if base.stat().st_size <= update.stat().st_size:
             raise ValueError("ambiguous NSP ordering")
-        print("SILKSONG_GATEWAY_V1")
+        print("SILKSONG_GATEWAY_V2")
+        return 0
+    if command == "silksong-read-keys":
+        parent.send_file(identify_keys())
         return 0
     if command in ("silksong-read-base", "silksong-read-update"):
         base, update = identify_inputs()
