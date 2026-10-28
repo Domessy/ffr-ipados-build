@@ -33,10 +33,20 @@ class SilksongGatewayTests(unittest.TestCase):
             with patch.object(silksong, "CACHE", base / "silk-cas"):
                 with patch.object(silksong, "CONFLICTS", base / "silk-conflicts"):
                     with patch.object(silksong, "OUTPUT", base / "results"):
-                        with patch.object(parent, "read_cache") as read:
+                        observed = []
+
+                        def inspect_cache_path():
+                            observed.append((parent.CACHE, parent.CONFLICTS, parent.OUTPUT))
+
+                        with patch.object(parent, "read_cache", side_effect=inspect_cache_path) as read:
                             self.assertEqual(silksong.dispatch("silksong-read-cache", parent), 0)
                             read.assert_called_once()
-                            self.assertEqual(parent.CACHE, base / "silk-cas")
+                        self.assertEqual(observed, [(
+                            base / "silk-cas",
+                            base / "silk-conflicts",
+                            base / "results",
+                        )])
+            # The gateway deliberately restores all FFR paths after dispatch.
             self.assertEqual((parent.CACHE, parent.CONFLICTS, parent.OUTPUT), prior)
 
 
