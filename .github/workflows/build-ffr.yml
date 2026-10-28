@@ -28,6 +28,11 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Verifier les scripts avant tout transfert prive
+        run: |
+          set -euo pipefail
+          python3 -m py_compile security/ffr_ssh_gate.py security/cache_export.py security/run_build.py
+
       - name: Preparer Xcode 27.1 et liberer de l'espace
         run: |
           set -euo pipefail
