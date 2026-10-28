@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """FFR-only SSH forced command gateway. Python stdlib; no arbitrary shell."""
 import os
+import re
 import shutil
 import stat
 import sys
+import tarfile
 import tempfile
 from pathlib import Path
 
@@ -11,6 +13,12 @@ HOME = Path.home()
 SOURCE = HOME / "Documents" / "FF Resonance"
 PRIVATE = HOME / "portage-ipados" / "ff-resonance" / "private" / "prod.keys"
 OUTPUT = HOME / "portage-ipados" / "ff-resonance" / "resultats"
+CACHE = HOME / "portage-ipados" / "ff-resonance" / "shader-cache"
+CAS_ROOTS = frozenset({"index", "shader", "variant", "metallib"})
+CAS_PART = re.compile(r"[A-Za-z0-9_.-]{1,180}\Z")
+CAS_MAX_BYTES = 120 * 1024**3
+CAS_MAX_FILE = 1024**3
+CAS_MAX_FILES = 1_000_000
 
 READABLE = {
     "read-base": SOURCE / "v-final_fantasy_resonance.nsp",
@@ -61,6 +69,89 @@ def receive_file(filename: str, max_bytes: int) -> None:
             os.unlink(temporary)
 
 
+def safe_cache_parts(name: str):
+    # No absolute paths, dot parts, backslashes, unicode controls or long names.
+    parts = name.split("/")
+    if not (2 <= len(parts) <= 7 and parts[0] in CAS_ROOTS
+            and all(p not in (".", "..") and CAS_PART.fullmatch(p) for p in parts)):
+        raise ValueError("unrecognized cache name")
+    return parts
+
+
+def cache_file(path: Path):
+    # No symlinks anywhere inside the user-owned dedicated shader cache.
+    cursor = path
+    while cursor != CACHE.parent:
+        if cursor.is_symlink():
+            raise ValueError("cache symlink")
+        cursor = cursor.parent
+
+
+def read_cache() -> None:
+    CACHE.mkdir(mode=0o700, parents=True, exist_ok=True)
+    with tarfile.open(fileobj=sys.stdout.buffer, mode="w|gz", compresslevel=1) as archive:
+        for rootname in sorted(CAS_ROOTS):
+            base = CACHE / rootname
+            if not base.is_dir():
+                continue
+            for folder, dirs, files in os.walk(base, followlinks=False):
+                dirs[:] = sorted(d for d in dirs if not os.path.islink(os.path.join(folder, d)))
+                for name in sorted(files):
+                    path = Path(folder) / name
+                    parts = path.relative_to(CACHE).parts
+                    try:
+                        safe_cache_parts("/".join(parts))
+                        metadata = path.lstat()
+                    except (ValueError, OSError):
+                        continue
+                    if not stat.S_ISREG(metadata.st_mode) or metadata.st_size > CAS_MAX_FILE:
+                        continue
+                    try:
+                        archive.add(str(path), arcname="/".join(parts), recursive=False)
+                    except FileNotFoundError:
+                        continue
+
+
+def write_cache() -> None:
+    # This is a one-way, restricted append/replace interface for shader
+    # compiler results. Tar members are never extracted with tarfile.extract.
+    CACHE.mkdir(mode=0o700, parents=True, exist_ok=True)
+    cache_file(CACHE)
+    count = total = 0
+    with tarfile.open(fileobj=sys.stdin.buffer, mode="r|gz") as archive:
+        for member in archive:
+            parts = safe_cache_parts(member.name)
+            if not member.isfile() or member.size > CAS_MAX_FILE:
+                raise ValueError("cache member is not a regular bounded file")
+            count += 1
+            total += member.size
+            if count > CAS_MAX_FILES or total > CAS_MAX_BYTES:
+                raise ValueError("cache upload limit")
+            destination = CACHE.joinpath(*parts)
+            cache_file(destination)
+            destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            cache_file(destination)
+            fd, temporary = tempfile.mkstemp(prefix=".ffr-cas-", dir=destination.parent)
+            try:
+                os.fchmod(fd, 0o600)
+                source = archive.extractfile(member)
+                if source is None:
+                    raise ValueError("unreadable cache member")
+                remaining = member.size
+                with os.fdopen(fd, "wb") as output:
+                    while remaining:
+                        block = source.read(min(1024 * 1024, remaining))
+                        if not block:
+                            raise ValueError("truncated cache member")
+                        output.write(block)
+                        remaining -= len(block)
+                os.replace(temporary, destination)
+            finally:
+                if os.path.exists(temporary):
+                    os.unlink(temporary)
+    print(f"FFR_CACHE_IMPORTED_FILES={count}", file=sys.stderr)
+
+
 def main() -> int:
     command = os.environ.get("SSH_ORIGINAL_COMMAND", "")
     try:
@@ -72,6 +163,10 @@ def main() -> int:
         elif command in WRITABLE:
             filename, limit = WRITABLE[command]
             receive_file(filename, limit)
+        elif command == "read-cache":
+            read_cache()
+        elif command == "write-cache":
+            write_cache()
         else:
             print("FFR: command not permitted", file=sys.stderr)
             return 126
