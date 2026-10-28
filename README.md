@@ -67,4 +67,4 @@ After final use, also revoke the FFR Tailscale auth key in the Tailscale admin c
 
 - Run #5 successfully transferred both NSPs and the Nintendo key file, then nxnative aborted because the older macos-15 image exposed Metal 32023.864 instead of the locked 32023.921 compiler. The workflow now uses `xcode-27` with Xcode 27.1; it checks the exact Metal compiler before transferring private files. End-to-end compilation and iPadOS 27 execution have not yet been validated.
 - The runner is temporary and external. An untrusted change to the workflow or build dependencies could still leak temporary inputs; review any future changes before use.
-- The build job lasts at most 180 minutes. The game has not yet been confirmed to launch on iPadOS 27.
+- Run #7 reached the previous 180-minute job timeout during shader compilation. The job limit is now 345 minutes (under GitHub's 360-minute ceiling), with public timing-only heartbeat and a private diagnostic snapshot periodically copied to CachyOS. The game has not yet been confirmed to launch on iPadOS 27.
