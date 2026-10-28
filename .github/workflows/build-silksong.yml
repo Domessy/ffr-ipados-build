@@ -31,8 +31,8 @@ jobs:
       - name: Verifier les scripts avant tout transfert prive
         run: |
           set -euo pipefail
-          python3 -m py_compile security/ffr_ssh_gate.py security/silksong_gateway.py security/cache_export.py security/run_silksong.py security/test_cache_import.py
-          python3 -m unittest -v security/test_cache_import.py
+          python3 -m py_compile security/ffr_ssh_gate.py security/silksong_gateway.py security/cache_export.py security/run_silksong.py security/test_cache_import.py security/test_silksong_gateway.py
+          python3 -m unittest -v security/test_cache_import.py security/test_silksong_gateway.py
 
       - name: Preparer Xcode 27.1 et liberer de l'espace
         run: |
