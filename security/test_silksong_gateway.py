@@ -15,16 +15,36 @@ class SilksongGatewayTests(unittest.TestCase):
             folder = Path(tmp)
             (folder / "game.nsp").write_bytes(b"b" * 100)
             (folder / "update.nsp").write_bytes(b"u" * 11)
-            with patch.object(silksong, "SOURCE", folder):
+            (folder / "prod.keys").write_bytes(b"test-only-placeholder")
+            with patch.object(silksong, "SOURCE", folder), patch.object(silksong, "KEYS", folder / "prod.keys"):
                 base, update = silksong.identify_inputs()
                 self.assertEqual((base.name, update.name), ("game.nsp", "update.nsp"))
-                self.assertEqual(silksong.dispatch("silksong-probe-v1", parent), 0)
+                self.assertEqual(silksong.dispatch("silksong-probe-v2", parent), 0)
 
     def test_refuses_other_input_counts(self):
         with tempfile.TemporaryDirectory() as tmp:
             with patch.object(silksong, "SOURCE", Path(tmp)):
                 with self.assertRaises(ValueError):
                     silksong.identify_inputs()
+
+    def test_private_silksong_keys_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            key = folder / "prod.keys"
+            key.write_bytes(b"test-only-placeholder")
+            with patch.object(silksong, "SOURCE", folder), patch.object(silksong, "KEYS", key):
+                self.assertEqual(silksong.identify_keys(), key)
+                with patch.object(parent, "send_file") as sender:
+                    self.assertEqual(silksong.dispatch("silksong-read-keys", parent), 0)
+                    sender.assert_called_once_with(key)
+                key.unlink()
+                with self.assertRaises(ValueError):
+                    silksong.identify_keys()
+                other = folder / "external.keys"
+                other.write_bytes(b"fake")
+                key.symlink_to(other)
+                with self.assertRaises(ValueError):
+                    silksong.identify_keys()
 
     def test_cache_paths_do_not_leak_into_ffr(self):
         with tempfile.TemporaryDirectory() as tmp:
