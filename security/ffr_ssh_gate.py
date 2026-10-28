@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """FFR-only SSH forced command gateway. Python stdlib; no arbitrary shell."""
+import hashlib
 import os
 import re
 import shutil
@@ -14,6 +15,7 @@ SOURCE = HOME / "Documents" / "FF Resonance"
 PRIVATE = HOME / "portage-ipados" / "ff-resonance" / "private" / "prod.keys"
 OUTPUT = HOME / "portage-ipados" / "ff-resonance" / "resultats"
 CACHE = HOME / "portage-ipados" / "ff-resonance" / "shader-cache"
+CONFLICTS = HOME / "portage-ipados" / "ff-resonance" / "shader-cache-conflicts"
 CAS_ROOTS = frozenset({"index", "shader", "variant", "metallib"})
 CAS_PART = re.compile(r"[A-Za-z0-9_.-]{1,180}\Z")
 CAS_MAX_BYTES = 120 * 1024**3
@@ -112,12 +114,19 @@ def read_cache() -> None:
                         continue
 
 
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as src:
+        for block in iter(lambda: src.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
 def write_cache() -> None:
-    # This is a one-way, restricted append/replace interface for shader
-    # compiler results. Tar members are never extracted with tarfile.extract.
+    """Append-only CAS import. Never replace a differing existing file."""
     CACHE.mkdir(mode=0o700, parents=True, exist_ok=True)
     cache_file(CACHE)
-    count = total = 0
+    count = total = created = reused = conflicts = 0
     with tarfile.open(fileobj=sys.stdin.buffer, mode="r|gz") as archive:
         for member in archive:
             parts = safe_cache_parts(member.name)
@@ -145,11 +154,35 @@ def write_cache() -> None:
                             raise ValueError("truncated cache member")
                         output.write(block)
                         remaining -= len(block)
-                os.replace(temporary, destination)
+                # Hard-link publishing is atomic and fails if an existing file
+                # already owns the path. No os.replace() of cache contents.
+                try:
+                    os.link(temporary, destination)
+                    created += 1
+                except FileExistsError:
+                    cache_file(destination)
+                    if sha256_file(destination) == sha256_file(Path(temporary)):
+                        reused += 1
+                        continue
+                    # Keep BOTH contents. Conflicts are excluded from read-cache
+                    # and cannot silently replace an older compiled shader.
+                    if CONFLICTS.is_symlink():
+                        raise ValueError("conflict root symlink")
+                    conflict = CONFLICTS.joinpath(*parts[:-1], parts[-1] + "." + sha256_file(Path(temporary)) + ".conflict")
+                    conflict.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+                    if conflict.is_symlink():
+                        raise ValueError("conflict path symlink")
+                    try:
+                        os.link(temporary, conflict)
+                    except FileExistsError:
+                        pass
+                    conflicts += 1
             finally:
                 if os.path.exists(temporary):
                     os.unlink(temporary)
-    print(f"FFR_CACHE_IMPORTED_FILES={count}", file=sys.stderr)
+    # Numeric-only response. Safe to expose to the public Actions heartbeat.
+    print(f"FFR_CACHE_NEW={created} FFR_CACHE_REUSED={reused} FFR_CACHE_CONFLICTS={conflicts}")
+
 
 
 def main() -> int:
@@ -157,6 +190,8 @@ def main() -> int:
     try:
         if command == "probe":
             print("FFR_GATEWAY_OK")
+        elif command == "probe-cache-v2":
+            print("FFR_GATEWAY_CACHE_V2")
         elif command in READABLE:
             # The user-selected prod.keys is a symlink created by initial setup.
             send_file(READABLE[command], allow_key_link=(command == "read-keys"))
