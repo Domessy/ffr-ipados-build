@@ -7,7 +7,7 @@ This PUBLIC repository contains only the build workflow and a restricted SSH gat
 - GitHub-hosted `xcode-27` (Apple Silicon, Xcode 27.1) builds are disabled by default: the job needs the repository variable `FFR_SECURITY_READY=true`.
 - The runner connects using Tailscale and a dedicated, **rotated** SSH key.
 - CachyOS `authorized_keys` forces that one key to execute only `security/ffr_ssh_gate.py`, restricted to Tailscale IPv4 peers (`100.64.0.0/10`).
-- The gateway permits six literal operations: `probe`, `read-base`, `read-update`, `read-keys`, `write-ipa`, and `write-log`. It has **no shell or arbitrary file access**. Transfers are direct from CachyOS to the ephemeral Mac and back.
+- The gateway permits eight literal operations: `probe`, `read-base`, `read-update`, `read-keys`, `write-ipa`, `write-log`, `read-cache` and `write-cache`. It has **no shell or arbitrary file access**; the cache operations are confined to a dedicated directory. Transfers are direct from CachyOS to the ephemeral Mac and back.
 - Outputs are written atomically to `~/portage-ipados/ff-resonance/resultats/`. The old unrestricted SSH credential is removed from CachyOS and replaced in GitHub Secrets when the hardening script executes.
 - nxnative is pinned to a specific commit hash. The Tailscale CLI is installed through the Homebrew formula. GitHub Actions, Homebrew, Python dependencies and the operating-system image remain external trust boundaries.
 - Full nxnative console output is intentionally kept **out of public GitHub Actions logs**. The private build log is sent only to CachyOS.
