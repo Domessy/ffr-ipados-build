@@ -170,8 +170,11 @@ def write_cache() -> None:
                         raise ValueError("conflict root symlink")
                     conflict = CONFLICTS.joinpath(*parts[:-1], parts[-1] + "." + sha256_file(Path(temporary)) + ".conflict")
                     conflict.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-                    if conflict.is_symlink():
-                        raise ValueError("conflict path symlink")
+                    cursor = conflict
+                    while cursor != CONFLICTS.parent:
+                        if cursor.is_symlink():
+                            raise ValueError("conflict path symlink")
+                        cursor = cursor.parent
                     try:
                         os.link(temporary, conflict)
                     except FileExistsError:
