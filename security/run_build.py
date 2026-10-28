@@ -44,6 +44,9 @@ def checkpoint(since_ns, final=False):
         stdout=recv.stdin, stderr=subprocess.DEVNULL,
     )
     recv.stdin.close()
+    # communicate() must not attempt to flush a stream that was closed after
+    # handing the pipe to the exporter subprocess.
+    recv.stdin = None
     try:
         sender_rc = sender.wait(timeout=30 * 60)
         response, _ = recv.communicate(timeout=45)
