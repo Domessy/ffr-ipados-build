@@ -195,6 +195,9 @@ def main() -> int:
             print("FFR_GATEWAY_OK")
         elif command == "probe-cache-v2":
             print("FFR_GATEWAY_CACHE_V2")
+        elif command.startswith("silksong-"):
+            import silksong_gateway
+            return silksong_gateway.dispatch(command, sys.modules[__name__])
         elif command in READABLE:
             # The user-selected prod.keys is a symlink created by initial setup.
             send_file(READABLE[command], allow_key_link=(command == "read-keys"))
