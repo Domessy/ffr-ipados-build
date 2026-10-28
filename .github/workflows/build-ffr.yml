@@ -16,7 +16,8 @@ jobs:
     if: vars.FFR_SECURITY_READY == 'true'
     # Apple Silicon standard, public repositories: GitHub Xcode 27 image.
     runs-on: xcode-27
-    timeout-minutes: 180
+    # GitHub-hosted jobs may run up to 360 min. Keep a margin for private log upload and cleanup.
+    timeout-minutes: 345
     defaults:
       run:
         shell: bash
@@ -183,14 +184,43 @@ jobs:
         run: |
           set -euo pipefail
           cd "$RUNNER_TEMP/nxnative"
-          # Never stream nxnative output (or accidental key material) to PUBLIC Actions logs.
-          if ! "$RUNNER_TEMP/ffr-venv/bin/python" scripts/build_ipa_from_nsp.py \
+          umask 077
+          echo 'nxnative compilation started. Full diagnostics stay private on CachyOS.'
+          started=$(date +%s)
+          last_upload=0
+
+          # Never stream nxnative output or arbitrary log lines to PUBLIC Actions logs.
+          "$RUNNER_TEMP/ffr-venv/bin/python" scripts/build_ipa_from_nsp.py \
             "$RUNNER_TEMP/ffr-nsp" \
             -k "$RUNNER_TEMP/ffr-prod.keys" \
             -o "$RUNNER_TEMP/FFR-iPadOS.ipa" \
             --no-keep-extracted \
-            --show-fps > "$RUNNER_TEMP/ffr-build.log" 2>&1; then
-            echo "nxnative returned a non-zero status; see private ffr-build.log on CachyOS."
+            --show-fps > "$RUNNER_TEMP/ffr-build.log" 2>&1 &
+          build_pid=$!
+
+          # Show only timings and file size, not proprietary content or file names.
+          # Periodically send a bounded private log snapshot via restricted SSH.
+          while kill -0 "$build_pid" 2>/dev/null; do
+            sleep 90
+            now=$(date +%s)
+            elapsed=$(( (now - started) / 60 ))
+            bytes=$(wc -c < "$RUNNER_TEMP/ffr-build.log" 2>/dev/null || echo 0)
+            printf 'nxnative running: %s min elapsed; private log: %s bytes.\n' "$elapsed" "$bytes"
+            if (( now - last_upload >= 600 )) && [ -s "$RUNNER_TEMP/ffr-build.log" ]; then
+              if tail -c 16777216 "$RUNNER_TEMP/ffr-build.log" | ssh -o ConnectTimeout=20 ffr-cachyos write-log > /dev/null 2>&1; then
+                echo "Private diagnostic snapshot updated on CachyOS."
+              else
+                echo "Could not refresh private diagnostic snapshot; build continues."
+              fi
+              last_upload=$now
+            fi
+          done
+
+          # Preserve the actual status even when the subprocess exits nonzero.
+          if wait "$build_pid"; then
+            echo 'nxnative build process finished successfully.'
+          else
+            echo 'nxnative returned a non-zero status; private ffr-build.log is on CachyOS.' >&2
             exit 1
           fi
           test -s "$RUNNER_TEMP/FFR-iPadOS.ipa"
@@ -206,7 +236,8 @@ jobs:
         if: always()
         run: |
           if [ -s "$RUNNER_TEMP/ffr-build.log" ]; then
-            ssh ffr-cachyos write-log < "$RUNNER_TEMP/ffr-build.log" || true
+            # Cap diagnostics to the gateway's 32 MiB limit even after a long shader compile.
+            tail -c 16777216 "$RUNNER_TEMP/ffr-build.log" | ssh -o ConnectTimeout=20 ffr-cachyos write-log || true
           fi
           rm -f "$RUNNER_TEMP/ffr-prod.keys" "$RUNNER_TEMP/ffr_ssh_key" || true
 
