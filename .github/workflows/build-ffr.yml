@@ -228,6 +228,8 @@ jobs:
           ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 ffr-cachyos read-cache \
             | tar -xz -C "$DMSH_CAS"
           echo "Existing shader cache restored (if any)."
+          echo "CAS file count: $(find "$DMSH_CAS" -type f | wc -l | tr -d ' ')"
+          du -sh "$DMSH_CAS"
           df -h "$RUNNER_TEMP"
           free_kb=$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')
           if [ "$free_kb" -lt 23000000 ]; then
