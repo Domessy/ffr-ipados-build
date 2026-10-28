@@ -6,6 +6,7 @@ size. Never forward nxnative's private output, keys, or game file contents.
 """
 import os
 from pathlib import Path
+import re
 import shutil
 import signal
 import subprocess
@@ -36,7 +37,7 @@ def checkpoint(since_ns, final=False):
     recv = subprocess.Popen(
         ["ssh", "-o", "ConnectTimeout=20", "-o", "ServerAliveInterval=30",
          "-o", "ServerAliveCountMax=6", "ffr-cachyos", "write-cache"],
-        stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
     )
     sender = subprocess.Popen(
         [sys.executable, str(EXPORT), str(CACHE), str(since_ns), str(threshold)],
@@ -45,7 +46,8 @@ def checkpoint(since_ns, final=False):
     recv.stdin.close()
     try:
         sender_rc = sender.wait(timeout=30 * 60)
-        recv_rc = recv.wait(timeout=45)
+        response, _ = recv.communicate(timeout=45)
+        recv_rc = recv.returncode
     except subprocess.TimeoutExpired:
         sender.kill()
         recv.kill()
@@ -56,7 +58,18 @@ def checkpoint(since_ns, final=False):
     if sender_rc != 0 or recv_rc != 0:
         print("Checkpoint transfer failed; prior checkpoints remain.", flush=True)
         return since_ns
-    print("Private cache checkpoint saved.", flush=True)
+    # The trusted CachyOS gateway returns integers only; never copy its
+    # arbitrary text into the public log.
+    match = re.search(rb"FFR_CACHE_NEW=(\d+) FFR_CACHE_REUSED=(\d+) FFR_CACHE_CONFLICTS=(\d+)", response)
+    if match:
+        created, reused, conflicts = map(int, match.groups())
+        print(f"Private cache checkpoint saved: new={created}, "
+              f"identical={reused}, conflicts={conflicts}.", flush=True)
+        if conflicts:
+            print("WARNING: differing versions preserved separately on CachyOS; "
+                  "existing CAS never overwritten.", flush=True)
+    else:
+        print("Private cache checkpoint saved; import summary unavailable.", flush=True)
     return threshold
 
 
@@ -95,6 +108,33 @@ def reclaim_runner_nsps():
             flush=True,
         )
     return freed > 0
+
+
+# Strictly numeric shader progress: no game-specific logs, paths, secrets,
+# filenames or compiler diagnostics reach public GitHub Actions.
+PROGRESS = re.compile(
+    rb"\[6/8\] iOS shaders[^\n]*? (cache check|compiling): "
+    rb"(\d+)%, ([\d,]+)/([\d,]+) shaders, ([\d,]+) (cached|not cached)"
+)
+
+
+def public_shader_progress():
+    if not LOG.is_file():
+        return
+    with LOG.open("rb") as source:
+        source.seek(max(0, LOG.stat().st_size - 32768))
+        data = source.read()
+    matches = list(PROGRESS.finditer(data))
+    if not matches:
+        return
+    phase, pct, done, total, count, kind = matches[-1].groups()
+    print(
+        f"shaders: phase={phase.decode('ascii')}; "
+        f"progress={int(pct)}%; processed={int(done.replace(b',', b''))}/"
+        f"{int(total.replace(b',', b''))}; "
+        f"{kind.decode('ascii')}={int(count.replace(b',', b''))}.",
+        flush=True,
+    )
 
 
 def stop_build(proc):
@@ -150,6 +190,8 @@ def main():
                 free_gib = shutil.disk_usage(TEMP).free / 1024**3
                 print(f"nxnative: {elapsed} min; private log {log_bytes} bytes; "
                       f"free disk {free_gib:.1f} GiB.", flush=True)
+                if elapsed % 5 == 0:
+                    public_shader_progress()
                 if time.monotonic() - last_sync >= SNAPSHOT_SECONDS:
                     since_ns = checkpoint(since_ns)
                     last_sync = time.monotonic()
@@ -165,6 +207,7 @@ def main():
             stop_build(active)
             rc = active.wait()
     active = None
+    public_shader_progress()
     checkpoint(since_ns, final=True)
     if planned_stop:
         print("Shader work checkpointed; relaunch a NEW run to resume from CAS.", flush=True)
