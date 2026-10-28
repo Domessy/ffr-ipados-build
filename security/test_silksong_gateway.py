@@ -33,7 +33,10 @@ class SilksongGatewayTests(unittest.TestCase):
             with patch.object(silksong, "CACHE", base / "silk-cas"):
                 with patch.object(silksong, "CONFLICTS", base / "silk-conflicts"):
                     with patch.object(silksong, "OUTPUT", base / "results"):
-                        self.assertEqual(silksong.dispatch("silksong-read-cache", parent), 0)
+                        with patch.object(parent, "read_cache") as read:
+                            self.assertEqual(silksong.dispatch("silksong-read-cache", parent), 0)
+                            read.assert_called_once()
+                            self.assertEqual(parent.CACHE, base / "silk-cas")
             self.assertEqual((parent.CACHE, parent.CONFLICTS, parent.OUTPUT), prior)
 
 
