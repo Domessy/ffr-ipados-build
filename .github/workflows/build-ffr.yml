@@ -62,10 +62,47 @@ jobs:
           echo 'Compilateurs Metal selectionnes :'
           xcrun -sdk macosx metal --version
           xcrun -sdk iphoneos metal --version
+
+          # xcodebuild uses the iOS DEVICE SDK, not an Android SDK or
+          # simulator runtime. All cleanup is confined to this ephemeral runner,
+          # never to CachyOS or any developer workstation.
+          echo 'Liberation espace: outils Android du runner ephemere.'
+          if [ "$HOME" = "/Users/runner" ]; then
+            for sdk in "$HOME/Library/Android/sdk" "$HOME/Library/Android/Sdk"; do
+              if [ -d "$sdk" ] && [ ! -L "$sdk" ]; then
+                du -sh "$sdk" || true
+                sudo rm -rf -- "$sdk"
+              fi
+            done
+          fi
+          free_kb=$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')
+          if [ "$free_kb" -lt 55000000 ]; then
+            echo 'Espace encore limite: nettoyage des runtimes de simulateurs GitHub inutilises.'
+            xcrun simctl runtime list || true
+            # On Xcode 27 this supported simctl operation removes simulator
+            # runtime disk images, not the iOS device SDK or Metal compiler.
+            # Bound its runtime to avoid hanging a hosted job indefinitely.
+            python3 - <<'PY'
+          import subprocess
+          try:
+              p = subprocess.run(
+                  ["xcrun", "simctl", "runtime", "delete", "all"],
+                  capture_output=True, text=True, timeout=240, check=False)
+              print(f"Simulator runtime cleanup exit code: {p.returncode}")
+              if p.returncode:
+                  print("Simulator runtime cleanup unavailable; continuing to disk preflight.")
+          except (OSError, subprocess.TimeoutExpired):
+              print("Simulator runtime cleanup timed out/unavailable; continuing to disk preflight.")
+          PY
+            xcrun simctl delete unavailable || true
+          fi
           df -h "$RUNNER_TEMP"
           free_kb=$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')
-          if [ "$free_kb" -lt 30000000 ]; then
-            echo "Espace insuffisant pour ce jeu ($free_kb Ko libres, objectif 30000000 Ko)." >&2
+          # Run #9 had 7.9 GiB of restored CAS and ~14 GiB at build start.
+          # Run #10 must restore ~17 GB, then receive 8.57 GiB of NSPs and
+          # assemble an IPA. Abort BEFORE any private transfer if too tight.
+          if [ "$free_kb" -lt 55000000 ]; then
+            echo "Espace insuffisant avant CAS de 17 Go ($free_kb Ko, objectif 55000000 Ko)." >&2
             echo 'Aucune donnee du jeu ne sera transferee.' >&2
             exit 1
           fi
@@ -101,8 +138,8 @@ jobs:
           # reject Metal versions incompatible with the pinned nxnative shader chain.
           "$RUNNER_TEMP/ffr-venv/bin/python" "$RUNNER_TEMP/nxnative/dm/gfx/tools/own_compilers.py" --check-metal
           free_kb=$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')
-          if [ "$free_kb" -lt 30000000 ]; then
-            echo "Espace restant insuffisant apres installation ($free_kb Ko)." >&2
+          if [ "$free_kb" -lt 52000000 ]; then
+            echo "Espace restant insuffisant apres installation ($free_kb Ko, objectif 52000000 Ko)." >&2
             exit 1
           fi
 
@@ -177,6 +214,8 @@ jobs:
           } > "$HOME/.ssh/config"
           chmod 600 "$HOME/.ssh/config"
           [ "$(ssh -o ConnectTimeout=15 ffr-cachyos probe)" = 'FFR_GATEWAY_OK' ]
+          # Requires the updated append-only gateway installed by local git pull.
+          [ "$(ssh -o ConnectTimeout=15 ffr-cachyos probe-cache-v2)" = 'FFR_GATEWAY_CACHE_V2' ]
 
       - name: Restaurer le cache de shaders depuis CachyOS
         run: |
@@ -191,8 +230,8 @@ jobs:
           echo "Existing shader cache restored (if any)."
           df -h "$RUNNER_TEMP"
           free_kb=$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')
-          if [ "$free_kb" -lt 18000000 ]; then
-            echo "Insufficient disk space before transferring NSPs." >&2
+          if [ "$free_kb" -lt 23000000 ]; then
+            echo "Insufficient disk space after restoring shader cache; before NSP transfer." >&2
             exit 1
           fi
 
