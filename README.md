@@ -143,3 +143,12 @@ gh workflow run build-ffr.yml -R Domessy/ffr-ipados-build
 The probe command must print `FFR_GATEWAY_CACHE_V2`. No new packages or
 persistent system changes are required on CachyOS. Keep
 `shader-cache-sauvegarde/` intact until the new IPA is verified.
+
+## Second game: Hollow Knight Silksong
+
+A separate `build-silksong.yml` workflow is available for the user's own two
+Switch NSPs in `~/Documents/Hollow Knight Silksong/`. It reuses the proven
+macOS GitHub Actions + Tailscale/SSH transport, but stores its IPA, private log
+and shader cache outside the FFR paths. Before running, **pull this repository
+on CachyOS** to activate the new restricted `silksong-` SSH commands.
+See [SILKSONG.md](SILKSONG.md) for the exact preflight and launch commands.
