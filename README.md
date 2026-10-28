@@ -98,3 +98,48 @@ Disk planning: Run #8 showed only 8.8 GiB free late in the Metal stage. From the
 This cache is local and potentially large; it contains derived compiled shader code, not just generic build artifacts. Do not publish it or upload it to GitHub artifacts. Its validity depends on using the same nxnative source, profile, Metal compiler and SDK; the upstream cache keys reject incompatible entries.
 
 The public build output reports only elapsed time, private log length, free disk and checkpoint status. Full diagnostics remain in `~/portage-ipados/ff-resonance/resultats/ffr-build.log`.
+
+
+## Run #10: validated resumption and enlarged-cache safeguards (2026-10-28)
+
+Run #8 reached 43,402 / 73,496 shaders (59%) and saved ~7.9 GB on CachyOS.
+Run #9 **reused 42,738 of those shaders** (cache check: 30,758 not cached), then
+reached 69,555 / 73,496 (95%). Its final snapshot succeeded and the local CAS
+is ~17 GB. GitHub calls both planned stops "failure" because exit code 75
+means another run is required; neither run failed due to a compiler crash.
+
+Run #10 hardening, limited to this repository and ephemeral GitHub Mac:
+
+- The forced SSH cache gateway must report `probe-cache-v2` before any private
+  game files are transferred. Update the *existing local checkout* first.
+- The gateway imports cache entries **append-only** using atomic hard links.
+  Existing files are compared by SHA-256. Identical copies are skipped; differing
+  versions are preserved under the separate local
+  `~/portage-ipados/ff-resonance/shader-cache-conflicts/` directory and reported
+  as a conflict count. They NEVER overwrite the primary cache.
+- Checkpoint responses expose only counts: new files, identical files and
+  conflicts. Every five minutes, the workflow also reports numeric shader
+  cache-check/compile progress; private nxnative output stays on CachyOS.
+- The macOS job frees the ephemeral runner's Android SDK (when installed) and
+  optionally removes simulator runtimes via Apple's `simctl`; neither affects
+  the iOS *device* SDK, the pinned Xcode 27.1 compiler, or CachyOS.
+- Disk-space preflights require at least 55,000,000 KiB (~52.5 GiB) after
+  ephemeral cleanup and 52,000,000 KiB after dependency installation. After
+  restoring the large CAS, at least 23,000,000 KiB must remain before NSP
+  transfer. If these preflights fail, **do not force the build**: inspect disk
+  diagnostics, adjust the cleanup, and rerun. NSP copies are still deleted
+  automatically once nxnative enters the shader stage.
+
+**Before triggering run #10**, on CachyOS:
+
+```bash
+cd "$HOME/portage-ipados/ff-resonance/github-build"
+git pull --ff-only origin main
+python3 -m py_compile security/ffr_ssh_gate.py security/cache_export.py security/run_build.py
+SSH_ORIGINAL_COMMAND=probe-cache-v2 python3 security/ffr_ssh_gate.py
+gh workflow run build-ffr.yml -R Domessy/ffr-ipados-build
+```
+
+The probe command must print `FFR_GATEWAY_CACHE_V2`. No new packages or
+persistent system changes are required on CachyOS. Keep
+`shader-cache-sauvegarde/` intact until the new IPA is verified.
