@@ -60,6 +60,43 @@ def checkpoint(since_ns, final=False):
     return threshold
 
 
+def reclaim_runner_nsps():
+    """Delete runner-only NSP copies once nxnative reports its iOS shader stage.
+
+    At that stage nxnative has completed all NCA extraction and reads the
+    extracted RomFS/ExeFS files. Never touch the user's original NSPs.
+    """
+    if not LOG.is_file():
+        return False
+    with LOG.open("rb") as stream:
+        stream.seek(max(0, LOG.stat().st_size - 65536))
+        tail = stream.read()
+    # Exact stage marker; do not reclaim files during extraction or survey.
+    if b"iOS shaders" not in tail:
+        return False
+    freed = 0
+    for name in (
+        "v-final_fantasy_resonance.nsp",
+        "v-final_fantasy_resonance_v65536.nsp",
+    ):
+        path = NSPS / name
+        if not path.is_file() or path.is_symlink():
+            continue
+        try:
+            size = path.stat().st_size
+            path.unlink()
+            freed += size
+        except OSError:
+            pass
+    if freed:
+        print(
+            f"Reclaimed {freed / 1024**3:.2f} GiB: removed only runner NSP "
+            "copies after the iOS shader stage began.",
+            flush=True,
+        )
+    return freed > 0
+
+
 def stop_build(proc):
     """Stop the game tool and all its compiler children in their own session."""
     if proc.poll() is not None:
@@ -93,6 +130,7 @@ def main():
     since_ns = time.time_ns()
     last_sync = time.monotonic()
     started = time.monotonic()
+    nsps_reclaimed = False
     cmd = [str(PYTHON), str(NATIVE / "scripts" / "build_ipa_from_nsp.py"),
            str(NSPS), "-k", str(KEYS), "-o", str(OUTPUT),
            "--no-keep-extracted", "--show-fps"]
@@ -107,6 +145,8 @@ def main():
                 time.sleep(60)
                 elapsed = int((time.monotonic() - started) / 60)
                 log_bytes = LOG.stat().st_size if LOG.exists() else 0
+                if not nsps_reclaimed:
+                    nsps_reclaimed = reclaim_runner_nsps()
                 free_gib = shutil.disk_usage(TEMP).free / 1024**3
                 print(f"nxnative: {elapsed} min; private log {log_bytes} bytes; "
                       f"free disk {free_gib:.1f} GiB.", flush=True)
