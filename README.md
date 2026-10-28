@@ -67,4 +67,32 @@ After final use, also revoke the FFR Tailscale auth key in the Tailscale admin c
 
 - Run #5 successfully transferred both NSPs and the Nintendo key file, then nxnative aborted because the older macos-15 image exposed Metal 32023.864 instead of the locked 32023.921 compiler. The workflow now uses `xcode-27` with Xcode 27.1; it checks the exact Metal compiler before transferring private files. End-to-end compilation and iPadOS 27 execution have not yet been validated.
 - The runner is temporary and external. An untrusted change to the workflow or build dependencies could still leak temporary inputs; review any future changes before use.
+- The restricted SSH gateway now permits `read-cache` and `write-cache` for a dedicated shader-cache directory in addition to the six original operations; cache contents never reach GitHub artifacts.
 - Run #7 reached the previous 180-minute job timeout during shader compilation. The job limit is now 345 minutes (under GitHub's 360-minute ceiling), with public timing-only heartbeat and a private diagnostic snapshot periodically copied to CachyOS. The game has not yet been confirmed to launch on iPadOS 27.
+
+## Resumable Metal shader compilation (after run #7)
+
+Run #7 reached about 25,031 / 73,496 shaders (34%) when GitHub cancelled the job at its configured 180-minute limit. It was advancing, not hung. Its cache was stored only on the ephemeral runner and cannot be recovered.
+
+From the next run onward, the workflow:
+- checks out this repository's exact commit, installs the pinned nxnative version and Xcode 27.1, then establishes the already restricted SSH session;
+- restores the private shader content-addressed cache from `~/portage-ipados/ff-resonance/shader-cache/` on CachyOS via the forced `read-cache` command;
+- transfers the original NSPs and `prod.keys` over SSH as before;
+- starts nxnative with `DMSH_CAS` set to a separate cache directory on the ephemeral Mac;
+- every ~15 minutes sends only newly created cache entries via the forced `write-cache` command;
+- voluntarily stops a still-running build at 240 minutes of build time (or low free disk space), saves one final incremental snapshot, and returns a non-zero status so a NEW run can continue.
+
+Each run will still need to transfer the base/update NSPs. The 345-minute job setting is unchanged, to leave time for private cache transfers and cleanup. A run that stops to checkpoint will appear as a failure in GitHub Actions, which does not necessarily mean the compilation has failed.
+
+**Before the next run**, update the existing local checkout so its forced-command Python gateway knows `read-cache` and `write-cache`:
+
+```bash
+cd "$HOME/portage-ipados/ff-resonance/github-build"
+git pull --ff-only origin main
+```
+
+No new SSH key, Tailscale configuration, package installation, or `harden-cachyos.sh` rerun is needed. The local gateway is the same already-authorized path; its allowlist now has these two extra cache-specific operations.
+
+This cache is local and potentially large; it contains derived compiled shader code, not just generic build artifacts. Do not publish it or upload it to GitHub artifacts. Its validity depends on using the same nxnative source, profile, Metal compiler and SDK; the upstream cache keys reject incompatible entries.
+
+The public build output reports only elapsed time, private log length, free disk and checkpoint status. Full diagnostics remain in `~/portage-ipados/ff-resonance/resultats/ffr-build.log`.
