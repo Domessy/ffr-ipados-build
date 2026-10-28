@@ -93,6 +93,8 @@ git pull --ff-only origin main
 
 No new SSH key, Tailscale configuration, package installation, or `harden-cachyos.sh` rerun is needed. The local gateway is the same already-authorized path; its allowlist now has these two extra cache-specific operations.
 
+Disk planning: Run #8 showed only 8.8 GiB free late in the Metal stage. From the next run, the orchestrator waits for nxnative's `iOS shaders` stage (all NCA extraction already finished) and then deletes ONLY the two temporary NSP copies from the GitHub Mac runner, reclaiming approximately 9 GiB for shader completion and `pack_ipa.py`. The originals on CachyOS and already-extracted RomFS/ExeFS on the runner are untouched. The IPA writer uses a `.ipa.partial` output which needs its own disk space before it can be renamed; even with this cleanup there is no guarantee of sufficient room until the actual IPA finishes.
+
 This cache is local and potentially large; it contains derived compiled shader code, not just generic build artifacts. Do not publish it or upload it to GitHub artifacts. Its validity depends on using the same nxnative source, profile, Metal compiler and SDK; the upstream cache keys reject incompatible entries.
 
 The public build output reports only elapsed time, private log length, free disk and checkpoint status. Full diagnostics remain in `~/portage-ipados/ff-resonance/resultats/ffr-build.log`.
