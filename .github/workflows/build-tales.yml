@@ -1,0 +1,298 @@
+name: Tales of Eternia - Survey and IPA (nxnative)
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Survey unknown game first; compile best-effort IPA separately
+        required: true
+        type: choice
+        default: survey
+        options:
+          - survey
+          - build
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tales-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    env:
+      TALES_MODE: ${{ inputs.mode }}
+    # Explicitly enabled only by security/harden-cachyos.sh on the user's PC.
+    if: vars.FFR_SECURITY_READY == 'true'
+    # Apple Silicon standard, public repositories: GitHub Xcode 27 image.
+    runs-on: xcode-27
+    # GitHub-hosted jobs may run up to 360 min. Keep a margin for private log upload and cleanup.
+    timeout-minutes: 345
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Recuperer les scripts de cache du meme commit GitHub
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Verifier les scripts avant tout transfert prive
+        run: |
+          set -euo pipefail
+          python3 -m py_compile security/ffr_ssh_gate.py security/tales_gateway.py security/cache_export.py security/run_tales.py security/test_cache_import.py security/test_tales_gateway.py
+          python3 -m unittest -v security/test_cache_import.py security/test_tales_gateway.py
+
+      - name: Preparer Xcode 27.1 et liberer de l'espace
+        run: |
+          set -euo pipefail
+          echo 'Espace initial :'
+          df -h "$RUNNER_TEMP"
+          # nxnative/dmsh_chain.lock requires the Xcode 27.1 Metal compiler.
+          KEEP=/Applications/Xcode_27.1.app
+          if [ ! -d "$KEEP/Contents/Developer" ]; then
+            echo 'Xcode 27.1 indisponible sur cette image GitHub.' >&2
+            exit 1
+          fi
+          echo "Xcode conserve : $KEEP"
+          sudo xcode-select -s "$KEEP/Contents/Developer"
+          for app in /Applications/Xcode_*.app; do
+            [ -d "$app" ] || continue
+            [ "$app" = "$KEEP" ] && continue
+            [ -L "$app" ] && continue
+            echo "Suppression sur runner ephemere : $app"
+            sudo rm -rf -- "$app"
+          done
+          xcodebuild -version
+          # Since Xcode 26, the Metal toolchain is an optional component.
+          if ! xcodebuild -showComponent metalToolchain 2>/dev/null | grep -qi 'Status: installed'; then
+            echo 'Installation du Metal Toolchain correspondant a Xcode 27.1.'
+            xcodebuild -downloadComponent metalToolchain
+          fi
+          echo 'Compilateurs Metal selectionnes :'
+          xcrun -sdk macosx metal --version
+          xcrun -sdk iphoneos metal --version
+
+          # xcodebuild uses the iOS DEVICE SDK, not an Android SDK or
+          # simulator runtime. All cleanup is confined to this ephemeral runner,
+          # never to CachyOS or any developer workstation.
+          echo 'Liberation espace temporaire pour Tales.'
+          if [ "$HOME" = "/Users/runner" ]; then
+            for sdk in "$HOME/Library/Android/sdk" "$HOME/Library/Android/Sdk"; do
+              if [ -d "$sdk" ] && [ ! -L "$sdk" ]; then
+                du -sh "$sdk" || true
+                sudo rm -rf -- "$sdk"
+              fi
+            done
+          fi
+          free_kb=$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')
+          if [ "$free_kb" -lt 55000000 ]; then
+            echo 'Espace encore limite: nettoyage des runtimes de simulateurs GitHub inutilises.'
+            xcrun simctl runtime list || true
+            # On Xcode 27 this supported simctl operation removes simulator
+            # runtime disk images, not the iOS device SDK or Metal compiler.
+            # Bound its runtime to avoid hanging a hosted job indefinitely.
+            python3 - <<'PY'
+          import subprocess
+          try:
+              p = subprocess.run(
+                  ["xcrun", "simctl", "runtime", "delete", "all"],
+                  capture_output=True, text=True, timeout=240, check=False)
+              print(f"Simulator runtime cleanup exit code: {p.returncode}")
+              if p.returncode:
+                  print("Simulator runtime cleanup unavailable; continuing to disk preflight.")
+          except (OSError, subprocess.TimeoutExpired):
+              print("Simulator runtime cleanup timed out/unavailable; continuing to disk preflight.")
+          PY
+            xcrun simctl delete unavailable || true
+          fi
+          df -h "$RUNNER_TEMP"
+          free_kb=$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')
+          # This game uses a dedicated cache; no other game's cache is touched.
+          # Reserve sufficient space for future per-game CAS, NSP files and
+          # assemble an IPA. Abort BEFORE any private transfer if too tight.
+          if [ "$free_kb" -lt 55000000 ]; then
+            echo "Espace insuffisant avant restauration du cache Tales ($free_kb Ko, objectif 55000000 Ko)." >&2
+            echo 'Aucune donnee du jeu ne sera transferee.' >&2
+            exit 1
+          fi
+
+      - name: Installer les dependances nxnative
+        run: |
+          set -euo pipefail
+          export HOMEBREW_NO_AUTO_UPDATE=1
+          # Homebrew passe par ghcr.io : attendre si le DNS est temporairement indisponible.
+          for attempt in 1 2 3 4; do
+            echo "Installation Homebrew, tentative ${attempt}/4"
+            if brew install xcodegen zstd spirv-cross glslang; then
+              break
+            fi
+            if [ "$attempt" -eq 4 ]; then
+              echo "Installation Homebrew impossible apres 4 tentatives." >&2
+              exit 1
+            fi
+            echo "Echec transitoire, nouvel essai dans 20 secondes."
+            sleep 20
+          done
+          dotnet --version
+          python3 -m venv "$RUNNER_TEMP/tales-venv"
+          "$RUNNER_TEMP/tales-venv/bin/python" -m pip install -q lz4 capstone fonttools
+          # Pin the upstream code that will process local Nintendo key material.
+          NXNATIVE_SHA="78cb26d91373d6731984a9692607b796a6b23162"
+          git init -q "$RUNNER_TEMP/nxnative"
+          git -C "$RUNNER_TEMP/nxnative" remote add origin https://github.com/seedds/nxnative.git
+          git -C "$RUNNER_TEMP/nxnative" fetch -q --depth 1 origin "$NXNATIVE_SHA"
+          git -C "$RUNNER_TEMP/nxnative" checkout -q --detach FETCH_HEAD
+          test "$(git -C "$RUNNER_TEMP/nxnative" rev-parse HEAD)" = "$NXNATIVE_SHA"
+          # Do this BEFORE transferring 9 GB of private game data:
+          # reject Metal versions incompatible with the pinned nxnative shader chain.
+          "$RUNNER_TEMP/tales-venv/bin/python" "$RUNNER_TEMP/nxnative/dm/gfx/tools/own_compilers.py" --check-metal
+          free_kb=$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')
+          if [ "$free_kb" -lt 52000000 ]; then
+            echo "Espace restant insuffisant apres installation ($free_kb Ko, objectif 52000000 Ko)." >&2
+            exit 1
+          fi
+
+      - name: Installer Tailscale en ligne de commande (sans action DNS)
+        run: |
+          set -euo pipefail
+          export HOMEBREW_NO_AUTO_UPDATE=1
+          for attempt in 1 2 3; do
+            if brew install --formula tailscale; then break; fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep 15
+          done
+          command -v tailscale
+          command -v tailscaled
+
+      - name: Connecter Tailscale sans modifier les DNS macOS
+        env:
+          TS_AUTHKEY: ${{ secrets.FFR_TS_AUTHKEY }}
+        run: |
+          set -euo pipefail
+          test -n "$TS_AUTHKEY"
+          TS_CLI="$(command -v tailscale)"
+          TS_DAEMON="$(command -v tailscaled)"
+          TS_SOCKET="$RUNNER_TEMP/tales-tailscaled.sock"
+          # Temporary daemon with in-memory state; no persistent login data.
+          nohup sudo -n "$TS_DAEMON" --state=mem: --socket="$TS_SOCKET" \
+            > "$RUNNER_TEMP/tales-tailscaled.log" 2>&1 < /dev/null &
+          echo "$!" > "$RUNNER_TEMP/tales-tailscaled.pid"
+          daemon_ready=0
+          for attempt in $(seq 1 30); do
+            if sudo -n "$TS_CLI" --socket="$TS_SOCKET" status --json > /dev/null 2>&1; then
+              daemon_ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$daemon_ready" -ne 1 ]; then
+            echo 'Tailscale daemon did not become ready.' >&2
+            exit 1
+          fi
+          # No MagicDNS required: the host is reached by its Tailscale IPv4 address.
+          sudo -n "$TS_CLI" --socket="$TS_SOCKET" up \
+            --authkey="$TS_AUTHKEY" \
+            --accept-dns=false \
+            --timeout=120s \
+            --hostname="tales-ci-${GITHUB_RUN_ID}"
+          sudo -n "$TS_CLI" --socket="$TS_SOCKET" status --json \
+            | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("BackendState") == "Running"; print("Tailscale running; macOS system DNS unchanged.")'
+
+      - name: Configurer SSH avec cle d'hote epinglee
+        env:
+          SSH_KEY: ${{ secrets.FFR_SSH_KEY }}
+          HOSTKEY: ${{ secrets.FFR_SSH_KNOWN_HOSTS }}
+          PC_IP: ${{ secrets.FFR_TS_HOST }}
+          PC_USER: ${{ secrets.FFR_SSH_USER }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$SSH_KEY" > "$RUNNER_TEMP/tales_ssh_key"
+          printf '%s\n' "$HOSTKEY" > "$RUNNER_TEMP/tales_known_hosts"
+          chmod 600 "$RUNNER_TEMP/tales_ssh_key" "$RUNNER_TEMP/tales_known_hosts"
+          {
+            echo 'Host ffr-cachyos'
+            printf '  HostName %s\n' "$PC_IP"
+            printf '  User %s\n' "$PC_USER"
+            echo '  Port 22'
+            printf '  IdentityFile %s\n' "$RUNNER_TEMP/tales_ssh_key"
+            printf '  UserKnownHostsFile %s\n' "$RUNNER_TEMP/tales_known_hosts"
+            echo '  StrictHostKeyChecking yes'
+            echo '  IdentitiesOnly yes'
+            echo '  BatchMode yes'
+          } > "$HOME/.ssh/config"
+          chmod 600 "$HOME/.ssh/config"
+          # Require the restricted Tales gateway, before any private transfer.
+          [ "$(ssh -o ConnectTimeout=15 ffr-cachyos tales-probe-v1)" = 'TALES_GATEWAY_V1' ]
+
+      - name: Restaurer le cache de shaders depuis CachyOS
+        run: |
+          set -euo pipefail
+          export DMSH_CAS="$RUNNER_TEMP/tales-shader-cas"
+          umask 077
+          mkdir -p "$DMSH_CAS"
+          # Cached shader results are streamed exclusively over restricted SSH;
+          # no Github artifacts or keys are used to store them.
+          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 ffr-cachyos tales-read-cache \
+            | tar -xz -C "$DMSH_CAS"
+          echo "Existing shader cache restored (if any)."
+          echo "Tales CAS file count: $(find "$DMSH_CAS" -type f | wc -l | tr -d ' ')"
+          du -sh "$DMSH_CAS"
+          df -h "$RUNNER_TEMP"
+          free_kb=$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')
+          if [ "$free_kb" -lt 23000000 ]; then
+            echo "Insufficient disk space after restoring shader cache; before NSP transfer." >&2
+            exit 1
+          fi
+
+      - name: Copier les 2 NSP et les cles depuis CachyOS (hors de GitHub)
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$RUNNER_TEMP/tales-nsp"
+          # The forced-command SSH key cannot execute a shell or browse files.
+          # Title metadata contains only validated hexadecimal IDs and update version.
+          read -r BASE_ID UPDATE_ID UPDATE_VER <<< "$(ssh ffr-cachyos tales-metadata-v1)"
+          [[ "$BASE_ID" =~ ^[0-9A-F]{16}$ && "$UPDATE_ID" =~ ^[0-9A-F]{16}$ && "$UPDATE_VER" =~ ^[0-9]+$ ]]
+          ssh ffr-cachyos tales-read-base > "$RUNNER_TEMP/tales-nsp/Tales [$BASE_ID][v0].nsp"
+          ssh ffr-cachyos tales-read-update > "$RUNNER_TEMP/tales-nsp/Tales [$UPDATE_ID][v$UPDATE_VER].nsp"
+          ssh ffr-cachyos tales-read-keys > "$RUNNER_TEMP/tales-prod.keys"
+          test -s "$RUNNER_TEMP/tales-prod.keys"
+          df -h "$RUNNER_TEMP"
+
+      - name: Analyser ou compiler le jeu sans publier les rapports
+        run: |
+          set -euo pipefail
+          python3 security/run_tales.py
+
+      - name: Renvoyer l'IPA directement sur CachyOS
+        if: ${{ inputs.mode == 'build' }}
+        run: |
+          set -euo pipefail
+          ssh ffr-cachyos tales-write-ipa < "$RUNNER_TEMP/TalesOfEternia-iPadOS.ipa"
+          shasum -a 256 "$RUNNER_TEMP/TalesOfEternia-iPadOS.ipa"
+          echo 'Tales IPA transferee sur CachyOS.'
+
+      - name: Renvoyer le journal de compilation
+        if: always()
+        run: |
+          if [ -s "$RUNNER_TEMP/tales-build.log" ]; then
+            # Cap diagnostics to the gateway's 32 MiB limit even after a long shader compile.
+            tail -c 16777216 "$RUNNER_TEMP/tales-build.log" | ssh -o ConnectTimeout=20 ffr-cachyos tales-write-log || true
+          fi
+          rm -f "$RUNNER_TEMP/tales-prod.keys" "$RUNNER_TEMP/tales_ssh_key" || true
+
+      - name: Fermer la connexion Tailscale ephemere
+        if: always()
+        run: |
+          TS_SOCKET="$RUNNER_TEMP/tales-tailscaled.sock"
+          if command -v tailscale >/dev/null 2>&1; then
+            sudo -n tailscale --socket="$TS_SOCKET" logout > /dev/null 2>&1 || true
+          fi
+          if [ -s "$RUNNER_TEMP/tales-tailscaled.pid" ]; then
+            sudo -n kill "$(cat "$RUNNER_TEMP/tales-tailscaled.pid")" > /dev/null 2>&1 || true
+          fi
+          rm -f "$RUNNER_TEMP/tales-prod.keys" "$RUNNER_TEMP/tales_ssh_key" || true
