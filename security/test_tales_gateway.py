@@ -97,7 +97,8 @@ class TalesGatewayTests(unittest.TestCase):
             link.symlink_to(permitted, target_is_directory=True)
             with patch.object(tales.Path, "home", return_value=home), \
                  patch.object(tales, "SOURCE_LINK", link):
-                self.assertEqual(tales.local_source(), permitted)
+                # macOS resolves /var to /private/var; compare canonical paths.
+                self.assertEqual(tales.local_source(), permitted.resolve(strict=True))
                 link.unlink()
                 link.symlink_to(home, target_is_directory=True)
                 with self.assertRaises(ValueError):
