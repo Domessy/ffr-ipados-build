@@ -91,11 +91,7 @@ def reclaim_runner_nsps():
     if b"iOS shaders" not in tail:
         return False
     freed = 0
-    for name in (
-        "tales-base.nsp",
-        "tales-update.nsp",
-    ):
-        path = NSPS / name
+    for path in sorted(NSPS.glob("*.nsp")):
         if not path.is_file() or path.is_symlink():
             continue
         try:
