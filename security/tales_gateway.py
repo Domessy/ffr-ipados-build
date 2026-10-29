@@ -9,7 +9,7 @@ CACHE = BASE / "shader-cache"
 CONFLICTS = BASE / "shader-cache-conflicts"
 OUTPUT = BASE / "resultats"
 COMMANDS = frozenset({
-    "tales-probe-v1", "tales-read-base", "tales-read-update", "tales-read-keys",
+    "tales-probe-v1", "tales-metadata-v1", "tales-read-base", "tales-read-update", "tales-read-keys",
     "tales-read-cache", "tales-write-cache", "tales-write-ipa",
     "tales-write-log", "tales-write-survey",
 })
@@ -68,6 +68,13 @@ def dispatch(command, parent):
         identify_inputs()
         identify_keys()
         print("TALES_GATEWAY_V1")
+        return 0
+    if command == "tales-metadata-v1":
+        base, update = identify_inputs()
+        base_id = int(TITLE.search(base.name).group(1), 16)
+        update_id = int(TITLE.search(update.name).group(1), 16)
+        update_ver = int(VERSION.search(update.name).group(1))
+        print(f"{base_id:016X} {update_id:016X} {update_ver}")
         return 0
     if command == "tales-read-keys":
         parent.send_file(identify_keys())
