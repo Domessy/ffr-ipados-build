@@ -201,6 +201,9 @@ def main() -> int:
         elif command.startswith("tales-"):
             import tales_gateway
             return tales_gateway.dispatch(command, sys.modules[__name__])
+        elif command.startswith("botw-"):
+            import botw_gateway
+            return botw_gateway.dispatch(command, sys.modules[__name__])
         elif command in READABLE:
             # The user-selected prod.keys is a symlink created by initial setup.
             send_file(READABLE[command], allow_key_link=(command == "read-keys"))
