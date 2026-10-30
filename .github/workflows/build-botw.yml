@@ -224,7 +224,7 @@ jobs:
           } > "$HOME/.ssh/config"
           chmod 600 "$HOME/.ssh/config"
           # Require the local path-scoped BOTW gateway, before any private data.
-          [ "$(ssh -o ConnectTimeout=15 ffr-cachyos botw-probe-v1)" = 'SILKSONG_GATEWAY_V1' ]
+          [ "$(ssh -o ConnectTimeout=15 ffr-cachyos botw-probe-v1)" = 'BOTW_GATEWAY_V1' ]
 
       - name: Verifier les 4 NSP et le budget disque sans transfert
         run: |
