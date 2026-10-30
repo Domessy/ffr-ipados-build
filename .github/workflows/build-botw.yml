@@ -40,8 +40,8 @@ jobs:
       - name: Verifier les scripts avant tout transfert prive
         run: |
           set -euo pipefail
-          python3 -m py_compile security/ffr_ssh_gate.py security/botw_gateway.py security/cache_export.py security/run_botw.py security/test_cache_import.py security/test_botw_gateway.py
-          python3 -m unittest -v security/test_cache_import.py security/test_botw_gateway.py
+          python3 -m py_compile security/ffr_ssh_gate.py security/botw_gateway.py security/botw_transfer.py security/cache_export.py security/run_botw.py security/test_cache_import.py security/test_botw_gateway.py security/test_botw_transfer.py
+          python3 -m unittest -v security/test_cache_import.py security/test_botw_gateway.py security/test_botw_transfer.py
 
       - name: Preparer Xcode 27.1 et liberer de l'espace
         run: |
@@ -284,14 +284,12 @@ jobs:
           UPDATE="$RUNNER_TEMP/botw-nsp/BOTW [01007EF00011E800][v$VERSION].nsp"
           DLC1="$RUNNER_TEMP/botw-nsp/BOTW [01007EF00011F001][v$DLC_VERSION].nsp"
           DLC2="$RUNNER_TEMP/botw-nsp/BOTW [01007EF00011F002][v$DLC_VERSION].nsp"
-          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 ffr-cachyos botw-read-base > "$BASE"
-          test "$(stat -f %z "$BASE")" -eq "$B"
-          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 ffr-cachyos botw-read-update > "$UPDATE"
-          test "$(stat -f %z "$UPDATE")" -eq "$U"
-          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 ffr-cachyos botw-read-dlc1 > "$DLC1"
-          test "$(stat -f %z "$DLC1")" -eq "$D1"
-          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 ffr-cachyos botw-read-dlc2 > "$DLC2"
-          test "$(stat -f %z "$DLC2")" -eq "$D2"
+          # Each stream logs its completed byte count, 10-second rate and ETA.
+          # Size checks are performed before atomically publishing the copy.
+          python3 security/botw_transfer.py base "$B" "$BASE"
+          python3 security/botw_transfer.py update "$U" "$UPDATE"
+          python3 security/botw_transfer.py dlc1 "$D1" "$DLC1"
+          python3 security/botw_transfer.py dlc2 "$D2" "$DLC2"
           ssh ffr-cachyos botw-read-keys > "$RUNNER_TEMP/botw-prod.keys"
           test -s "$RUNNER_TEMP/botw-prod.keys"
           echo 'Four BOTW NSP copies verified by byte count; keys remain private.'
