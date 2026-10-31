@@ -11,6 +11,7 @@ on:
       - 'security/totknx_*.py'
       - 'security/run_totknx.py'
       - 'security/cache_export.py'
+      - 'security/setup_totknx.sh'
   workflow_dispatch:
 
 permissions:
@@ -38,6 +39,7 @@ jobs:
             security/totknx_transfer.py security/run_totknx.py \
             security/cache_export.py security/test_cache_import.py \
             security/test_totknx_gateway.py security/test_totknx_transfer.py
+          bash -n security/setup_totknx.sh
           python3 -m unittest -v \
             security/test_cache_import.py \
             security/test_totknx_gateway.py \
