@@ -233,6 +233,7 @@ jobs:
           fi
 
       - name: Verifier le jeu MPR v0 et le budget disque sans transfert
+        if: ${{ inputs.mode != 'keys-check' }}
         run: |
           set -euo pipefail
           read -r TITLE VERSION B UPDATES <<< "$(ssh ffr-cachyos mpr-manifest-v1)"
@@ -276,10 +277,11 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
-          # Existing shared read-only route, used by the other verified game pipelines.
-          # Never print the file contents or its filesystem path in CI logs.
+          # Restricted Metroid-only key route; no dependence on deleted FFR folders.
+          # The key is a local file owned by the MPR project on CachyOS.
+          # Never print key bytes, only private validation status.
           ssh -o ConnectTimeout=20 -o ServerAliveInterval=30 -o ServerAliveCountMax=6 \
-            ffr-cachyos read-keys > "$RUNNER_TEMP/mpr-prod.keys"
+            ffr-cachyos mpr-read-keys > "$RUNNER_TEMP/mpr-prod.keys"
           chmod 600 "$RUNNER_TEMP/mpr-prod.keys"
           test -s "$RUNNER_TEMP/mpr-prod.keys"
           # Only sanity-check the key-file structure, without disclosing values.
