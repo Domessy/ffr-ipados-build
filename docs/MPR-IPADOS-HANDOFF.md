@@ -40,6 +40,13 @@ Private gateway commands:
 `mpr-probe-v1`, `mpr-manifest-v1`, `mpr-read-base`, `mpr-read-keys`,
 `mpr-read-cache`, `mpr-write-cache`, `mpr-write-ipa`, `mpr-write-log`.
 
+MPR-specific private key file:
+`~/portage-ipados/metroid-prime-remastered/private/prod.keys`.
+It must be a real, nonempty regular file, not a symlink into an older game
+project. Create it from an existing owned backup with permissions 0600; do
+not print or commit key bytes. No fallback to FF Resonance is permitted.
+The MPR gateway and workflow now use `mpr-read-keys`.
+
 The original NSP and private keys are never committed or included in GitHub
 artifacts. The workflow only uploads the resulting IPA to CachyOS privately.
 No system packages are added or changed on CachyOS.
@@ -81,13 +88,50 @@ gh workflow run build-mpr.yml --ref main -f mode=build -R Domessy/ffr-ipados-bui
 - MPR preflight #1 passed.
 - MPR build #2, run [41200169838](https://github.com/Domessy/ffr-ipados-build/actions/runs/41200169838), failed AFTER the entire 7,262,924,560-byte v0 NSP was transferred and verified, while reading private keys via `mpr-read-keys`.
 - GitHub's only remote diagnostic was `FFR gateway failed: ValueError`. The underlying ValueError source was suppressed by the forced-command gateway, so the precise underlying exception has NOT been proven. No game compilation started; no shaders were compiled.
-- Fix: use the existing shared and previously tested read-only `read-keys` command rather than the new MPR alias; transfer and sanity-check private keys BEFORE any large NSP upload. No private key values appear in public CI output.
+- Initial attempted fix switched to shared `read-keys`, but that still depended on the removed FF Resonance path. Superseded by a dedicated MPR private key file and route; validate keys before NSP transfer.
 - Introduce `mode=keys-check` to verify the keys and SSH route on a new ephemeral runner WITHOUT downloading game files or attempting a build.
 - Require the keys-check run to pass before restarting `mode=build`. Never infer that the new route works until the keys-check returns success.
 
 ```bash
 gh workflow run build-mpr.yml --ref main -f mode=keys-check -R Domessy/ffr-ipados-build
 ```
+
+## Former key-path dependency fixed
+
+After a successful preflight, build #2 fully transferred the 7,262,924,560-byte
+base NSP but failed to read `prod.keys`. Follow-up keys-check #3 (run
+[41203589140](https://github.com/Domessy/ffr-ipados-build/actions/runs/41203589140))
+failed at `mpr-probe-v1`, before key transfer. Both stages previously
+depended on `~/portage-ipados/ff-resonance/private/prod.keys` via the generic
+gateway, making MPR dependent on a project the user later deleted. The user
+confirmed removing old game folders. A missing or dangling old key path is the
+strong likely explanation, not yet independently verified on CachyOS.
+
+Correction: `security/mpr_gateway.py` uses only the regular file
+`~/portage-ipados/metroid-prime-remastered/private/prod.keys` for its probe,
+safe diagnostic route, and key streaming; `build-mpr.yml` uses that same
+restricted `mpr-read-keys` route, and validates the keys **before** uploading
+the large NSP. No prior Final Fantasy project data is required at runtime.
+
+Procedure, only after selecting an intact local `prod.keys` backup:
+
+```bash
+mkdir -p "$HOME/portage-ipados/metroid-prime-remastered/private"
+chmod 700 "$HOME/portage-ipados/metroid-prime-remastered/private"
+install -m 600 "/absolute/path/to/existing/prod.keys" \
+  "$HOME/portage-ipados/metroid-prime-remastered/private/prod.keys"
+cd "$HOME/portage-ipados/ff-resonance/github-build"
+git pull --ff-only origin main
+env SSH_ORIGINAL_COMMAND=mpr-diagnose-v1 python3 security/ffr_ssh_gate.py
+env SSH_ORIGINAL_COMMAND=mpr-probe-v1 python3 security/ffr_ssh_gate.py
+```
+
+Use an already verified copy: do not invent keys, import public random keys,
+or assume the NSP itself can replace the private decryption keys. If the old
+clone directory was removed, repair the forced SSH gateway's local deployment
+path before GitHub Actions tests; the existing gateway must still be installed.
+
+Then run `mode=keys-check` before another `mode=build`.
 
 ## Checkpointing is enabled from the first build
 
