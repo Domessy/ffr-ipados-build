@@ -10,6 +10,20 @@ on:
         default: preflight
         options:
           - preflight
+          - build
+      package:
+        description: Full IPA or small IPA plus separate RomFS
+        type: choice
+        default: full
+        required: true
+        options:
+          - full
+          - slim
+      device_gpu:
+        description: Optional verified Metal GPU architecture; blank until M5 identified
+        type: string
+        default: ''
+        required: false
 
 permissions:
   contents: read
@@ -220,6 +234,57 @@ jobs:
             exit 1
           fi
           echo 'TOTK preflight passed.'
+
+      - name: Transferer deux NSP TOTK et polices via SSH prive
+        if: ${{ inputs.mode == 'build' }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$RUNNER_TEMP/totk-mng-nsp" "$RUNNER_TEMP/totk-mng-fonts"
+          read -r TITLE VERSION BASE UPDATE FONTS <<< "$(ssh ffr-cachyos totk-mng-manifest-v1)"
+          python3 security/totk_mng_transfer.py base "$BASE" "$RUNNER_TEMP/totk-mng-nsp/base.nsp"
+          python3 security/totk_mng_transfer.py update "$UPDATE" "$RUNNER_TEMP/totk-mng-nsp/update.nsp"
+          ssh ffr-cachyos totk-mng-read-keys > "$RUNNER_TEMP/totk-mng-prod.keys"
+          test -s "$RUNNER_TEMP/totk-mng-prod.keys"
+          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 ffr-cachyos totk-mng-read-fonts \
+            | tar -xz -C "$RUNNER_TEMP/totk-mng-fonts"
+          test "$(find "$RUNNER_TEMP/totk-mng-fonts" -maxdepth 1 -type f -name '*.bfttf' | wc -l | tr -d ' ')" -eq 6
+          free=$(( $(df -Pk "$RUNNER_TEMP" | awk 'NR==2 {print $4}') * 1024 ))
+          (( free >= 60 * 1024**3 )) || { echo 'Insufficient disk after NSP transfer.' >&2; exit 1; }
+
+      - name: Compiler TOTK 1.4.3 via MacNativeGames
+        if: ${{ inputs.mode == 'build' }}
+        env:
+          TOTK_MNG_PACKAGE: ${{ inputs.package }}
+          TOTK_MNG_DEVICE_GPU: ${{ inputs.device_gpu }}
+        run: |
+          set -euo pipefail
+          python3 security/run_totk_mng.py
+
+      - name: Rapatrier IPA MacNativeGames sur CachyOS
+        if: ${{ inputs.mode == 'build' }}
+        run: |
+          set -euo pipefail
+          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 \
+            ffr-cachyos totk-mng-write-ipa < "$RUNNER_TEMP/ZeldaTOTK-MacNativeGames.ipa"
+
+      - name: Rapatrier GameData si IPA slim
+        if: ${{ inputs.mode == 'build' && inputs.package == 'slim' }}
+        run: |
+          set -euo pipefail
+          rom="$RUNNER_TEMP/totk-mng-work/totk/extracted/v143/romfs/romfs.bin"
+          test -s "$rom"
+          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 \
+            ffr-cachyos totk-mng-write-romfs < "$rom"
+
+      - name: Recuperer le journal prive TOTK
+        if: always()
+        run: |
+          if [ -s "$RUNNER_TEMP/totk-mng-build.log" ]; then
+            tail -c 16777216 "$RUNNER_TEMP/totk-mng-build.log" \
+              | ssh -o ConnectTimeout=20 ffr-cachyos totk-mng-write-log || true
+          fi
+          rm -f "$RUNNER_TEMP/totk-mng-prod.keys" || true
 
       - name: Nettoyer Tailscale ephemere
         if: always()
