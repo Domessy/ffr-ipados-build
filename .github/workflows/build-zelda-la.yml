@@ -109,7 +109,7 @@ jobs:
           fi
           df -h "$RUNNER_TEMP"
           free_kb=$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')
-          # Sufficient space for v0 game data, extracted RomFS, shader CAS and IPA.
+          # Sufficient space for Link's Awakening 1.1.0 game data, extracted RomFS, shader CAS and IPA.
           if [ "$free_kb" -lt 42000000 ]; then
             echo 'ZLA runner disk below initial 42 GB admission guard.' >&2
             exit 1
@@ -297,7 +297,7 @@ jobs:
             echo 'ZLA keys-check passed; the game NSP was not transferred.'
           fi
 
-      - name: Transferer les NSP TOTK base et update
+      - name: Transferer les NSP Zelda Link's Awakening base et update
         if: ${{ inputs.mode == 'build' }}
         run: |
           set -euo pipefail
