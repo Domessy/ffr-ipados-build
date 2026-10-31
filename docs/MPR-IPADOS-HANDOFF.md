@@ -76,6 +76,19 @@ If preflight succeeds, build the unsigned IPA:
 gh workflow run build-mpr.yml --ref main -f mode=build -R Domessy/ffr-ipados-build
 ```
 
+## First build attempt and key-transfer correction (2026-10-31)
+
+- MPR preflight #1 passed.
+- MPR build #2, run [41200169838](https://github.com/Domessy/ffr-ipados-build/actions/runs/41200169838), failed AFTER the entire 7,262,924,560-byte v0 NSP was transferred and verified, while reading private keys via `mpr-read-keys`.
+- GitHub's only remote diagnostic was `FFR gateway failed: ValueError`. The underlying ValueError source was suppressed by the forced-command gateway, so the precise underlying exception has NOT been proven. No game compilation started; no shaders were compiled.
+- Fix: use the existing shared and previously tested read-only `read-keys` command rather than the new MPR alias; transfer and sanity-check private keys BEFORE any large NSP upload. No private key values appear in public CI output.
+- Introduce `mode=keys-check` to verify the keys and SSH route on a new ephemeral runner WITHOUT downloading game files or attempting a build.
+- Require the keys-check run to pass before restarting `mode=build`. Never infer that the new route works until the keys-check returns success.
+
+```bash
+gh workflow run build-mpr.yml --ref main -f mode=keys-check -R Domessy/ffr-ipados-build
+```
+
 ## Checkpointing is enabled from the first build
 
 The MPR pipeline uses the existing append-only CAS backend with its own
