@@ -72,6 +72,26 @@ class MPRGatewayTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     mpr.local_source()
 
+    def test_diagnostic_reports_only_fixed_status_codes(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            game = root / "game"
+            game.mkdir()
+            self.make_base(game)
+            keys = root / "prod.keys"
+            keys.write_text("synthetic private test bytes")
+            with patch.object(mpr, "local_source", return_value=game), \
+                 patch.object(parent, "PRIVATE", keys), \
+                 patch("builtins.print") as output:
+                self.assertEqual(mpr.dispatch("mpr-diagnose-v1", parent), 0)
+                output.assert_called_once_with("MPR_DIAG_V1 source=ok base=ok keys=ok")
+            keys.unlink()
+            with patch.object(mpr, "local_source", side_effect=ValueError("sensitive path")), \
+                 patch.object(parent, "PRIVATE", keys), \
+                 patch("builtins.print") as output:
+                self.assertEqual(mpr.dispatch("mpr-diagnose-v1", parent), 0)
+                output.assert_called_once_with("MPR_DIAG_V1 source=fail base=fail keys=fail")
+
     def test_allowlist_and_cache_scope_restoration(self):
         self.assertEqual(mpr.dispatch("mpr-arbitrary-shell", parent), 126)
         previous = parent.CACHE, parent.CONFLICTS, parent.OUTPUT
