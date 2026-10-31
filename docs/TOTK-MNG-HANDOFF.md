@@ -34,13 +34,18 @@ The six genuine files must come from the owner's Switch firmware or an existing 
 
 The existing FFR private `prod.keys` is reused behind the forced SSH key; its bytes are never committed or printed.
 
-## Disk budget — current blocker
+## Disk budget — isolated staged-build candidate (not yet validated)
 
-The MacNativeGames builder enforces at least **60 GiB free** at the beginning of an iOS build with an update, when source and output share a filesystem and the game data has not previously been extracted. This condition holds even for `--ios-game-data documents` on a fresh build.
+Stock MacNativeGames requires at least **60 GiB free** when an iOS base+update build starts on a fresh shared work/output volume. The source NSPs require another ~16.46 GiB; with our earlier runner's ~55.6 GiB initially free, the stock workflow cannot start.
 
-The source NSPs together are approximately 17.68 GB (16.46 GiB). Our previous `xcode-27` BOTW preflight left ~55.6 GiB free BEFORE transfer. A conservative admission threshold for full MNG processing is 63 GiB plus the byte size of both NSPs, about 79.5 GiB. Consequently, a normal `xcode-27` runner **will be rejected before transferring private files**. This is intentional; it is not a failed port or an MNG incompatibility.
+A pinned, fail-closed ephemeral-runner adapter (`security/totk_mng_compact.py`) now attempts to reduce peak disk use **without bypassing the code/IVFC/hash checks**:
 
-Do not patch out the upstream disk check without measuring realistic peak usage or obtaining a technically justified alternative. Options for a later change include a runner with more storage, verified alternate APFS volume arrangement, or a remote read-only source mount with suitable isolation. None has yet been implemented or validated.
+1. After verifying the base RomFS and producing its overlays, delete the *redundant decrypted base RomFS copy* from the runner. The update merge reads the original base NSP directly, not that RomFS copy.
+2. After the 1.4.3 update is merged and verified, extract the optional game icon, then delete only the *two staged NSP copies* in `$RUNNER_TEMP/totk-mng-nsp/`. They remain untouched on CachyOS.
+3. Build the shaders and the **full IPA**, retaining the verified v143 RomFS image and sufficient free working space.
+4. Only for this one environment, set the builder's initial disk admission to **34 GiB after source transfer**; leave its original requirement for all other builds. The workflow demands **37 GiB plus the exact input bytes before transfer**, **35 GiB after transfer**, and monitors a **7 GiB** free-space floor during the build. A failure aborts cleanly and sends private diagnostics.
+
+Given previous runner measurements, the new initial threshold is around **53.5 GiB**, potentially feasible. It is a reasoned experiment, not proof of peak consumption or gameplay stability. If the disk floor is breached, stop and collect the build log rather than disabling safeguards. No MNG IPA has yet been built through this compact path.
 
 ## Build command on CachyOS
 
@@ -58,7 +63,7 @@ Then set `~/portage-ipados/zelda-totk-mng/source` to the game source folder and 
 gh workflow run build-totk-mng.yml --ref main -f mode=preflight -R Domessy/ffr-ipados-build
 ```
 
-Only if the preflight's capacity check passes, select `mode=build`. No actual MNG IPA has been produced yet.
+Only if the preflight capacity check passes, select `mode=build` and `package=full`. A full IPA build is the initial target; `slim` remains available as fallback. The compact stage has not yet been tested on a hosted runner.
 
 ## Diagnostics
 
