@@ -24,7 +24,7 @@ class MPRGatewayTests(unittest.TestCase):
             fake = folder / "fake.keys"
             fake.write_text("test fixture only")
             with patch.object(mpr, "local_source", return_value=folder), \
-                 patch.object(parent, "PRIVATE", fake):
+                 patch.object(mpr, "KEYS", fake):
                 self.assertEqual(mpr.base_file(), (file, 0))
                 with patch("builtins.print") as output:
                     self.assertEqual(mpr.dispatch("mpr-manifest-v1", parent), 0)
@@ -81,16 +81,36 @@ class MPRGatewayTests(unittest.TestCase):
             keys = root / "prod.keys"
             keys.write_text("synthetic private test bytes")
             with patch.object(mpr, "local_source", return_value=game), \
-                 patch.object(parent, "PRIVATE", keys), \
+                 patch.object(mpr, "KEYS", keys), \
                  patch("builtins.print") as output:
                 self.assertEqual(mpr.dispatch("mpr-diagnose-v1", parent), 0)
                 output.assert_called_once_with("MPR_DIAG_V1 source=ok base=ok keys=ok")
             keys.unlink()
             with patch.object(mpr, "local_source", side_effect=ValueError("sensitive path")), \
-                 patch.object(parent, "PRIVATE", keys), \
+                 patch.object(mpr, "KEYS", keys), \
                  patch("builtins.print") as output:
                 self.assertEqual(mpr.dispatch("mpr-diagnose-v1", parent), 0)
                 output.assert_called_once_with("MPR_DIAG_V1 source=fail base=fail keys=fail")
+
+    def test_private_key_path_is_independent_of_shared_ffr(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "prod.keys"
+            p.write_text("test private")
+            with patch.object(mpr, "KEYS", p):
+                self.assertEqual(mpr.private_keys(), p)
+                with patch.object(parent, "send_file") as send:
+                    self.assertEqual(mpr.dispatch("mpr-read-keys", parent), 0)
+                    send.assert_called_once_with(p)
+                p.unlink()
+                with self.assertRaises(ValueError):
+                    mpr.private_keys()
+                # A symlink is deliberately disallowed to keep the project
+                # independent from paths that may be removed later.
+                original = Path(d) / "origin.keys"
+                original.write_text("origin test")
+                p.symlink_to(original)
+                with self.assertRaises(ValueError):
+                    mpr.private_keys()
 
     def test_allowlist_and_cache_scope_restoration(self):
         self.assertEqual(mpr.dispatch("mpr-arbitrary-shell", parent), 126)
