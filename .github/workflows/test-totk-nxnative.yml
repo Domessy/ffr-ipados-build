@@ -1,0 +1,54 @@
+name: TOTK nxnative - synthetic security tests
+
+on:
+  push:
+    branches:
+      - feature/totk-nxnative-preflight
+    paths:
+      - '.github/workflows/build-totk-nxnative.yml'
+      - '.github/workflows/test-totk-nxnative.yml'
+      - 'security/ffr_ssh_gate.py'
+      - 'security/totknx_*.py'
+      - 'security/run_totknx.py'
+      - 'security/cache_export.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: totknx-tests-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  safety-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout the tested commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Verify Python syntax and unit tests (synthetic only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            security/ffr_ssh_gate.py security/totknx_gateway.py \
+            security/totknx_transfer.py security/run_totknx.py \
+            security/cache_export.py security/test_cache_import.py \
+            security/test_totknx_gateway.py security/test_totknx_transfer.py
+          python3 -m unittest -v \
+            security/test_cache_import.py \
+            security/test_totknx_gateway.py \
+            security/test_totknx_transfer.py
+      - name: Confirm workflow was not configured to transfer game data
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -R -E 'totknx-read-(base|update|keys)|totknx-write-ipa|FFR_SSH_KEY|FFR_TS_AUTHKEY' \
+              .github/workflows/test-totk-nxnative.yml; then
+            echo 'Unsafe test-only workflow reference.' >&2
+            exit 1
+          fi
+          echo 'Synthetic checks only: no SSH, Switch keys, NSP or real game data.'
