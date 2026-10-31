@@ -6,6 +6,7 @@ selects one immediate ~/Documents folder through a project-local symlink.
 """
 from pathlib import Path
 import re
+import stat
 
 ROOT = Path.home() / "portage-ipados" / "metroid-prime-remastered"
 SOURCE = ROOT / "source"
@@ -15,7 +16,7 @@ OUTPUT = ROOT / "resultats"
 TITLE = "010012101468C000"
 UPDATE = "010012101468C800"
 ROUTES = frozenset({
-    "mpr-probe-v1", "mpr-manifest-v1",
+    "mpr-probe-v1", "mpr-manifest-v1", "mpr-diagnose-v1",
     "mpr-read-base", "mpr-read-keys", "mpr-read-cache",
     "mpr-write-cache", "mpr-write-ipa", "mpr-write-log",
 })
@@ -66,9 +67,35 @@ def base_file():
     return base, sum(u for p,b,u in validated if p != base)
 
 
+def diagnose(parent):
+    """Fixed codes only: no private filenames, paths, key bytes or exceptions."""
+    source_ok = False
+    nsp_ok = False
+    key_ok = False
+    try:
+        local_source()
+        source_ok = True
+        base_file()
+        nsp_ok = True
+    except (OSError, ValueError):
+        pass
+    try:
+        if parent.PRIVATE.is_file():
+            with parent.PRIVATE.open("rb") as stream:
+                key_ok = stat.S_ISREG(parent.PRIVATE.stat().st_mode) and bool(stream.read(1))
+    except (OSError, ValueError):
+        pass
+    print(f"MPR_DIAG_V1 source={'ok' if source_ok else 'fail'} "
+          f"base={'ok' if nsp_ok else 'fail'} "
+          f"keys={'ok' if key_ok else 'fail'}")
+    return 0
+
+
 def dispatch(command, parent):
     if command not in ROUTES:
         return 126
+    if command == "mpr-diagnose-v1":
+        return diagnose(parent)
     if command == "mpr-probe-v1":
         base_file()
         if not parent.PRIVATE.is_file():
