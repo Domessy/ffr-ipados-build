@@ -111,7 +111,7 @@ jobs:
           free_kb=$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')
           # Sufficient space for v0 game data, extracted RomFS, shader CAS and IPA.
           if [ "$free_kb" -lt 55000000 ]; then
-            echo 'TOTKNX runner disk below initial 42 GB admission guard.' >&2
+            echo 'TOTKNX runner disk below initial 55 GB admission guard.' >&2
             exit 1
           fi
 
@@ -223,7 +223,7 @@ jobs:
           chmod 600 "$HOME/.ssh/config"
           # Require the local path-scoped TOTKNX gateway, before any private data.
           # Key-only checks must not depend on the local game directory:
-          # a failed TOTKNX source probe previously prevented key diagnosis.
+          # key-only checks deliberately skip source probing.
           if [ "${{ inputs.mode }}" = "keys-check" ]; then
             [ "$(ssh -o ConnectTimeout=15 ffr-cachyos probe)" = 'FFR_GATEWAY_OK' ]
           else
@@ -273,7 +273,7 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
-          # Restricted Metroid-only key route; no dependence on deleted FFR folders.
+          # Restricted TOTK nxnative-only key route; no dependence on deleted FFR folders.
           # The key is a local file owned by the TOTKNX project on CachyOS.
           # Never print key bytes, only private validation status.
           ssh -o ConnectTimeout=20 -o ServerAliveInterval=30 -o ServerAliveCountMax=6 \
