@@ -87,6 +87,41 @@ Only if the preflight capacity check passes, select `mode=build` and `package=fu
 
 No workflow is scheduled to auto-trigger. No actions in this project modify the user's system outside the project directory, nor can they install applications on the iPad without a separate device interaction.
 
+## Parallel comparison: nxnative TOTK 1.4.3 (planned, NOT built)
+
+This remains a separate requested workstream. **Do not overwrite the known
+functional MacNativeGames IPA.** The initial priority was MacNativeGames; the
+nxnative TOTK route is retained for a side-by-side test on iPad Pro M5.
+
+- Upstream nxnative already has a TOTK title profile at
+  `dm/games/0100F2C0115B6000/` for **base v0 + update 1.4.3 (v720896)**,
+  matching the user's original source files in
+  `~/Documents/The Legend of Zelda Tears of the Kingdom/`.
+- Upstream reports native iPhone operation with a 60 FPS frame-step path.
+  This is not an iPad M5 performance measurement; recent upstream notes still
+  flag transient high memory use and some rendering cases needing validation.
+- Separate GitHub Actions workflow, separate local cache and output filename
+  are required. Retain `ZeldaTOTK-MacNativeGames.ipa` unchanged.
+- Reuse private, controlled reading of the two original NSP files already
+  validated for the MNG build, but **do not depend on any deleted legacy
+  FFR private-key path**. The user's TOTK source folder also contains its own
+  `prod.keys`; keep key bytes private and use an isolated owned copy
+  (no public upload, no symbolic reference to deleted game projects).
+- Use checkpointed nxnative `DMSH_CAS` shader storage on CachyOS with
+  periodic incremental snapshots and private diagnostic logs, ideally
+  reusing proven BOTW/MPR helper behavior without mixing shader caches.
+- Preflight disk capacity with real original NSP sizes: base
+  17,150,647,554 bytes and update 526,970,136 bytes; account for large
+  extracted RomFS and compilation/packaging overhead. Do not infer success
+  from the MNG disk footprint, as the nxnative toolchain differs.
+- Compare launch, visuals, FPS, thermals, memory, startup pipeline warm-up,
+  save/reload, control mapping and longer gameplay on the **same** iPad M5.
+
+As of 2026-10-31, **only the MacNativeGames TOTK build exists in our workflow**.
+The nxnative comparison workflow has not yet been added or run. Do not launch
+a second long build while the user's Metroid Prime Remastered runner is active,
+unless the user explicitly prioritizes that scheduling.
+
 ## Next reliability work (NOT IMPLEMENTED)
 
 The user correctly flagged the missing checkpoint mechanism before the initial run completed. The current workflow cannot resume its stage 4/4 from a canceled runner. Address this before substantial follow-on work:
