@@ -262,6 +262,31 @@ jobs:
             exit 1
           fi
 
+      - name: Recuperer et verifier les cles privees AVANT le NSP
+        if: ${{ inputs.mode == 'build' }}
+        run: |
+          set -euo pipefail
+          umask 077
+          # Existing shared read-only route, used by the other verified game pipelines.
+          # Never print the file contents or its filesystem path in CI logs.
+          ssh -o ConnectTimeout=20 -o ServerAliveInterval=30 -o ServerAliveCountMax=6 \
+            ffr-cachyos read-keys > "$RUNNER_TEMP/mpr-prod.keys"
+          chmod 600 "$RUNNER_TEMP/mpr-prod.keys"
+          test -s "$RUNNER_TEMP/mpr-prod.keys"
+          # Only sanity-check the key-file structure, without disclosing values.
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          p = Path(os.environ["RUNNER_TEMP"]) / "mpr-prod.keys"
+          lines = p.read_bytes().splitlines()
+          if len(lines) < 4 or not any(
+              line.strip().startswith(b"header_key =") or line.strip().startswith(b"header_key=")
+              for line in lines
+          ):
+              raise SystemExit("MPR private key file is missing expected header_key")
+          print("MPR private keys: received and structurally verified before source transfer.")
+          PY
+
       - name: Transferer le seul NSP de base MPR 1.0.0
         if: ${{ inputs.mode == 'build' }}
         run: |
@@ -271,7 +296,6 @@ jobs:
           read -r TITLE VERSION B UPDATES <<< "$(ssh ffr-cachyos mpr-manifest-v1)"
           [[ "$TITLE" == "010012101468C000" && "$VERSION" == 0 ]]
           python3 security/mpr_transfer.py base "$B" "$RUNNER_TEMP/mpr-nsp/Metroid Prime Remastered [010012101468C000][v0].nsp"
-          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 ffr-cachyos mpr-read-keys > "$RUNNER_TEMP/mpr-prod.keys"
           test -s "$RUNNER_TEMP/mpr-prod.keys"
           echo 'MPR source transfer complete; original remains on CachyOS.'
 
