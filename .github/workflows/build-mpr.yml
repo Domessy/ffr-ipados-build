@@ -222,7 +222,15 @@ jobs:
           } > "$HOME/.ssh/config"
           chmod 600 "$HOME/.ssh/config"
           # Require the local path-scoped MPR gateway, before any private data.
-          [ "$(ssh -o ConnectTimeout=15 ffr-cachyos mpr-probe-v1)" = 'MPR_GATEWAY_V1' ]
+          # Key-only checks must not depend on the local game directory:
+          # a failed MPR source probe previously prevented key diagnosis.
+          if [ "${{ inputs.mode }}" = "keys-check" ]; then
+            [ "$(ssh -o ConnectTimeout=15 ffr-cachyos probe)" = 'FFR_GATEWAY_OK' ]
+          else
+            # Safe fixed-code diagnostics, intentionally no paths or key data.
+            ssh -o ConnectTimeout=15 ffr-cachyos mpr-diagnose-v1
+            [ "$(ssh -o ConnectTimeout=15 ffr-cachyos mpr-probe-v1)" = 'MPR_GATEWAY_V1' ]
+          fi
 
       - name: Verifier le jeu MPR v0 et le budget disque sans transfert
         run: |
