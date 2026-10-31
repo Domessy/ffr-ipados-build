@@ -185,7 +185,7 @@ jobs:
             --authkey="$TS_AUTHKEY" \
             --accept-dns=false \
             --timeout=120s \
-            --hostname="totk_mng-ci-${GITHUB_RUN_ID}"
+            --hostname="totk-mng-ci-${GITHUB_RUN_ID}"
           sudo -n "$TS_CLI" --socket="$TS_SOCKET" status --json \
             | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("BackendState") == "Running"; print("Tailscale running; macOS system DNS unchanged.")'
 
