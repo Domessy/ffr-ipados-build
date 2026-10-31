@@ -92,12 +92,21 @@ def main():
             return 2
         cmd.extend(["--device-gpu", gpu])
     LOG.parent.mkdir(parents=True, exist_ok=True)
+    # Adapt only the exact pinned upstream on this ephemeral CI runner.
+    adapter = Path(__file__).with_name("totk_mng_compact.py")
+    checked = subprocess.run(
+        [sys.executable, str(adapter), "--builder", str(REPO / "build_app.py")],
+        check=False, timeout=30)
+    if checked.returncode:
+        print("TOTK compact builder adaptation failed", flush=True)
+        return 2
     started = time.monotonic()
     planned_stop = False
     print(f"TOTK MacNativeGames starting: package={package}; GPU-specific archive={'yes' if gpu else 'no'}", flush=True)
     with LOG.open("wb") as logfile:
         active = subprocess.Popen(cmd, cwd=REPO, stdin=subprocess.DEVNULL,
                                   stdout=logfile, stderr=subprocess.STDOUT,
+                                  env={**os.environ, "TOTK_MNG_COMPACT": "1"},
                                   start_new_session=True)
         try:
             while active.poll() is None:
