@@ -10,6 +10,7 @@ on:
         default: preflight
         options:
           - preflight
+          - keys-check
           - build
 
 permissions:
@@ -263,7 +264,7 @@ jobs:
           fi
 
       - name: Recuperer et verifier les cles privees AVANT le NSP
-        if: ${{ inputs.mode == 'build' }}
+        if: ${{ inputs.mode == 'build' || inputs.mode == 'keys-check' }}
         run: |
           set -euo pipefail
           umask 077
@@ -286,6 +287,9 @@ jobs:
               raise SystemExit("MPR private key file is missing expected header_key")
           print("MPR private keys: received and structurally verified before source transfer.")
           PY
+          if [ "${{ inputs.mode }}" = "keys-check" ]; then
+            echo 'MPR keys-check passed; the game NSP was not transferred.'
+          fi
 
       - name: Transferer le seul NSP de base MPR 1.0.0
         if: ${{ inputs.mode == 'build' }}
