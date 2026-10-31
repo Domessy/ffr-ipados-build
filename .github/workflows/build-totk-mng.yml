@@ -53,8 +53,8 @@ jobs:
       - name: Verifier les scripts avant tout transfert prive
         run: |
           set -euo pipefail
-          python3 -m py_compile security/ffr_ssh_gate.py security/totk_mng_gateway.py security/totk_mng_transfer.py security/run_totk_mng.py security/test_totk_mng_gateway.py security/test_totk_mng_transfer.py
-          python3 -m unittest -v security/test_totk_mng_gateway.py security/test_totk_mng_transfer.py
+          python3 -m py_compile security/ffr_ssh_gate.py security/totk_mng_gateway.py security/totk_mng_transfer.py security/totk_mng_compact.py security/run_totk_mng.py security/test_totk_mng_gateway.py security/test_totk_mng_transfer.py security/test_totk_mng_compact.py
+          python3 -m unittest -v security/test_totk_mng_gateway.py security/test_totk_mng_transfer.py security/test_totk_mng_compact.py
 
       - name: Preparer Xcode 27.1 et liberer de l'espace
         run: |
@@ -141,6 +141,7 @@ jobs:
           git -C "$RUNNER_TEMP/macnativegames" fetch -q --depth 1 origin "$MNG_SHA"
           git -C "$RUNNER_TEMP/macnativegames" checkout -q --detach FETCH_HEAD
           test "$(git -C "$RUNNER_TEMP/macnativegames" rev-parse HEAD)" = "$MNG_SHA"
+          python3 security/totk_mng_compact.py --check --builder "$RUNNER_TEMP/macnativegames/build_app.py"
 
       - name: Installer Tailscale en ligne de commande (sans action DNS)
         run: |
@@ -222,7 +223,10 @@ jobs:
           [[ "$TITLE" == 0100F2C0115B6000 && "$VERSION" == 720896 ]]
           [[ "$BASE" =~ ^[1-9][0-9]*$ && "$UPDATE" =~ ^[1-9][0-9]*$ ]]
           free=$(( $(df -Pk "$RUNNER_TEMP" | awk 'NR==2 {print $4}') * 1024 ))
-          needed=$(( 63 * 1024**3 + BASE + UPDATE ))
+          # Compact CI mode: the verified base RomFS is deleted before the
+          # update merge, then temporary NSP copies are removed before IPA
+          # packaging. Keep 37 GiB AFTER private source transfer.
+          needed=$(( 37 * 1024**3 + BASE + UPDATE ))
           echo "TOTK sources=2; total_bytes=$((BASE+UPDATE)); fonts_ready=$FONTS"
           echo "TOTK free_bytes=$free; required_safe_bytes=$needed"
           if [ "$FONTS" != 1 ]; then
@@ -230,7 +234,7 @@ jobs:
             exit 1
           fi
           if (( free < needed )); then
-            echo 'BLOCKED: runner too small (MacNativeGames needs 60 GiB AFTER the NSPs are transferred).' >&2
+            echo 'BLOCKED: runner too small for verified staged TOTK build (37 GiB after transfer).' >&2
             exit 1
           fi
           echo 'TOTK preflight passed.'
@@ -250,7 +254,7 @@ jobs:
             | tar -xz -C "$RUNNER_TEMP/totk-mng-fonts"
           test "$(find "$RUNNER_TEMP/totk-mng-fonts" -maxdepth 1 -type f -name '*.bfttf' | wc -l | tr -d ' ')" -eq 6
           free=$(( $(df -Pk "$RUNNER_TEMP" | awk 'NR==2 {print $4}') * 1024 ))
-          (( free >= 60 * 1024**3 )) || { echo 'Insufficient disk after NSP transfer.' >&2; exit 1; }
+          (( free >= 35 * 1024**3 )) || { echo 'Insufficient disk after transfer for staged TOTK build.' >&2; exit 1; }
 
       - name: Compiler TOTK 1.4.3 via MacNativeGames
         if: ${{ inputs.mode == 'build' }}
