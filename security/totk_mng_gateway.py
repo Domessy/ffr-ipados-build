@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """TOTK 1.4.3 source gateway. Fixed commands only; never expose arbitrary paths."""
-import io
 from pathlib import Path
-import re
 import tarfile
 
 ROOT = Path.home() / "portage-ipados" / "zelda-totk-mng"
@@ -74,11 +72,7 @@ def font_files():
             return None
         if not 8 < p.stat().st_size < 32 * 1024**2:
             return None
-        with p.open("rb") as stream:
-            if stream.read(4) != b"BFTF":
-                # BFTTF exact structure and firmware authenticity checked upstream.
-                # Don't reject a valid file solely for a guessed magic.
-                pass
+        # MacNativeGames validates the BFTTF structure and its actual SHA-256.
         result.append(p)
     return result
 
