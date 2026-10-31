@@ -1,0 +1,234 @@
+name: Zelda TOTK - MacNativeGames preflight and IPA
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Capacity check first, then build using identical private sources
+        type: choice
+        required: true
+        default: preflight
+        options:
+          - preflight
+
+permissions:
+  contents: read
+
+concurrency:
+  group: totk-mng-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # Explicitly enabled only by security/harden-cachyos.sh on the user's PC.
+    if: vars.FFR_SECURITY_READY == 'true'
+    # Apple Silicon standard, public repositories: GitHub Xcode 27 image.
+    runs-on: xcode-27
+    # GitHub-hosted jobs may run up to 360 min. Keep a margin for private log upload and cleanup.
+    timeout-minutes: 345
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Recuperer les scripts de cache du meme commit GitHub
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Verifier les scripts avant tout transfert prive
+        run: |
+          set -euo pipefail
+          python3 -m py_compile security/ffr_ssh_gate.py security/totk_mng_gateway.py security/totk_mng_transfer.py security/run_totk_mng.py security/test_totk_mng_gateway.py
+          python3 -m unittest -v security/test_totk_mng_gateway.py
+
+      - name: Preparer Xcode 27.1 et liberer de l'espace
+        run: |
+          set -euo pipefail
+          echo 'Espace initial :'
+          df -h "$RUNNER_TEMP"
+          # Xcode 27.1 for Apple Silicon Metal pipelines.
+          KEEP=/Applications/Xcode_27.1.app
+          if [ ! -d "$KEEP/Contents/Developer" ]; then
+            echo 'Xcode 27.1 indisponible sur cette image GitHub.' >&2
+            exit 1
+          fi
+          echo "Xcode conserve : $KEEP"
+          sudo xcode-select -s "$KEEP/Contents/Developer"
+          for app in /Applications/Xcode_*.app; do
+            [ -d "$app" ] || continue
+            [ "$app" = "$KEEP" ] && continue
+            [ -L "$app" ] && continue
+            echo "Suppression sur runner ephemere : $app"
+            sudo rm -rf -- "$app"
+          done
+          xcodebuild -version
+          # Since Xcode 26, the Metal toolchain is an optional component.
+          if ! xcodebuild -showComponent metalToolchain 2>/dev/null | grep -qi 'Status: installed'; then
+            echo 'Installation du Metal Toolchain correspondant a Xcode 27.1.'
+            xcodebuild -downloadComponent metalToolchain
+          fi
+          echo 'Compilateurs Metal selectionnes :'
+          xcrun -sdk macosx metal --version
+          xcrun -sdk iphoneos metal --version
+
+          # xcodebuild uses the iOS DEVICE SDK, not an Android SDK or
+          # simulator runtime. All cleanup is confined to this ephemeral runner,
+          # never to CachyOS or any developer workstation.
+          echo 'Liberation espace temporaire pour TOTK.'
+          if [ "$HOME" = "/Users/runner" ]; then
+            for sdk in "$HOME/Library/Android/sdk" "$HOME/Library/Android/Sdk"; do
+              if [ -d "$sdk" ] && [ ! -L "$sdk" ]; then
+                du -sh "$sdk" || true
+                sudo rm -rf -- "$sdk"
+              fi
+            done
+          fi
+          free_kb=$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')
+          if [ "$free_kb" -lt 55000000 ]; then
+            echo 'Espace encore limite: nettoyage des runtimes de simulateurs GitHub inutilises.'
+            xcrun simctl runtime list || true
+            # On Xcode 27 this supported simctl operation removes simulator
+            # runtime disk images, not the iOS device SDK or Metal compiler.
+            # Bound its runtime to avoid hanging a hosted job indefinitely.
+            python3 - <<'PY'
+          import subprocess
+          try:
+              p = subprocess.run(
+                  ["xcrun", "simctl", "runtime", "delete", "all"],
+                  capture_output=True, text=True, timeout=240, check=False)
+              print(f"Simulator runtime cleanup exit code: {p.returncode}")
+              if p.returncode:
+                  print("Simulator runtime cleanup unavailable; continuing to disk preflight.")
+          except (OSError, subprocess.TimeoutExpired):
+              print("Simulator runtime cleanup timed out/unavailable; continuing to disk preflight.")
+          PY
+            xcrun simctl delete unavailable || true
+          fi
+          df -h "$RUNNER_TEMP"
+          free_kb=$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')
+          # TOTK cache is independent from all other titles.
+          # Reserve capacity for shaders, NSPs and
+          # assemble an IPA. Abort BEFORE any private transfer if too tight.
+          if [ "$free_kb" -lt 55000000 ]; then
+            echo "Espace insuffisant avant restauration du cache TOTK ($free_kb Ko, objectif 55000000 Ko)." >&2
+            echo 'Aucune donnee du jeu ne sera transferee.' >&2
+            exit 1
+          fi
+
+      - name: Installer outils MacNativeGames 1.4.3
+        run: |
+          set -euo pipefail
+          export HOMEBREW_NO_AUTO_UPDATE=1
+          brew install python@3.14 opus libvpx xcodegen cmake ninja
+          MNG_SHA=933b6a0d1438de160208a0a13eb5e8d7a2cb8094
+          git init -q "$RUNNER_TEMP/macnativegames"
+          git -C "$RUNNER_TEMP/macnativegames" remote add origin https://github.com/ly05010419/MacNativeGames.git
+          git -C "$RUNNER_TEMP/macnativegames" fetch -q --depth 1 origin "$MNG_SHA"
+          git -C "$RUNNER_TEMP/macnativegames" checkout -q --detach FETCH_HEAD
+          test "$(git -C "$RUNNER_TEMP/macnativegames" rev-parse HEAD)" = "$MNG_SHA"
+
+      - name: Installer Tailscale en ligne de commande (sans action DNS)
+        run: |
+          set -euo pipefail
+          export HOMEBREW_NO_AUTO_UPDATE=1
+          for attempt in 1 2 3; do
+            if brew install --formula tailscale; then break; fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep 15
+          done
+          command -v tailscale
+          command -v tailscaled
+
+      - name: Connecter Tailscale sans modifier les DNS macOS
+        env:
+          TS_AUTHKEY: ${{ secrets.FFR_TS_AUTHKEY }}
+        run: |
+          set -euo pipefail
+          test -n "$TS_AUTHKEY"
+          TS_CLI="$(command -v tailscale)"
+          TS_DAEMON="$(command -v tailscaled)"
+          TS_SOCKET="$RUNNER_TEMP/totk_mng-tailscaled.sock"
+          # Temporary daemon with in-memory state; no persistent login data.
+          nohup sudo -n "$TS_DAEMON" --state=mem: --socket="$TS_SOCKET" \
+            > "$RUNNER_TEMP/totk_mng-tailscaled.log" 2>&1 < /dev/null &
+          echo "$!" > "$RUNNER_TEMP/totk_mng-tailscaled.pid"
+          daemon_ready=0
+          for attempt in $(seq 1 30); do
+            if sudo -n "$TS_CLI" --socket="$TS_SOCKET" status --json > /dev/null 2>&1; then
+              daemon_ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$daemon_ready" -ne 1 ]; then
+            echo 'Tailscale daemon did not become ready.' >&2
+            exit 1
+          fi
+          # No MagicDNS required: the host is reached by its Tailscale IPv4 address.
+          sudo -n "$TS_CLI" --socket="$TS_SOCKET" up \
+            --authkey="$TS_AUTHKEY" \
+            --accept-dns=false \
+            --timeout=120s \
+            --hostname="totk_mng-ci-${GITHUB_RUN_ID}"
+          sudo -n "$TS_CLI" --socket="$TS_SOCKET" status --json \
+            | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("BackendState") == "Running"; print("Tailscale running; macOS system DNS unchanged.")'
+
+      - name: Configurer SSH avec cle d'hote epinglee
+        env:
+          SSH_KEY: ${{ secrets.FFR_SSH_KEY }}
+          HOSTKEY: ${{ secrets.FFR_SSH_KNOWN_HOSTS }}
+          PC_IP: ${{ secrets.FFR_TS_HOST }}
+          PC_USER: ${{ secrets.FFR_SSH_USER }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$SSH_KEY" > "$RUNNER_TEMP/totk_mng_ssh_key"
+          printf '%s\n' "$HOSTKEY" > "$RUNNER_TEMP/totk_mng_known_hosts"
+          chmod 600 "$RUNNER_TEMP/totk_mng_ssh_key" "$RUNNER_TEMP/totk_mng_known_hosts"
+          {
+            echo 'Host ffr-cachyos'
+            printf '  HostName %s\n' "$PC_IP"
+            printf '  User %s\n' "$PC_USER"
+            echo '  Port 22'
+            printf '  IdentityFile %s\n' "$RUNNER_TEMP/totk_mng_ssh_key"
+            printf '  UserKnownHostsFile %s\n' "$RUNNER_TEMP/totk_mng_known_hosts"
+            echo '  StrictHostKeyChecking yes'
+            echo '  IdentitiesOnly yes'
+            echo '  BatchMode yes'
+          } > "$HOME/.ssh/config"
+          chmod 600 "$HOME/.ssh/config"
+          # Require the local path-scoped TOTK gateway, before any private data.
+          [ "$(ssh -o ConnectTimeout=15 ffr-cachyos totk-mng-probe-v1)" = 'TOTK_MNG_GATEWAY_V1' ]
+
+      - name: Verifier la capacite MacNativeGames et les polices
+        run: |
+          set -euo pipefail
+          read -r TITLE VERSION BASE UPDATE FONTS <<< "$(ssh ffr-cachyos totk-mng-manifest-v1)"
+          [[ "$TITLE" == 0100F2C0115B6000 && "$VERSION" == 720896 ]]
+          [[ "$BASE" =~ ^[1-9][0-9]*$ && "$UPDATE" =~ ^[1-9][0-9]*$ ]]
+          free=$(( $(df -Pk "$RUNNER_TEMP" | awk 'NR==2 {print $4}') * 1024 ))
+          needed=$(( 63 * 1024**3 + BASE + UPDATE ))
+          echo "TOTK sources=2; total_bytes=$((BASE+UPDATE)); fonts_ready=$FONTS"
+          echo "TOTK free_bytes=$free; required_safe_bytes=$needed"
+          if [ "$FONTS" != 1 ]; then
+            echo 'BLOCKED: missing six original Switch system shared-font files.' >&2
+            exit 1
+          fi
+          if (( free < needed )); then
+            echo 'BLOCKED: runner too small (MacNativeGames needs 60 GiB AFTER the NSPs are transferred).' >&2
+            exit 1
+          fi
+          echo 'TOTK preflight passed.'
+
+      - name: Nettoyer Tailscale ephemere
+        if: always()
+        run: |
+          TS_SOCKET="$RUNNER_TEMP/totk_mng-tailscaled.sock"
+          if command -v tailscale >/dev/null 2>&1; then
+            sudo -n tailscale --socket="$TS_SOCKET" logout >/dev/null 2>&1 || true
+          fi
+          if [ -s "$RUNNER_TEMP/totk_mng-tailscaled.pid" ]; then
+            sudo -n kill "$(cat "$RUNNER_TEMP/totk_mng-tailscaled.pid")" >/dev/null 2>&1 || true
+          fi
+          rm -f "$RUNNER_TEMP/totk_mng_ssh_key" || true
