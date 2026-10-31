@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from security import zla_transfer as transfer
+from security import la_transfer as transfer
 
 
 class DummySSH:
