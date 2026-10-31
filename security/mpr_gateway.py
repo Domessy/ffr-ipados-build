@@ -9,6 +9,7 @@ import re
 import stat
 
 ROOT = Path.home() / "portage-ipados" / "metroid-prime-remastered"
+KEYS = ROOT / "private" / "prod.keys"
 SOURCE = ROOT / "source"
 CACHE = ROOT / "shader-cache"
 CONFLICTS = ROOT / "shader-cache-conflicts"
@@ -67,6 +68,13 @@ def base_file():
     return base, sum(u for p,b,u in validated if p != base)
 
 
+def private_keys():
+    """Only a private regular file in this project's own directory."""
+    if KEYS.is_symlink() or not KEYS.is_file() or KEYS.stat().st_size == 0:
+        raise ValueError("Metroid project private keys are unavailable")
+    return KEYS
+
+
 def diagnose(parent):
     """Fixed codes only: no private filenames, paths, key bytes or exceptions."""
     source_ok = False
@@ -80,9 +88,9 @@ def diagnose(parent):
     except (OSError, ValueError):
         pass
     try:
-        if parent.PRIVATE.is_file():
-            with parent.PRIVATE.open("rb") as stream:
-                key_ok = stat.S_ISREG(parent.PRIVATE.stat().st_mode) and bool(stream.read(1))
+        path = private_keys()
+        with path.open("rb") as stream:
+            key_ok = stat.S_ISREG(path.stat().st_mode) and bool(stream.read(1))
     except (OSError, ValueError):
         pass
     print(f"MPR_DIAG_V1 source={'ok' if source_ok else 'fail'} "
@@ -98,8 +106,7 @@ def dispatch(command, parent):
         return diagnose(parent)
     if command == "mpr-probe-v1":
         base_file()
-        if not parent.PRIVATE.is_file():
-            raise ValueError("private prod.keys not configured")
+        private_keys()
         print("MPR_GATEWAY_V1")
         return 0
     if command == "mpr-manifest-v1":
@@ -110,9 +117,8 @@ def dispatch(command, parent):
         parent.send_file(base_file()[0])
         return 0
     if command == "mpr-read-keys":
-        if not parent.PRIVATE.is_file():
-            raise ValueError("private prod.keys not configured")
-        parent.send_file(parent.PRIVATE, allow_key_link=True)
+        private_keys()
+        parent.send_file(private_keys())
         return 0
     previous = parent.CACHE, parent.CONFLICTS, parent.OUTPUT
     try:
