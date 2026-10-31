@@ -12,7 +12,7 @@ OUTPUT = ROOT / "resultats"
 TITLE = "0100F2C0115B6000"
 VERSION = 720896
 ROUTES = frozenset({
-    "totknx-probe-v1", "totknx-manifest-v1",
+    "totknx-probe-v1", "totknx-diagnose-v1", "totknx-manifest-v1",
     "totknx-read-base", "totknx-read-update", "totknx-read-keys",
     "totknx-read-cache", "totknx-write-cache",
     "totknx-write-ipa", "totknx-write-log",
@@ -69,9 +69,31 @@ def private_keys():
     return KEYS
 
 
+def diagnose():
+    source = package = keys = False
+    try:
+        source_folder()
+        source = True
+        packages()
+        package = True
+    except (OSError, ValueError):
+        pass
+    try:
+        private_keys()
+        keys = True
+    except (OSError, ValueError):
+        pass
+    print(f"TOTKNX_DIAG_V1 source={'ok' if source else 'fail'} "
+          f"packages={'ok' if package else 'fail'} "
+          f"keys={'ok' if keys else 'fail'}")
+    return 0
+
+
 def dispatch(command, parent):
     if command not in ROUTES:
         return 126
+    if command == "totknx-diagnose-v1":
+        return diagnose()
     if command == "totknx-probe-v1":
         packages()
         private_keys()
