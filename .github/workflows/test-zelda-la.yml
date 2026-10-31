@@ -1,0 +1,49 @@
+name: Link's Awakening nxnative - synthetic security tests
+
+on:
+  push:
+    branches:
+      - feature/zelda-links-awakening-nxnative
+    paths:
+      - '.github/workflows/build-zelda-la.yml'
+      - '.github/workflows/test-zelda-la.yml'
+      - 'security/ffr_ssh_gate.py'
+      - 'security/la_*.py'
+      - 'security/test_la_*.py'
+      - 'security/run_la.py'
+      - 'security/cache_export.py'
+      - 'security/setup_la.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zla-tests-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  safety-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout the tested commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Verify Python syntax and unit tests (synthetic only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            security/ffr_ssh_gate.py security/la_gateway.py \
+            security/la_transfer.py security/run_la.py \
+            security/cache_export.py security/test_cache_import.py \
+            security/test_la_gateway.py security/test_la_transfer.py
+          bash -n security/setup_la.sh
+          python3 -m unittest -v \
+            security/test_cache_import.py \
+            security/test_la_gateway.py \
+            security/test_la_transfer.py
+      - name: Confirm this run performed only synthetic checks
+        run: echo 'No SSH connection, private keys, NSP or game data used.'
