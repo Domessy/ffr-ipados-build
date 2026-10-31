@@ -26,7 +26,20 @@ Required private resources:
 - `shader-cache/`, `shader-cache-conflicts/`, and `resultats/` are project-isolated.
 - The output is `resultats/ZeldaTOTK-nxnative.ipa`; diagnostics `resultats/totknx-build.log`.
 
-After the Metroid job terminates and no other game build uses the checkout, prepare the files:
+After the Metroid job terminates, and after this branch has been merged to `main`, update the existing local checkout and run the reversible preparation script:
+
+```bash
+cd "$HOME/portage-ipados/ff-resonance/github-build"
+git status --short
+git pull --ff-only origin main
+bash security/setup_totknx.sh
+python3 -m unittest -v security/test_cache_import.py security/test_totknx_gateway.py security/test_totknx_transfer.py
+```
+
+The script checks the exact base/update identities and sizes; it creates the TOTK-only source link, copies the original TOTK-local keys to a private regular file, and refuses to overwrite a mismatched private copy. No original NSP, previous game IPA or other project's files are altered.
+
+Alternative manual setup (only needed if the script is not used):
+
 
 ```bash
 ROOT="$HOME/portage-ipados/zelda-totk-nxnative"
@@ -45,7 +58,7 @@ test -f "$ROOT/private/prod.keys" && test ! -L "$ROOT/private/prod.keys" || exit
 chmod 600 "$ROOT/private/prod.keys"
 ```
 
-Use the same local project checkout that the forced SSH key currently executes. Before switching to the feature branch, verify no active job still needs the old gateway:
+Use the same local project checkout that the forced SSH key currently executes. The following feature-branch commands are retained only for branch-only troubleshooting before merge, and must not be mixed with an active game job:
 
 ```bash
 cd "$HOME/portage-ipados/ff-resonance/github-build"
@@ -61,10 +74,10 @@ Do not force-switch a dirty checkout; preserve local edits. Gate output should r
 
 ## Controlled run sequence (not started)
 
-Only when Metroid is finished and the local setup/tests pass:
+Only when Metroid is finished, the changes are merged into main, and the local setup/tests pass:
 
 ```bash
-gh workflow run build-totk-nxnative.yml --ref feature/totk-nxnative-preflight -f mode=preflight -R Domessy/ffr-ipados-build
+gh workflow run build-totk-nxnative.yml --ref main -f mode=preflight -R Domessy/ffr-ipados-build
 ```
 
 If the preflight passes and there is enough runner disk for the original NSP bytes (base `17,150,647,554`, update `526,970,136`, to be rechecked against the local manifest), the build may subsequently be dispatched with `mode=build`. The preflight **does not transfer any NSP or keys**; it checks the private command gateway, compiler compatibility, and free runner capacity. `mode=keys-check` tests key transfer without NSPs but does move key bytes to the ephemeral runner and should only be used deliberately.
