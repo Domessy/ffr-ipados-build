@@ -101,6 +101,27 @@ class TOTKNXGatewayTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     gw.source_folder()
 
+    def test_diagnostic_fixed_codes_never_reveals_paths(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            self.fixtures(folder)
+            keys = folder / "keys"
+            keys.write_text("synthetic")
+            with patch.object(gw, "source_folder", return_value=folder), \
+                 patch.object(gw, "KEYS", keys), \
+                 patch("builtins.print") as output:
+                self.assertEqual(gw.dispatch("totknx-diagnose-v1", parent), 0)
+                output.assert_called_once_with(
+                    "TOTKNX_DIAG_V1 source=ok packages=ok keys=ok"
+                )
+            with patch.object(gw, "source_folder", side_effect=ValueError("hidden path")), \
+                 patch.object(gw, "KEYS", folder / "missing.keys"), \
+                 patch("builtins.print") as output:
+                self.assertEqual(gw.dispatch("totknx-diagnose-v1", parent), 0)
+                output.assert_called_once_with(
+                    "TOTKNX_DIAG_V1 source=fail packages=fail keys=fail"
+                )
+
     def test_command_allowlist_and_separate_cache_scope(self):
         self.assertEqual(gw.dispatch("totknx-shell", parent), 126)
         original = parent.CACHE, parent.CONFLICTS, parent.OUTPUT
