@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TOTK nxnative gateway tests: fake sparse NSPs, fake keys, no retail assets."""
+"""Link's Awakening nxnative gateway tests: fake sparse NSPs, fake keys, no retail assets."""
 import tempfile
 import unittest
 from pathlib import Path
@@ -60,7 +60,7 @@ class ZLAGatewayTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     gw.packages()
                 (folder / "Other.nsp").unlink()
-                sources["update"].rename(folder / "Unknown Update.nsp")
+                sources["update"].rename(folder / "Unknown package.nsp")
                 with self.assertRaises(ValueError):
                     gw.packages()
 
@@ -87,7 +87,7 @@ class ZLAGatewayTests(unittest.TestCase):
             home = Path(d)
             docs = home / "Documents"
             docs.mkdir()
-            game = docs / "TOTK"
+            game = docs / "LinkAwakening"
             game.mkdir()
             project = home / "project"
             project.mkdir()
