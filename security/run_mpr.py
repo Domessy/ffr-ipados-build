@@ -76,6 +76,28 @@ def checkpoint(since_ns, final=False):
     return threshold
 
 
+def sync_private_diagnostic():
+    """Send a bounded snapshot privately; never echo the logfile in public CI."""
+    if not LOG.is_file():
+        return
+    # Last 8 MiB only; gateway atomically replaces the previous diagnostic.
+    with LOG.open("rb") as f:
+        f.seek(max(0, LOG.stat().st_size - 8 * 1024**2))
+        data = f.read(8 * 1024**2)
+    if not data:
+        return
+    try:
+        proc = subprocess.run(
+            ["ssh", "-o", "ConnectTimeout=20", "-o", "ServerAliveInterval=30",
+             "-o", "ServerAliveCountMax=6", "ffr-cachyos", "mpr-write-log"],
+            input=data, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            check=False, timeout=90,
+        )
+        print(f"MPR private log snapshot: bytes={len(data)}, status={'saved' if proc.returncode == 0 else 'failed'}", flush=True)
+    except (OSError, subprocess.TimeoutExpired):
+        print("MPR private diagnostic sync unavailable; build continues.", flush=True)
+
+
 def reclaim_runner_nsps():
     """Delete runner-only NSP copies once nxnative reports its iOS shader stage.
 
@@ -193,6 +215,7 @@ def compile_ipa():
                     public_shader_progress()
                 if time.monotonic() - last_sync >= SNAPSHOT_SECONDS:
                     since_ns = checkpoint(since_ns)
+                    sync_private_diagnostic()
                     last_sync = time.monotonic()
                 if (time.monotonic() - started >= MAX_BUILD_SECONDS
                         or shutil.disk_usage(TEMP).free < MIN_DISK_BYTES):
@@ -208,6 +231,7 @@ def compile_ipa():
     active = None
     public_shader_progress()
     checkpoint(since_ns, final=True)
+    sync_private_diagnostic()
     if planned_stop:
         print("Shader work checkpointed; relaunch a NEW run to resume from CAS.", flush=True)
         return 75
