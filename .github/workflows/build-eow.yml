@@ -127,7 +127,7 @@ jobs:
           fi
           df -h "$RUNNER_TEMP"
           free_kb=$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')
-          # Sufficient space for Odyssey 1.1.0 game data, extracted RomFS, shader CAS and IPA.
+          # Sufficient space for Echoes of Wisdom 1.1.0 game data, extracted RomFS, shader CAS and IPA.
           if [ "$free_kb" -lt 42000000 ]; then
             echo 'EOW runner disk below initial 42 GB admission guard.' >&2
             exit 1
@@ -286,7 +286,7 @@ jobs:
             exit 1
           fi
 
-      - name: Recuperer et verifier les cles privees AVANT le NSP
+      - name: Recuperer et verifier les cles privees AVANT le XCI/NSP
         if: ${{ inputs.mode == 'build' || inputs.mode == 'keys-check' }}
         run: |
           set -euo pipefail
