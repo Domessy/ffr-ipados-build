@@ -7,9 +7,19 @@ Status: code and synthetic GitHub CI prepared; real original NSPs, iPad IPA and 
 - Local original files: `/home/syssy/Documents/Super Mario Odyssey/` with two NSPs and `prod.keys`.
 - Game Title ID: `0100000000010000`; update Title ID: `0100000000010800`.
 - nxnative supported update: **1.4.1 / v393216** on base v0.
-- GitHub-hosted toolchain: Xcode 27.1, pinned `seedds/nxnative@5ce955ada8b7b2a1369461aa1e2c89bbd093e52a` (2026-11-01).
+- GitHub-hosted toolchain: Xcode 27.2 with Metal 32023.922, pinned `seedds/nxnative@5ce955ada8b7b2a1369461aa1e2c89bbd093e52a` (2026-11-01).
 - Upstream game profile: `dm/games/0100000000010000/`. The author reports iPhone gameplay; the user's iPad Pro M5 remains a separate validation target.
 - Launch output: `SuperMarioOdyssey-nxnative.ipa`.
+
+## Xcode / Metal compiler compatibility — 2026-11-01
+
+Run `41288840452` stopped in the dependency setup **before** contacting CachyOS. The pinned nxnative shader chain records both `metal_macosx` and `metal_iphoneos` as `Apple metal version 32023.922 (metalfe-32023.922.4)`. Our initial workflow selected Xcode 27.1 (`32023.921`), causing the explicit compiler mismatch.
+
+Fix: on the disposable `xcode-27` runner, select Xcode 27.2 (resolve the `Xcode_27.2.app` alias to the real app before deleting other Xcode installations), ensure its MetalToolchain is installed, and check both SDK compiler version strings. Keep `own_compilers.py --check-metal` before contacting CachyOS. Do **not** set `DM_ALLOW_OTHER_METAL=1`; untested compiler fingerprints change the shader cache chain and invalidate prior results.
+
+The runner image's installed-tools manifest lists Xcode 27.2 as `/Applications/Xcode_27.2_Release_Candidate.app` with a shortcut `/Applications/Xcode_27.2.app`. If a future image no longer contains it, fail before transferring private data. CI checks the static configuration, while actual compiler success requires a preflight or build run.
+
+After the fix is merged, rerunning **only** `mode=build` is sufficient. The workflow already performs the same preflight/Metal check in `mode=build`; no local `git pull` is needed for a workflow-only change, and the original NSPs and keys remain untouched.
 
 ## Isolation and storage on CachyOS
 

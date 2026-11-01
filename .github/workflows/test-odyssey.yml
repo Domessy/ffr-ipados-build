@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/super-mario-odyssey-nxnative
+      - fix/odyssey-xcode-27-2
     paths:
       - '.github/workflows/build-odyssey.yml'
       - '.github/workflows/test-odyssey.yml'
@@ -45,5 +46,20 @@ jobs:
             security/test_cache_import.py \
             security/test_odyssey_gateway.py \
             security/test_odyssey_transfer.py
+      - name: Verify compiler selection stays pinned to upstream Metal 32023.922
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          workflow = Path(".github/workflows/build-odyssey.yml").read_text()
+          assert "/Applications/Xcode_27.2.app" in workflow
+          assert "/Applications/Xcode_27.2_Release_Candidate.app" in workflow
+          assert "Apple metal version 32023.922 (metalfe-32023.922.4)" in workflow
+          assert "own_compilers.py" in workflow and "--check-metal" in workflow
+          assert "Xcode 27.1" not in workflow
+          assert "DM_ALLOW_OTHER_METAL" not in workflow
+          print("Odyssey build targets Xcode 27.2 and strictly validated Metal 32023.922.")
+          PY
       - name: Confirm this run performed only synthetic checks
         run: echo 'No SSH connection, private keys, NSP or game data used.'
