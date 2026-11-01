@@ -55,7 +55,7 @@ class EOWTransferTests(unittest.TestCase):
             self.assertIn("100.0%", output.getvalue())
             self.assertIn("verified complete", output.getvalue())
             self.assertNotIn(str(dest), output.getvalue())
-            self.assertEqual(open_ssh.call_args.args[0][-1], "ody-read-base")
+            self.assertEqual(open_ssh.call_args.args[0][-1], "eow-read-base")
 
     def test_update_route_is_independent(self):
         with tempfile.TemporaryDirectory() as temp:
