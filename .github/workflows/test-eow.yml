@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/zelda-echoes-nxnative
+      - fix/eow-source-directory-case
     paths:
       - '.github/workflows/build-eow.yml'
       - '.github/workflows/test-eow.yml'
@@ -39,12 +40,13 @@ jobs:
             security/ffr_ssh_gate.py security/eow_gateway.py \
             security/eow_transfer.py security/run_eow.py \
             security/cache_export.py security/test_cache_import.py \
-            security/test_eow_gateway.py security/test_eow_transfer.py
+            security/test_eow_gateway.py security/test_eow_transfer.py security/test_eow_setup.py
           bash -n security/setup_eow.sh
           python3 -m unittest -v \
             security/test_cache_import.py \
             security/test_eow_gateway.py \
-            security/test_eow_transfer.py
+            security/test_eow_transfer.py \
+            security/test_eow_setup.py
       - name: Verify compiler selection stays pinned to upstream Metal 32023.922
         shell: bash
         run: |
