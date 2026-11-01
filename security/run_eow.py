@@ -113,7 +113,9 @@ def reclaim_runner_nsps():
     if b"iOS shaders" not in tail:
         return False
     freed = 0
-    for path in sorted(NSPS.iterdir()):\n        if path.suffix.casefold() not in (".xci", ".nsp"):\n            continue
+    for path in sorted(NSPS.iterdir()):
+        if path.suffix.casefold() not in (".xci", ".nsp"):
+            continue
         if not path.is_file() or path.is_symlink():
             continue
         try:
@@ -134,7 +136,7 @@ def reclaim_runner_nsps():
 # Strictly numeric shader progress: no game-specific logs, paths, secrets,
 # filenames or compiler diagnostics reach public GitHub Actions.
 PROGRESS = re.compile(
-    rb"\[6/8\] iOS shaders[^\n]*? (cache check|compiling): "
+    rb"\[\d+/\d+\] iOS shaders[^\n]*? (cache check|compiling): "
     rb"(\d+)%, ([\d,]+)/([\d,]+) shaders, ([\d,]+) (cached|not cached)"
 )
 
