@@ -44,35 +44,53 @@ jobs:
           python3 -m py_compile security/ffr_ssh_gate.py security/odyssey_gateway.py security/odyssey_transfer.py security/cache_export.py security/run_odyssey.py security/test_cache_import.py security/test_odyssey_gateway.py security/test_odyssey_transfer.py
           python3 -m unittest -v security/test_cache_import.py security/test_odyssey_gateway.py security/test_odyssey_transfer.py
 
-      - name: Preparer Xcode 27.1 et liberer de l'espace
+      - name: Selectionner Xcode 27.2 et verifier Metal, puis liberer de l'espace
         run: |
           set -euo pipefail
           echo 'Espace initial :'
           df -h "$RUNNER_TEMP"
-          # nxnative/dmsh_chain.lock requires the Xcode 27.1 Metal compiler.
-          KEEP=/Applications/Xcode_27.1.app
-          if [ ! -d "$KEEP/Contents/Developer" ]; then
-            echo 'Xcode 27.1 indisponible sur cette image GitHub.' >&2
+          # The pinned nxnative commit requires Apple Metal 32023.922.
+          # xcode-27 images may expose Xcode 27.2 as an alias to its RC app.
+          CANDIDATE=''
+          for app in /Applications/Xcode_27.2.app /Applications/Xcode_27.2.0.app /Applications/Xcode_27.2_Release_Candidate.app; do
+            if [ -d "$app/Contents/Developer" ]; then
+              CANDIDATE="$app"
+              break
+            fi
+          done
+          if [ -z "$CANDIDATE" ]; then
+            echo 'Xcode 27.2 is unavailable on this GitHub runner image.' >&2
             exit 1
           fi
+          # Resolve aliases before cleanup: never remove the actual selected Xcode.
+          KEEP="$(cd "$CANDIDATE" && pwd -P)"
           echo "Xcode conserve : $KEEP"
           sudo xcode-select -s "$KEEP/Contents/Developer"
+          xcodebuild -version
+          xcodebuild -version | grep -Eq '^Xcode 27\\.2(\\.|$)'
           for app in /Applications/Xcode_*.app; do
             [ -d "$app" ] || continue
-            [ "$app" = "$KEEP" ] && continue
             [ -L "$app" ] && continue
+            [ "$(cd "$app" && pwd -P)" = "$KEEP" ] && continue
             echo "Suppression sur runner ephemere : $app"
             sudo rm -rf -- "$app"
           done
-          xcodebuild -version
-          # Since Xcode 26, the Metal toolchain is an optional component.
+          # Metal is an optional Xcode component; fetch only if not installed.
           if ! xcodebuild -showComponent metalToolchain 2>/dev/null | grep -qi 'Status: installed'; then
-            echo 'Installation du Metal Toolchain correspondant a Xcode 27.1.'
+            echo 'Installation du Metal Toolchain correspondant a Xcode 27.2.'
             xcodebuild -downloadComponent metalToolchain
           fi
           echo 'Compilateurs Metal selectionnes :'
           xcrun -sdk macosx metal --version
           xcrun -sdk iphoneos metal --version
+          for sdk in macosx iphoneos; do
+            xcrun -sdk "$sdk" metal --version \
+              | grep -Fq 'Apple metal version 32023.922 (metalfe-32023.922.4)' || {
+                echo "Incorrect Metal compiler for $sdk; stopping before private transfers." >&2
+                exit 1
+              }
+          done
+          echo 'Metal 32023.922 verified for macOS and iPhoneOS SDKs.'
 
           # xcodebuild uses the iOS DEVICE SDK, not an Android SDK or
           # simulator runtime. All cleanup is confined to this ephemeral runner,
