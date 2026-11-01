@@ -3,14 +3,13 @@ name: The Legend of Zelda Echoes of Wisdom nxnative - synthetic security tests
 on:
   push:
     branches:
-      - feature/zelda-echoes-of-wisdom-nxnative
       - feature/zelda-echoes-nxnative
     paths:
       - '.github/workflows/build-eow.yml'
       - '.github/workflows/test-eow.yml'
       - 'security/ffr_ssh_gate.py'
-      - 'security/eowssey_*.py'
-      - 'security/test_eowssey_*.py'
+      - 'security/eow_*.py'
+      - 'security/test_eow_*.py'
       - 'security/run_eow.py'
       - 'security/cache_export.py'
       - 'security/setup_eow.sh'
