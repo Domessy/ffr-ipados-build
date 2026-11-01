@@ -5,7 +5,26 @@ ROOT="$HOME/portage-ipados/zelda-echoes-of-wisdom"
 SRC="$HOME/Documents/The Legend of Zelda Echoes of Wisdom"
 GATE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/ffr_ssh_gate.py"
 
-[[ -d "$SRC" && ! -L "$SRC" ]] || { echo "EOW: original game directory missing" >&2; exit 1; }
+# Linux directory names are case-sensitive. Accept only a unique case-variant
+# of the exact expected title under ~/Documents; never search other locations.
+if [[ ! -d "$SRC" && ! -L "$SRC" ]]; then
+  matches=()
+  while IFS= read -r -d '' candidate; do
+    matches+=("$candidate")
+  done < <(find "$HOME/Documents" -mindepth 1 -maxdepth 1 -type d \
+    -iname 'the legend of zelda echoes of wisdom' -print0)
+  if (( ${#matches[@]} == 1 )); then
+    SRC="${matches[0]}"
+    echo "EOW: located the game folder using a case-insensitive exact-name match."
+  fi
+fi
+if [[ ! -d "$SRC" || -L "$SRC" ]]; then
+  echo "EOW: original game directory unavailable or symbolic link rejected." >&2
+  echo "EOW: candidate directories (name only):" >&2
+  find "$HOME/Documents" -mindepth 1 -maxdepth 1 -iname '*echoes*wisdom*' \
+    -printf '  %f (%y)\n' >&2 || true
+  exit 1
+fi
 [[ -s "$SRC/prod.keys" && -f "$SRC/prod.keys" && ! -L "$SRC/prod.keys" ]] || {
   echo "EOW: source prod.keys missing or not a regular file" >&2; exit 1
 }
