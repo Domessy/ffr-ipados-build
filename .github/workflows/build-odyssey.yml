@@ -67,7 +67,7 @@ jobs:
           echo "Xcode conserve : $KEEP"
           sudo xcode-select -s "$KEEP/Contents/Developer"
           xcodebuild -version
-          xcodebuild -version | grep -Eq '^Xcode 27\\.2(\\.|$)'
+          xcodebuild -version | grep -Eq '^Xcode 27\.2(\.|$)'
           for app in /Applications/Xcode_*.app; do
             [ -d "$app" ] || continue
             [ -L "$app" ] && continue
