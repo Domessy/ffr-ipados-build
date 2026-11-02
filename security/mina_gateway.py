@@ -21,6 +21,7 @@ ROUTES = frozenset({
     "mina-probe-v1", "mina-diagnose-v1", "mina-manifest-v1",
     "mina-read-base", "mina-read-update", "mina-read-keys",
     "mina-read-cache", "mina-write-cache", "mina-write-ipa", "mina-write-log",
+    "mina-write-survey", "mina-write-profile",
 })
 TITLE_TAG = re.compile(r"\[([0-9a-f]{16})\]", re.I)
 VERSION_TAG = re.compile(r"\[v(\d+)\]", re.I)
@@ -154,6 +155,10 @@ def dispatch(command, parent):
             parent.receive_file("DarkSoulsRemastered-nxnative.ipa", 16 * 1024**3)
         elif command == "mina-write-log":
             parent.receive_file("mina-build.log", 32 * 1024**2)
+        elif command == "mina-write-survey":
+            parent.receive_file("mina-survey.md", 4 * 1024**2)
+        elif command == "mina-write-profile":
+            parent.receive_file("mina-profile.tsv", 2 * 1024**2)
         return 0
     finally:
         parent.CACHE, parent.CONFLICTS, parent.OUTPUT = previous
