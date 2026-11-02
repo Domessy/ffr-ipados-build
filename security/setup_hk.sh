@@ -54,7 +54,12 @@ chmod 600 "$ROOT/private/prod.keys"
 echo "HK: fixed-code diagnostics (no filenames or key bytes)"
 SSH_ORIGINAL_COMMAND=hk-diagnose-v2 python3 "$GATE"
 if ! probe="$(SSH_ORIGINAL_COMMAND=hk-probe-v1 python3 "$GATE")"; then
-  echo "HK: source validation failed; inspect HK_DIAG_V2 reason above (count/header/title_id/size_or_role/version_or_name). No files changed." >&2
+  echo "HK: source validation failed; inspect HK_DIAG_V2 reason above." >&2
+  echo "HK: local game files (names/sizes only; no keys or file contents):" >&2
+  find "$SRC" -mindepth 1 -maxdepth 2 -type f \
+    \( -iname '*.nsp' -o -iname '*.xci' -o -iname '*.nsz' \) \
+    -printf '  %P (%s bytes)\n' >&2 || true
+  echo "HK: originals unchanged. Resolve the source layout before starting GitHub Actions." >&2
   exit 1
 fi
 [[ "$probe" == HK_GATEWAY_V1 ]] || exit 1
