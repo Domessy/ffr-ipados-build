@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify encrypted Mina base/update CNMT and tag only the runner's patch NSP.
+"""Verify encrypted Metroid Dread base/update CNMT and tag only the runner's patch NSP.
 
 Private diagnostics go to RUNNER_TEMP/dread-inspection.log, returned by a fixed
 SSH route. Public GitHub logs show only fixed stage labels and numeric statuses.
