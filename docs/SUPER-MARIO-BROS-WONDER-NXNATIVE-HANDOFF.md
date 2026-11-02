@@ -11,7 +11,7 @@ Date : 2026-11-02. État : préparation et tests synthétiques du pipeline. **Au
 
 ## Profil nxnative et variante 1.2.0
 
-Dépôt amont figé : `seedds/nxnative@65501fbbaf8526f7aab0a1edd028135888590f8` ; profil existant `dm/games/010015100B514000/` avec la base v0, 1.0.1 (v65536) et la version **1.2.1 (v327680)** ; la version utilisateur 1.2.0 n'y est pas enregistrée.
+Dépôt amont figé : `seedds/nxnative@65501fbbaf8526f7aab0a1edd028135888590f8e` ; profil existant `dm/games/010015100B514000/` avec la base v0, 1.0.1 (v65536) et la version **1.2.1 (v327680)** ; la version utilisateur 1.2.0 n'y est pas enregistrée.
 
 Le mécanisme `scripts/build_ipa_from_nsp.py` prend une version non enregistrée, puis produit un **profil dérivé** sous le répertoire temporaire du runner, à partir des identifiants réels des modules et de la mise à jour. Les tables de shaders sont créées avec les fichiers de la version dérivée, au lieu de reprendre sans contrôle celles de 1.2.1. Ne pas réétiqueter la version 1.2.0 comme une 1.2.1 pour forcer la sélection du profil amont.
 
@@ -51,6 +51,12 @@ Le premier précontrôle échouait avec `FFR gateway failed: ValueError` parce q
 La passerelle exige exactement un XCI et un NSP dans le dossier, vérifie leur nature régulière, l'en-tête `HEAD` du XCI à l'offset 0x100 et l'en-tête `PFS0` du NSP. Elle détermine les rôles par extension, jamais par la taille. Le workflow reçoit les deux formats sur le canal SSH privé ; le runner macOS conserve un nom XCI pour la copie de base, et le lecteur CNMT contrôle ensuite leur véritable contenu avant la compilation. Les sources de CachyOS restent inchangées.
 
 La version 1.2.0 reste construite via profil dérivé en utilisant la révision chiffrée réellement lue, avec contrôle du numéro de version NACP affiché. Aucun remplacement artificiel par le profil 1.2.1.
+
+## Correctif du SHA amont (2026-11-02)
+
+Premier build réel XCI/NSP : Xcode/Homebrew et dotnet étaient installés, puis `git fetch --depth 1 origin 65501fbbaf8526f7aab0a1edd028135888590f8` a échoué avec `fatal: couldn't find remote ref`. Ce SHA ne comporte que **39 caractères** : le SHA complet confirmé par l'API GitHub en `main` de `seedds/nxnative` est `65501fbbaf8526f7aab0a1edd028135888590f8e`. Le workflow et la documentation utilisent désormais cette référence complète, vérifiée au format hexadécimal sur 40 caractères avant le fetch. Le contrôle synthétique de CI vérifie l'égalité exacte et évite qu'une référence tronquée soit à nouveau acceptée.
+
+Aucun NSP, XCI ni fichier de clés n'avait été transféré au moment de cet échec. Conserver la logique de profil dérivé pour Wonder 1.2.0 et la validation CNMT/NACP intactes.
 
 ## Reversibilité
 
