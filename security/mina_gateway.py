@@ -46,10 +46,25 @@ def classify(path):
     versions = {int(v) for v in VERSION_TAG.findall(name)}
     if any(v < 0 for v in versions):
         raise ValueError("invalid version marker")
+    # Retail NSP filenames may use a displayed game version like "v1.0.5"
+    # rather than Nintendo's integer [vNNN] convention. The version string
+    # only identifies a plausible update role: nx_extract later verifies
+    # encrypted Application/Patch CNMT and the actual version.
+    displayed_versions = {
+        tuple(map(int, match.groups()))
+        for match in re.finditer(
+            r"(?<![a-z0-9])v?(\\d+)\\.(\\d+)\\.(\\d+)(?![a-z0-9])",
+            name,
+        )
+    }
+    if len(displayed_versions) > 1:
+        raise ValueError("conflicting displayed version markers")
+    displayed = next(iter(displayed_versions), None)
     update_hint = (
         UPDATE_TITLE.casefold() in name or "update" in name or
         "mise a jour" in name or "mise à jour" in name or
-        any(v > 0 for v in versions)
+        any(v > 0 for v in versions) or
+        (displayed is not None and displayed > (1, 0, 0))
     )
     if update_hint:
         if TITLE.casefold() in name and UPDATE_TITLE.casefold() not in name and ids:
