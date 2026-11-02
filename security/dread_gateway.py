@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Metroid Dread experimental/provisional nxnative port: restricted SSH gateway.
+"""Metroid Dread registered nxnative 2.1.0 port: restricted SSH gateway.
 
 No arbitrary filesystem traversal or shell commands. Local original files
 are only read, and cache/output paths are project-specific.
@@ -88,7 +88,7 @@ def packages():
 
     A size-based fallback is acceptable only for an unambiguous pair. The
     encrypted Application/Patch identities are then checked with nx_extract
-    on the runner before the provisional build starts.
+    on the runner before the registered-profile build starts.
     """
     files = sorted(p for p in source_folder().iterdir() if p.suffix.casefold() == ".nsp")
     if len(files) != 2:
