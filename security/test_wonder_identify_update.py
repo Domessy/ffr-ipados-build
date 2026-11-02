@@ -3,8 +3,8 @@
 import unittest
 from security.wonder_identify_update import validate_metadata, meta_rows
 
-BASE = "content Application 0100633007d48000 0\n"
-UPDATE = "content Patch 0100633007d48800 327680\n"
+BASE = "content Application 010015100b514000 0\n"
+UPDATE = "content Patch 010015100b514800 327680\n"
 
 
 class WonderContentMetadataTests(unittest.TestCase):
@@ -13,12 +13,12 @@ class WonderContentMetadataTests(unittest.TestCase):
 
     def test_wrong_base_or_update_id_rejected(self):
         for base, update in (
-            ("content Application 0100633007d48001 0\n", UPDATE),
-            (BASE, "content Patch 0100633007d47800 327680\n"),
-            (BASE, "content Patch 0100633007d48800 0\n"),
+            ("content Application 010015100b514001 0\n", UPDATE),
+            (BASE, "content Patch 010015100b513800 327680\n"),
+            (BASE, "content Patch 010015100b514800 0\n"),
             (BASE, ""),
-            (BASE, UPDATE + "content Patch 0100633007d48800 131072\n"),
-            ("content Patch 0100633007d48800 327680\n", UPDATE),
+            (BASE, UPDATE + "content Patch 010015100b514800 131072\n"),
+            ("content Patch 010015100b514800 327680\n", UPDATE),
         ):
             with self.subTest(base=base, update=update):
                 with self.assertRaises(ValueError):
@@ -26,7 +26,7 @@ class WonderContentMetadataTests(unittest.TestCase):
 
     def test_parser_ignores_untrusted_lines(self):
         self.assertEqual(meta_rows("debug text\n" + UPDATE), [("Patch", "010015100B514800", 327680)])
-        self.assertEqual(meta_rows("content Patch 0100633007d48800 327680 injected\n"), [])
+        self.assertEqual(meta_rows("content Patch 010015100b514800 327680 injected\n"), [])
 
 
 class WonderPrivateInspectionTests(unittest.TestCase):
