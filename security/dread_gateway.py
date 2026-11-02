@@ -18,7 +18,7 @@ TITLE = "010093801237C000"
 UPDATE_TITLE = "010093801237C800"
 VERSION = 'unverified'
 ROUTES = frozenset({
-    "dread-probe-v1", "dread-diagnose-v1", "dread-diagnose-v2", "dread-manifest-v1",
+    "dread-probe-v1", "dread-diagnose-v1", "dread-diagnose-v2", "dread-diagnose-v3", "dread-manifest-v1",
     "dread-read-base", "dread-read-update", "dread-read-keys",
     "dread-read-cache", "dread-write-cache", "dread-write-ipa", "dread-write-log",
     "dread-write-survey", "dread-write-profile", "dread-write-inspection",
@@ -205,6 +205,61 @@ def diagnose_detailed():
     return 0
 
 
+def diagnose_count():
+    """Return fixed numeric source facts; no paths, filenames or key bytes."""
+    source_ok = packages_ok = keys_ok = False
+    reason = "none"
+    top_nsp = nested_nsp = top_nsz = top_xci = 0
+    try:
+        folder = source_folder()
+        source_ok = True
+        # One level of children is enough to distinguish a nested dump from
+        # a bad extension without traversing unrelated Documents folders.
+        for child in folder.iterdir():
+            suffix = child.suffix.casefold()
+            if suffix == ".nsp":
+                top_nsp += 1
+            elif suffix == ".nsz":
+                top_nsz += 1
+            elif suffix == ".xci":
+                top_xci += 1
+            if child.is_dir() and not child.is_symlink():
+                nested_nsp += sum(p.suffix.casefold() == ".nsp"
+                                  for p in child.iterdir())
+        try:
+            packages()
+            packages_ok = True
+        except (OSError, ValueError) as exc:
+            issue = str(exc).casefold()
+            if "exactly two" in issue:
+                reason = "count"
+            elif "size" in issue:
+                reason = "size_or_role"
+            elif "pfs0" in issue:
+                reason = "header"
+            elif "title id" in issue:
+                reason = "title_id"
+            elif "version" in issue:
+                reason = "version_or_name"
+            elif "regular" in issue or "symlink" in issue:
+                reason = "file_type"
+            else:
+                reason = "role"
+    except (OSError, ValueError):
+        reason = "source"
+    try:
+        private_keys()
+        keys_ok = True
+    except (OSError, ValueError):
+        pass
+    print(f"DREAD_DIAG_V3 source={'ok' if source_ok else 'fail'} "
+          f"packages={'ok' if packages_ok else 'fail'} "
+          f"keys={'ok' if keys_ok else 'fail'} reason={reason} "
+          f"top_nsp={top_nsp} nested_nsp={nested_nsp} "
+          f"top_nsz={top_nsz} top_xci={top_xci}")
+    return 0
+
+
 def dispatch(command, parent):
     if command not in ROUTES:
         return 126
@@ -212,6 +267,8 @@ def dispatch(command, parent):
         return diagnose()
     if command == "dread-diagnose-v2":
         return diagnose_detailed()
+    if command == "dread-diagnose-v3":
+        return diagnose_count()
     if command == "dread-probe-v1":
         packages()
         private_keys()
