@@ -61,6 +61,35 @@ class MINAGatewayTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             gw.classify(Path("Mina the Hollower [0100DCD01F306800][v0].nsp"))
 
+    def test_actual_mina_v105_filenames_and_sparse_sizes(self):
+        """Regression for the user's two names; never read real NSP contents."""
+        with tempfile.TemporaryDirectory() as folder_name:
+            folder = Path(folder_name)
+            base = folder / "Mina the Hollower [0100DCD01F306000][v0].nsp"
+            update = folder / "Mina the Hollower v1.0.5.nsp"
+            for file, size in (
+                (base, 875425557),
+                (update, 34497814),
+            ):
+                with file.open("wb") as stream:
+                    stream.write(b"PFS0")
+                    stream.truncate(size)
+            self.assertEqual(gw.classify(base), "base")
+            self.assertEqual(gw.classify(update), "update")
+            with patch.object(gw, "source_folder", return_value=folder):
+                self.assertEqual(gw.packages(), {"base": base, "update": update})
+            self.assertEqual(gw.VERSION, "unverified")
+
+    def test_retail_version_markers_and_conflicting_explicit_title(self):
+        self.assertEqual(gw.classify(Path("Mina the Hollower 1.0.0.nsp")), "base")
+        self.assertEqual(gw.classify(Path("Mina the Hollower v1.0.5.nsp")), "update")
+        self.assertEqual(gw.classify(Path("Mina the Hollower 1.2.0.nsp")), "update")
+        with self.assertRaisesRegex(ValueError, "update marked as base"):
+            gw.classify(Path("Mina the Hollower [0100DCD01F306000] v1.0.5.nsp")
+            )
+        with self.assertRaisesRegex(ValueError, "conflicting displayed"):
+            gw.classify(Path("Mina 1.0.5 1.0.6.nsp"))
+
     def test_fallback_for_two_unidentified_nsp_names(self):
         # Unknown filenames are permitted when their sizes are unambiguous;
         # nx_extract performs the definitive encrypted CNMT identity check.

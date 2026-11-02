@@ -34,6 +34,17 @@ The Mac's `mina_identify_update.py` still uses the pinned encrypted `nx_extract 
 
 Setup calls the redacted `mina-diagnose-v2` route. It reports source/packages/keys and one fixed reason category (count, size_or_role, header, title_id, version_or_name, file_type, source, role). If the local check still fails, collect that category plus a local listing of the two NSP basenames/sizes, **never the keys or NSP bytes**.
 
+### Confirmed 1.0.5 filename classification defect
+
+After the previous generic fallback fix, the user supplied the exact source basenames and sizes:
+
+- `Mina the Hollower [0100DCD01F306000][v0].nsp` — 875425557 bytes (base)
+- `Mina the Hollower v1.0.5.nsp` — 34497814 bytes (update)
+
+The issue was not the volume or the keys. The update filename contained the game's title but lacked the literal word `update` and a Nintendo-style `[vNNN]` token; the classifier consequently marked it as **base** and rejected a duplicate base. The updated classifier recognizes commercial dotted versions `vMAJOR.MINOR.PATCH` greater than 1.0.0 as an update hint and retains checks against contradictory explicit IDs and `[vNNN]` values.
+
+Synthetic tests now use exactly these two basenames and sparse files with the reported byte lengths. The actual encrypted update CNMT remains the authoritative check on the ephemeral Mac runner. Never equate displayed 1.0.5 with an assumed numeric Nintendo update version.
+
 ## Execute on CachyOS after merge
 
 ```bash
