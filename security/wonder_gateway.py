@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Super Mario Bros. Wonder curated nxnative v327680 port: restricted SSH gateway.
+"""Super Mario Bros. Wonder 1.2.0 derived-profile XCI/NSP restricted SSH gateway.
 
 No arbitrary filesystem traversal or shell commands. Local original files
 are only read, and cache/output paths are project-specific.
@@ -84,60 +84,49 @@ def classify(path):
 
 
 def packages():
-    """Resolve the two NSP roles without requiring particular filename conventions.
+    """Require the user's single base XCI and update NSP, never rename originals.
 
-    A size-based fallback is acceptable only for an unambiguous pair. The
-    encrypted Application/Patch identities are then checked with nx_extract
-    on the runner before the provisional build starts.
+    File extensions determine roles; encrypted CNMT, not a guessed filename or
+    file-size ratio, is the authoritative title/version check on the Mac.
     """
-    files = sorted(p for p in source_folder().iterdir() if p.suffix.casefold() == ".nsp")
+    files = sorted(p for p in source_folder().iterdir()
+                   if p.suffix.casefold() in (".xci", ".nsp"))
     if len(files) != 2:
-        raise ValueError("exactly two NSPs expected")
-
-    identified = {}
-    unidentified = []
+        raise ValueError("exactly one XCI base and one NSP update required")
+    result = {}
     for p in files:
         if p.is_symlink() or not p.is_file():
-            raise ValueError("source is not a regular NSP")
-        if not 100 * 1024 < p.stat().st_size < 18 * 1024**3:
-            raise ValueError("NSP size outside bounded range")
-        with p.open("rb") as stream:
-            if stream.read(4) != b"PFS0":
-                raise ValueError("NSP PFS0 header absent")
-        try:
-            role = classify(p)
-        except ValueError as exc:
-            # Never use a size fallback to override contradictory title or
-            # version tags. Unknown naming alone is not proof of bad data.
-            if str(exc) != "unidentified package role; explicit title/version required":
-                raise
-            unidentified.append(p)
-            continue
-        if role in identified:
+            raise ValueError("package must be a regular file")
+        role = {".xci": "base", ".nsp": "update"}[p.suffix.casefold()]
+        if role in result:
             raise ValueError("duplicate package role")
-        identified[role] = p
-
-    if unidentified:
-        ordered = sorted(files, key=lambda p: p.stat().st_size, reverse=True)
-        largest, smallest = ordered
-        # An update is generally much smaller for this title. If sizes are
-        # close, the source role must be established by an explicit marker.
-        if smallest.stat().st_size * 2 >= largest.stat().st_size:
-            raise ValueError("ambiguous base/update package sizes")
-        inferred = {"base": largest, "update": smallest}
-        if any(identified.get(role, path) != path
-               for role, path in inferred.items()):
-            raise ValueError("filename identity contradicts package sizes")
-        identified = inferred
-
-    if set(identified) != {"base", "update"}:
-        raise ValueError("incomplete base/update pair")
-    if not 128 * 1024**2 < identified["base"].stat().st_size < 18 * 1024**3:
-        raise ValueError("base NSP size outside bounded range")
-    if not 100 * 1024 < identified["update"].stat().st_size < 5 * 1024**3:
-        raise ValueError("update NSP size outside bounded range")
-    return identified
-
+        ids = {tag.upper() for tag in TITLE_TAG.findall(p.name)}
+        required_id = TITLE if role == "base" else UPDATE_TITLE
+        if ids and ids != {required_id}:
+            raise ValueError("explicit title ID contradicts package role")
+        versions = {int(v) for v in VERSION_TAG.findall(p.name)}
+        if role == "base" and versions and versions != {0}:
+            raise ValueError("XCI base version marker must be v0")
+        if role == "update" and versions and (
+                len(versions) != 1 or 0 in versions or
+                versions.intersection({65536, 327680})):
+            raise ValueError("NSP version marker conflicts with requested 1.2.0")
+        size = p.stat().st_size
+        if role == "base" and not 128 * 1024**2 < size < 24 * 1024**3:
+            raise ValueError("XCI base size outside bounded range")
+        if role == "update" and not 100 * 1024 < size < 8 * 1024**3:
+            raise ValueError("NSP update size outside bounded range")
+        with p.open("rb") as stream:
+            if role == "base":
+                stream.seek(0x100)
+                if stream.read(4) != b"HEAD":
+                    raise ValueError("XCI HEAD header absent at offset 0x100")
+            elif stream.read(4) != b"PFS0":
+                raise ValueError("NSP PFS0 header absent")
+        result[role] = p
+    if set(result) != {"base", "update"}:
+        raise ValueError("exactly one XCI base and one NSP update required")
+    return result
 
 def private_keys():
     if KEYS.is_symlink() or not KEYS.is_file() or not KEYS.stat().st_size:
@@ -182,7 +171,7 @@ def diagnose_detailed():
             reason = "count"
         elif "size" in issue:
             reason = "size_or_role"
-        elif "pfs0" in issue:
+        elif "pfs0" in issue or "head" in issue:
             reason = "header"
         elif "title id" in issue:
             reason = "title_id"
