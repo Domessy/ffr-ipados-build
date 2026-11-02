@@ -152,7 +152,7 @@ def dispatch(command, parent):
         elif command == "mina-write-cache":
             parent.write_cache()
         elif command == "mina-write-ipa":
-            parent.receive_file("DarkSoulsRemastered-nxnative.ipa", 16 * 1024**3)
+            parent.receive_file("MinaTheHollower-nxnative.ipa", 16 * 1024**3)
         elif command == "mina-write-log":
             parent.receive_file("mina-build.log", 32 * 1024**2)
         elif command == "mina-write-survey":
