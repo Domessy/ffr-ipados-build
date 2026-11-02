@@ -356,6 +356,15 @@ jobs:
             tail -c 16777216 "$RUNNER_TEMP/mina-build.log" \
               | ssh -o ConnectTimeout=20 ffr-cachyos mina-write-log || true
           fi
+          # The inspector ran before nxnative itself. Retain its raw bounded
+          # diagnostic through a separate fixed private SSH route, especially
+          # when the encrypted CNMT reader fails before mina-build.log exists.
+          if [ -s "$RUNNER_TEMP/mina-inspection.log" ]; then
+            head -c 8388608 "$RUNNER_TEMP/mina-inspection.log" \
+              | ssh -o ConnectTimeout=20 ffr-cachyos mina-write-inspection || true
+            echo 'MINA: private inspection diagnostic transfer attempted.'
+          fi
+
           # No game files or secrets in GitHub artifacts. Preserve only the
           # upstream's best-effort survey and provisional profile privately.
           SURVEY="$RUNNER_TEMP/mina-nsp/0100DCD01F306000_survey/survey.md"
