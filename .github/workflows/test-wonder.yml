@@ -1,0 +1,109 @@
+name: Super Mario Bros. Wonder nxnative - synthetic security tests
+
+on:
+  push:
+    branches:
+      - feature/wonder-nxnative
+    paths:
+      - '.github/workflows/build-wonder.yml'
+      - '.github/workflows/test-wonder.yml'
+      - 'security/ffr_ssh_gate.py'
+      - 'security/wonder_*.py'
+      - 'security/test_wonder_*.py'
+      - 'security/run_wonder.py'
+      - 'security/cache_export.py'
+      - 'security/setup_wonder.sh'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/build-wonder.yml'
+      - '.github/workflows/test-wonder.yml'
+      - 'security/ffr_ssh_gate.py'
+      - 'security/wonder_*.py'
+      - 'security/test_wonder_*.py'
+      - 'security/run_wonder.py'
+      - 'security/cache_export.py'
+      - 'security/setup_wonder.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wonder-tests-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  safety-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout the tested commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Verify Python syntax and unit tests (synthetic only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            security/ffr_ssh_gate.py security/wonder_gateway.py \
+            security/wonder_transfer.py security/run_wonder.py \
+            security/cache_export.py security/test_cache_import.py \
+            security/test_wonder_gateway.py security/test_wonder_transfer.py security/test_wonder_setup.py security/wonder_identify_update.py security/test_wonder_identify_update.py security/test_wonder_run.py
+          bash -n security/setup_wonder.sh
+          python3 -m unittest -v \
+            security/test_cache_import.py \
+            security/test_wonder_gateway.py \
+            security/test_wonder_transfer.py \
+            security/test_wonder_setup.py \
+            security/test_wonder_identify_update.py security/test_wonder_run.py
+      - name: Verify compiler selection stays pinned to upstream Metal 32023.922
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          workflow = Path(".github/workflows/build-wonder.yml").read_text()
+          assert "/Applications/Xcode_27.2.app" in workflow
+          assert "/Applications/Xcode_27.2_Release_Candidate.app" in workflow
+          assert "Apple metal version 32023.922 (metalfe-32023.922.4)" in workflow
+          assert "own_compilers.py" in workflow and "--check-metal" in workflow
+          assert "Xcode 27.1" not in workflow
+          assert "DM_ALLOW_OTHER_METAL" not in workflow
+          assert '65501fbbaf8526f7aab0a1edd028135888590f8' in workflow
+          assert 'security/wonder_identify_update.py' in workflow
+          verify = Path('security/wonder_identify_update.py').read_text()
+          assert 'version in (65536, 327680)' in verify
+          assert '010015100B514000' in verify and '010015100B514800' in verify
+          runner = Path('security/run_wonder.py').read_text()
+          assert 'f"v{revision}"' in runner and 'read_verified_patch()' in runner
+          assert 'EXPECTED_DISPLAY_VERSION = "1.2.0"' in runner
+          print("Super Mario Bros. Wonder: Xcode 27.2, locked shader compiler, pinned nxnative and strict update 1.2.0.")
+          PY
+      - name: Confirm this run performed only synthetic checks
+        run: echo 'No SSH connection, private keys, NSP or game data used.'
+
+  macos-preflight-tests:
+    # Only on PRs: small synthetic check for case-insensitive APFS/BSD tools.
+    # Prevents costly Xcode 27 full builds failing before any NSP transfer.
+    if: github.event_name == 'pull_request'
+    runs-on: macos-15
+    timeout-minutes: 8
+    steps:
+      - name: Checkout exact tested revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Test portable setup and locked source gateway with synthetic data
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n security/setup_wonder.sh
+          python3 -m unittest -v \
+            security/test_wonder_gateway.py \
+            security/test_wonder_setup.py \
+            security/test_wonder_identify_update.py security/test_wonder_run.py
+      - name: No retail data required
+        run: echo 'Synthetic macOS test complete; no game files or keys were used.'
