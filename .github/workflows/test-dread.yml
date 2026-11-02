@@ -6,14 +6,14 @@ on:
       - feature/metroid-dread-nxnative
       - fix/dread-source-count-diagnostics
     paths:
-      - '.github/workflows/build-mina.yml'
-      - '.github/workflows/test-mina.yml'
+      - '.github/workflows/build-dread.yml'
+      - '.github/workflows/test-dread.yml'
       - 'security/ffr_ssh_gate.py'
       - 'security/dread_*.py'
       - 'security/test_dread_*.py'
-      - 'security/run_mina.py'
+      - 'security/run_dread.py'
       - 'security/cache_export.py'
-      - 'security/setup_mina.sh'
+      - 'security/setup_dread.sh'
   pull_request:
     branches:
       - main
@@ -50,10 +50,10 @@ jobs:
           set -euo pipefail
           python3 -m py_compile \
             security/ffr_ssh_gate.py security/dread_gateway.py \
-            security/dread_transfer.py security/run_mina.py \
+            security/dread_transfer.py security/run_dread.py \
             security/cache_export.py security/test_cache_import.py \
             security/test_dread_gateway.py security/test_dread_transfer.py security/test_dread_setup.py security/dread_identify_update.py security/test_dread_identify_update.py
-          bash -n security/setup_mina.sh
+          bash -n security/setup_dread.sh
           python3 -m unittest -v \
             security/test_cache_import.py \
             security/test_dread_gateway.py \
