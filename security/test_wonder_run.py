@@ -21,7 +21,9 @@ class WonderDerivedProfileTests(unittest.TestCase):
             filename.write_text("262144\n")
             with patch.object(app, "VERIFIED_PATCH", filename):
                 self.assertEqual(app.read_verified_patch(), 262144)
-            for untrusted in ("327680\n", "0\n", "v262144\n", "../262144\n", ""):
+                filename.write_text("196608\n")
+                self.assertEqual(app.read_verified_patch(), 196608)
+            for untrusted in ("327680\n", "65536\n", "0\n", "v262144\n", "../262144\n", ""):
                 filename.write_text(untrusted)
                 with patch.object(app, "VERIFIED_PATCH", filename):
                     with self.assertRaises(ValueError):
