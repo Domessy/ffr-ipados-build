@@ -1,0 +1,66 @@
+name: Hollow Knight nxnative - synthetic security tests
+
+on:
+  push:
+    branches:
+      - feature/hk-hollower-nxnative
+    paths:
+      - '.github/workflows/build-mina.yml'
+      - '.github/workflows/test-mina.yml'
+      - 'security/ffr_ssh_gate.py'
+      - 'security/hk_*.py'
+      - 'security/test_hk_*.py'
+      - 'security/run_mina.py'
+      - 'security/cache_export.py'
+      - 'security/setup_mina.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hk-tests-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  safety-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout the tested commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Verify Python syntax and unit tests (synthetic only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            security/ffr_ssh_gate.py security/hk_gateway.py \
+            security/hk_transfer.py security/run_mina.py \
+            security/cache_export.py security/test_cache_import.py \
+            security/test_hk_gateway.py security/test_hk_transfer.py security/test_hk_setup.py security/hk_identify_update.py security/test_hk_identify_update.py
+          bash -n security/setup_mina.sh
+          python3 -m unittest -v \
+            security/test_cache_import.py \
+            security/test_hk_gateway.py \
+            security/test_hk_transfer.py \
+            security/test_hk_setup.py \
+            security/test_hk_identify_update.py
+      - name: Verify compiler selection stays pinned to upstream Metal 32023.922
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          workflow = Path(".github/workflows/build-mina.yml").read_text()
+          assert "/Applications/Xcode_27.2.app" in workflow
+          assert "/Applications/Xcode_27.2_Release_Candidate.app" in workflow
+          assert "Apple metal version 32023.922 (metalfe-32023.922.4)" in workflow
+          assert "own_compilers.py" in workflow and "--check-metal" in workflow
+          assert "Xcode 27.1" not in workflow
+          assert "DM_ALLOW_OTHER_METAL" not in workflow
+          print("Dark Souls build targets Xcode 27.2 and strictly validated Metal 32023.922.")
+          PY
+      - name: Confirm this run performed only synthetic checks
+        run: echo 'No SSH connection, private keys, NSP or game data used.'
