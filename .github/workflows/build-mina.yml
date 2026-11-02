@@ -127,7 +127,7 @@ jobs:
           fi
           df -h "$RUNNER_TEMP"
           free_kb=$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')
-          # Sufficient space for Mina the Hollower unknown game data, extracted RomFS, shader CAS and IPA.
+          # Sufficient space for provisional Mina the Hollower game data, extracted RomFS, shader CAS and IPA.
           if [ "$free_kb" -lt 42000000 ]; then
             echo 'MINA runner disk below initial 42 GB admission guard.' >&2
             exit 1
@@ -250,7 +250,7 @@ jobs:
             [ "$(ssh -o ConnectTimeout=15 ffr-cachyos mina-probe-v1)" = 'MINA_GATEWAY_V1' ]
           fi
 
-      - name: Verifier Mina the Hollower unknown et capacite sans transfert
+      - name: Verifier les NSP Mina et la capacite sans transfert
         if: ${{ inputs.mode != 'keys-check' }}
         run: |
           set -euo pipefail
@@ -261,7 +261,7 @@ jobs:
           free=$(( $(df -Pk "$RUNNER_TEMP" | awk 'NR==2 {print $4}') * 1024 ))
           required=$(( 2 * total + 16 * 1024**3 ))
           if (( required < 34 * 1024**3 )); then required=$(( 34 * 1024**3 )); fi
-          echo "MINA title=$TITLE; update=$VERSION; package_bytes=$total"
+          echo "MINA title=$TITLE; update_version=$VERSION (resolved by nxnative extraction); package_bytes=$total"
           echo "MINA free_bytes=$free; required_bytes=$required"
           if (( free < required )); then
             echo 'MINA: insufficient disk; no source transferred.' >&2
@@ -322,9 +322,9 @@ jobs:
           umask 077
           mkdir -p "$RUNNER_TEMP/mina-nsp"
           read -r TITLE VERSION B U <<< "$(ssh ffr-cachyos mina-manifest-v1)"
-          [[ "$TITLE" == "0100DCD01F306000" && "$VERSION" == "unknown" ]]
+          [[ "$TITLE" == "0100DCD01F306000" && "$VERSION" == "unverified" ]]
           python3 security/mina_transfer.py base "$B" "$RUNNER_TEMP/mina-nsp/Mina the Hollower [0100DCD01F306000][v0].nsp"
-          python3 security/mina_transfer.py update "$U" "$RUNNER_TEMP/mina-nsp/Mina the Hollower update [0100DCD01F306800][unverified].nsp"
+          python3 security/mina_transfer.py update "$U" "$RUNNER_TEMP/mina-nsp/Mina the Hollower update [0100DCD01F306800].nsp"
           test -s "$RUNNER_TEMP/mina-prod.keys"
           echo 'MINA source transfer complete; originals remain on CachyOS.'
 
