@@ -87,6 +87,8 @@ class MinaPrivateInspectionTests(unittest.TestCase):
 class MinaDotnetHostRegressionTests(unittest.TestCase):
     def test_inspector_runs_managed_dll_via_dotnet_not_standalone_apphost(self):
         import os
+        from contextlib import redirect_stdout
+        from io import StringIO
         from pathlib import Path
         import tempfile
         from unittest.mock import patch
@@ -118,9 +120,14 @@ class MinaDotnetHostRegressionTests(unittest.TestCase):
                     return UPDATE
                 self.fail(f"unexpected stage: {stage}")
 
+            fake_console = StringIO()
+            # Avoid printing a fake "CNMT verified; v262144" in the real
+            # GitHub Actions build log during this synthetic unit test.
             with patch.dict(os.environ, {"RUNNER_TEMP": str(temp)}), \
-                 patch.object(mod, "checked", side_effect=fake_checked):
+                 patch.object(mod, "checked", side_effect=fake_checked), \
+                 redirect_stdout(fake_console):
                 mod.main()
+            self.assertIn("patch v262144", fake_console.getvalue())
 
             self.assertEqual([stage for _, stage in invocations],
                              ["build-inspector", "base-contents", "update-contents"])
