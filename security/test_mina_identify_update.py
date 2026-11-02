@@ -84,5 +84,54 @@ class MinaPrivateInspectionTests(unittest.TestCase):
             self.assertIn("stage=update-contents; timeout", log.read_text())
 
 
+class MinaDotnetHostRegressionTests(unittest.TestCase):
+    def test_inspector_runs_managed_dll_via_dotnet_not_standalone_apphost(self):
+        import os
+        from pathlib import Path
+        import tempfile
+        from unittest.mock import patch
+        from security import mina_identify_update as mod
+
+        with tempfile.TemporaryDirectory() as home:
+            temp = Path(home)
+            pkg = temp / "mina-nsp"
+            pkg.mkdir()
+            base = pkg / f"Mina the Hollower [{mod.TITLE}][v0].nsp"
+            update = pkg / f"Mina the Hollower update [{mod.UPDATE}].nsp"
+            base.write_bytes(b"PFS0")
+            update.write_bytes(b"PFS0")
+            (temp / "mina-prod.keys").write_text("synthetic - no actual keys")
+            upstream = temp / "nxnative/dm/tools/nx_extract"
+            upstream.mkdir(parents=True)
+            (upstream / "nx_extract.csproj").write_text("<Project/>")
+
+            invocations = []
+
+            def fake_checked(command, stage, log_path, timeout):
+                invocations.append((command, stage))
+                if stage == "build-inspector":
+                    (temp / "mina-nsp-inspection/nx_extract.dll").write_bytes(b"synthetic")
+                    return ""
+                if stage == "base-contents":
+                    return BASE
+                if stage == "update-contents":
+                    return UPDATE
+                self.fail(f"unexpected stage: {stage}")
+
+            with patch.dict(os.environ, {"RUNNER_TEMP": str(temp)}), \
+                 patch.object(mod, "checked", side_effect=fake_checked):
+                mod.main()
+
+            self.assertEqual([stage for _, stage in invocations],
+                             ["build-inspector", "base-contents", "update-contents"])
+            managed_path = str(temp / "mina-nsp-inspection/nx_extract.dll")
+            for command, _ in invocations[1:]:
+                self.assertEqual(command[:2], ["dotnet", managed_path])
+                self.assertEqual(command[3], "--contents")
+            self.assertFalse(update.exists())
+            self.assertTrue((pkg / f"Mina the Hollower update [{mod.UPDATE}][v262144].nsp").exists())
+            self.assertTrue((temp / "mina-inspection.log").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
