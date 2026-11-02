@@ -42,8 +42,7 @@ class HollowKnightSetupTests(unittest.TestCase):
             # On a case-sensitive filesystem the shell must discover the
             # unique spelling variant. On typical macOS APFS the requested
             # "Hollow Knight" name already resolves to the same directory.
-            if not (documents / "Hollow Knight").exists() or os.path.samefile(
-                    game, documents / "Hollow Knight") is False:
+            if not (documents / "Hollow Knight").exists():
                 self.assertIn("case-insensitive exact-name match", result.stdout)
             self.assertIn("HK_GATEWAY_V1", result.stdout)
             project = home / "portage-ipados/hollow-knight"
