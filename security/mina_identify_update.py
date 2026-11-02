@@ -97,14 +97,18 @@ def main():
     checked(["dotnet", "build", str(upstream), "-c", "Release",
              "-o", str(output), "-v", "quiet", "-nologo"],
             "build-inspector", log_path, timeout=300)
-    exe = output / "nx_extract"
-    if not exe.is_file():
-        raise InspectionError("build-inspector", "executable-missing")
+    # Homebrew's 'dotnet' CLI knows its runtime location, but a standalone
+    # apphost ('nx_extract') can exit 131 when DOTNET_ROOT is not set on macOS.
+    # Launch the exact built managed DLL through the proven CLI instead.
+    # No globally installed runtime or machine-level configuration is changed.
+    managed = output / "nx_extract.dll"
+    if not managed.is_file():
+        raise InspectionError("build-inspector", "managed-dll-missing")
 
     print("MINA: verifying encrypted base and patch metadata.", flush=True)
-    base_stdout = checked([str(exe), str(keys), "--contents", str(base)],
+    base_stdout = checked(["dotnet", str(managed), str(keys), "--contents", str(base)],
                           "base-contents", log_path, timeout=180)
-    update_stdout = checked([str(exe), str(keys), "--contents", str(update)],
+    update_stdout = checked(["dotnet", str(managed), str(keys), "--contents", str(update)],
                             "update-contents", log_path, timeout=180)
     try:
         version = validate_metadata(base_stdout, update_stdout)
