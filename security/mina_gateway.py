@@ -21,7 +21,7 @@ ROUTES = frozenset({
     "mina-probe-v1", "mina-diagnose-v1", "mina-diagnose-v2", "mina-manifest-v1",
     "mina-read-base", "mina-read-update", "mina-read-keys",
     "mina-read-cache", "mina-write-cache", "mina-write-ipa", "mina-write-log",
-    "mina-write-survey", "mina-write-profile",
+    "mina-write-survey", "mina-write-profile", "mina-write-inspection",
 })
 TITLE_TAG = re.compile(r"\[([0-9a-f]{16})\]", re.I)
 VERSION_TAG = re.compile(r"\[v(\d+)\]", re.I)
@@ -245,6 +245,8 @@ def dispatch(command, parent):
             parent.receive_file("mina-survey.md", 4 * 1024**2)
         elif command == "mina-write-profile":
             parent.receive_file("mina-profile.tsv", 2 * 1024**2)
+        elif command == "mina-write-inspection":
+            parent.receive_file("mina-inspection.log", 8 * 1024**2)
         return 0
     finally:
         parent.CACHE, parent.CONFLICTS, parent.OUTPUT = previous
