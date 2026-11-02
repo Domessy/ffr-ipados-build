@@ -7,7 +7,7 @@ import tempfile
 import unittest
 
 
-SCRIPT = Path(__file__).with_name("setup_mina.sh")
+SCRIPT = Path(__file__).with_name("setup_hk.sh")
 
 
 class HollowKnightSetupTests(unittest.TestCase):
@@ -19,7 +19,7 @@ class HollowKnightSetupTests(unittest.TestCase):
         with (folder / "base [0100633007D48000][v0].nsp").open("wb") as stream:
             stream.write(b"PFS0")
             stream.truncate(600 * 1024**2)
-        with (folder / "update [0100633007D48800][v131072].nsp").open("wb") as stream:
+        with (folder / "update [0100633007D48800][v589824].nsp").open("wb") as stream:
             stream.write(b"PFS0")
             stream.truncate(8 * 1024**2)
 
@@ -48,7 +48,7 @@ class HollowKnightSetupTests(unittest.TestCase):
                 (game / "prod.keys").read_bytes(),
             )
             self.assertTrue((game / "base [0100633007D48000][v0].nsp").exists())
-            self.assertTrue((game / "update [0100633007D48800][v131072].nsp").exists())
+            self.assertTrue((game / "update [0100633007D48800][v589824].nsp").exists())
 
     def test_ambiguous_case_variants_are_not_selected(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -56,7 +56,7 @@ class HollowKnightSetupTests(unittest.TestCase):
             documents = home / "Documents"
             documents.mkdir()
             self.make_sources(documents / "HOLLOW KNIGHT")
-            self.make_sources(documents / "HOLLOW KNIGHT")
+            self.make_sources(documents / "Hollow KNIGHT")
             result = self.run_setup(home)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("directory unavailable", result.stderr)
