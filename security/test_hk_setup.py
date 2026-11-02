@@ -39,10 +39,14 @@ class HollowKnightSetupTests(unittest.TestCase):
             self.make_sources(game)
             result = self.run_setup(home)
             self.assertEqual(result.returncode, 0, (result.stdout, result.stderr))
-            self.assertIn("case-insensitive exact-name match", result.stdout)
+            # On a case-sensitive filesystem the shell must discover the
+            # unique spelling variant. On typical macOS APFS the requested
+            # "Hollow Knight" name already resolves to the same directory.
+            if not (documents / "Hollow Knight").exists():
+                self.assertIn("case-insensitive exact-name match", result.stdout)
             self.assertIn("HK_GATEWAY_V1", result.stdout)
             project = home / "portage-ipados/hollow-knight"
-            self.assertEqual((project / "source").resolve(), game)
+            self.assertTrue((project / "source").samefile(game))
             self.assertEqual(
                 (project / "private/prod.keys").read_bytes(),
                 (game / "prod.keys").read_bytes(),
@@ -56,6 +60,10 @@ class HollowKnightSetupTests(unittest.TestCase):
             documents = home / "Documents"
             documents.mkdir()
             self.make_sources(documents / "HOLLOW KNIGHT")
+            # Many macOS runners use case-insensitive APFS. Two distinct
+            # directories with only case differences cannot coexist there.
+            if (documents / "Hollow KNIGHT").exists():
+                self.skipTest("filesystem does not distinguish case-only directory names")
             self.make_sources(documents / "Hollow KNIGHT")
             result = self.run_setup(home)
             self.assertNotEqual(result.returncode, 0)

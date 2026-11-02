@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/hollow-knight-nxnative
+      - fix/hk-macos-portable-preflight
     paths:
       - '.github/workflows/build-hk.yml'
       - '.github/workflows/test-hk.yml'
@@ -81,3 +82,26 @@ jobs:
           PY
       - name: Confirm this run performed only synthetic checks
         run: echo 'No SSH connection, private keys, NSP or game data used.'
+
+  macos-preflight-tests:
+    # Only on PRs: small synthetic check for case-insensitive APFS/BSD tools.
+    # Prevents costly Xcode 27 full builds failing before any NSP transfer.
+    if: github.event_name == 'pull_request'
+    runs-on: macos-15
+    timeout-minutes: 8
+    steps:
+      - name: Checkout exact tested revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Test portable setup and locked source gateway with synthetic data
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n security/setup_hk.sh
+          python3 -m unittest -v \
+            security/test_hk_gateway.py \
+            security/test_hk_setup.py \
+            security/test_hk_identify_update.py
+      - name: No retail data required
+        run: echo 'Synthetic macOS test complete; no game files or keys were used.'
