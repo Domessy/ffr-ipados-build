@@ -41,7 +41,7 @@ class DREADTransferTests(unittest.TestCase):
     def test_success_atomic_and_numeric_log(self):
         with tempfile.TemporaryDirectory() as temp:
             folder = self.setup_folder(temp)
-            dest = folder / "Metroid Dread [010093801237C000][v0].nsp"
+            dest = folder / "Metroid Dread [010093801237C000][v0].xci"
             data = b"NSP-test-payload"
             output = io.StringIO()
             with patch.dict(os.environ, {"RUNNER_TEMP": temp}), \
@@ -70,7 +70,7 @@ class DREADTransferTests(unittest.TestCase):
     def test_mismatch_never_publishes_partial_file(self):
         with tempfile.TemporaryDirectory() as temp:
             folder = self.setup_folder(temp)
-            dest = folder / "DREAD [01007EF00011E800][v1114112].nsp"
+            dest = folder / "DREAD base.xci"
             with patch.dict(os.environ, {"RUNNER_TEMP": temp}), \
                  patch.object(transfer.subprocess, "Popen",
                               return_value=DummySSH(b"underfilled")), \
@@ -83,7 +83,7 @@ class DREADTransferTests(unittest.TestCase):
     def test_nonzero_ssh_never_publishes_file(self):
         with tempfile.TemporaryDirectory() as temp:
             folder = self.setup_folder(temp)
-            dest = folder / "DREAD [01007EF00011F001][v327680].nsp"
+            dest = folder / "DREAD base.xci"
             with patch.dict(os.environ, {"RUNNER_TEMP": temp}), \
                  patch.object(transfer.subprocess, "Popen",
                               return_value=DummySSH(b"data", returncode=255)), \

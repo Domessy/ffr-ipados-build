@@ -99,7 +99,7 @@ def sync_private_diagnostic():
 
 
 def reclaim_runner_nsps():
-    """Delete runner-only NSP copies once nxnative reports its iOS shader stage.
+    """Delete runner-only XCI and NSP copies once nxnative reports its iOS shader stage.
 
     At that stage nxnative has completed base and update extractions and reads the
     extracted RomFS/ExeFS files. Never touch the user's original NSPs.
@@ -113,7 +113,9 @@ def reclaim_runner_nsps():
     if b"iOS shaders" not in tail:
         return False
     freed = 0
-    for path in sorted(NSPS.glob("*.nsp")):
+    for path in sorted(NSPS.iterdir()):
+        if path.suffix.casefold() not in (".xci", ".nsp"):
+            continue
         if not path.is_file() or path.is_symlink():
             continue
         try:
@@ -124,7 +126,7 @@ def reclaim_runner_nsps():
             pass
     if freed:
         print(
-            f"Reclaimed {freed / 1024**3:.2f} GiB: removed only runner NSP "
+            f"Reclaimed {freed / 1024**3:.2f} GiB: removed only runner XCI/NSP "
             "copies after the iOS shader stage began.",
             flush=True,
         )

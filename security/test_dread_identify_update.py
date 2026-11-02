@@ -99,9 +99,9 @@ class MetroidDotnetHostRegressionTests(unittest.TestCase):
             temp = Path(home)
             pkg = temp / "dread-nsp"
             pkg.mkdir()
-            base = pkg / f"Metroid Dread [{mod.TITLE}][v0].nsp"
+            base = pkg / f"Metroid Dread [{mod.TITLE}][v0].xci"
             update = pkg / f"Metroid Dread update [{mod.UPDATE}].nsp"
-            base.write_bytes(b"PFS0")
+            base.write_bytes(b"\0" * 0x100 + b"HEAD")
             update.write_bytes(b"PFS0")
             (temp / "dread-prod.keys").write_text("synthetic - no actual keys")
             upstream = temp / "nxnative/dm/tools/nx_extract"

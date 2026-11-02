@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Metroid Dread registered nxnative 2.1.0 port: restricted SSH gateway.
+"""Metroid Dread registered nxnative 2.1.0 XCI+NSP port: restricted SSH gateway.
 
 No arbitrary filesystem traversal or shell commands. Local original files
 are only read, and cache/output paths are project-specific.
@@ -18,7 +18,7 @@ TITLE = "010093801237C000"
 UPDATE_TITLE = "010093801237C800"
 VERSION = 'unverified'
 ROUTES = frozenset({
-    "dread-probe-v1", "dread-diagnose-v1", "dread-diagnose-v2", "dread-manifest-v1",
+    "dread-probe-v1", "dread-diagnose-v1", "dread-diagnose-v2", "dread-diagnose-v3", "dread-manifest-v1",
     "dread-read-base", "dread-read-update", "dread-read-keys",
     "dread-read-cache", "dread-write-cache", "dread-write-ipa", "dread-write-log",
     "dread-write-survey", "dread-write-profile", "dread-write-inspection",
@@ -84,60 +84,47 @@ def classify(path):
 
 
 def packages():
-    """Resolve the two NSP roles without requiring particular filename conventions.
+    """Require exactly one XCI base and one NSP update in the selected folder.
 
-    A size-based fallback is acceptable only for an unambiguous pair. The
-    encrypted Application/Patch identities are then checked with nx_extract
-    on the runner before the registered-profile build starts.
+    XCI/NSP identity is ultimately established from encrypted CNMT by
+    nx_extract on the ephemeral Mac. Never move/rename local original files.
     """
-    files = sorted(p for p in source_folder().iterdir() if p.suffix.casefold() == ".nsp")
+    files = sorted(p for p in source_folder().iterdir()
+                   if p.suffix.casefold() in (".xci", ".nsp"))
     if len(files) != 2:
-        raise ValueError("exactly two NSPs expected")
-
-    identified = {}
-    unidentified = []
+        raise ValueError("exactly two packages (one XCI, one NSP) expected")
+    result = {}
     for p in files:
         if p.is_symlink() or not p.is_file():
-            raise ValueError("source is not a regular NSP")
-        if not 100 * 1024 < p.stat().st_size < 18 * 1024**3:
-            raise ValueError("NSP size outside bounded range")
-        with p.open("rb") as stream:
-            if stream.read(4) != b"PFS0":
-                raise ValueError("NSP PFS0 header absent")
-        try:
-            role = classify(p)
-        except ValueError as exc:
-            # Never use a size fallback to override contradictory title or
-            # version tags. Unknown naming alone is not proof of bad data.
-            if str(exc) != "unidentified package role; explicit title/version required":
-                raise
-            unidentified.append(p)
-            continue
-        if role in identified:
+            raise ValueError("package is not a regular file")
+        role = {".xci": "base", ".nsp": "update"}[p.suffix.casefold()]
+        if role in result:
             raise ValueError("duplicate package role")
-        identified[role] = p
-
-    if unidentified:
-        ordered = sorted(files, key=lambda p: p.stat().st_size, reverse=True)
-        largest, smallest = ordered
-        # An update is generally much smaller for this title. If sizes are
-        # close, the source role must be established by an explicit marker.
-        if smallest.stat().st_size * 2 >= largest.stat().st_size:
-            raise ValueError("ambiguous base/update package sizes")
-        inferred = {"base": largest, "update": smallest}
-        if any(identified.get(role, path) != path
-               for role, path in inferred.items()):
-            raise ValueError("filename identity contradicts package sizes")
-        identified = inferred
-
-    if set(identified) != {"base", "update"}:
-        raise ValueError("incomplete base/update pair")
-    if not 128 * 1024**2 < identified["base"].stat().st_size < 18 * 1024**3:
-        raise ValueError("base NSP size outside bounded range")
-    if not 100 * 1024 < identified["update"].stat().st_size < 5 * 1024**3:
-        raise ValueError("update NSP size outside bounded range")
-    return identified
-
+        ids = {tag.upper() for tag in TITLE_TAG.findall(p.name)}
+        allowed = {TITLE} if role == "base" else {TITLE, UPDATE_TITLE}
+        if ids and not ids <= allowed:
+            raise ValueError("unrelated explicit title ID")
+        versions = {int(v) for v in VERSION_TAG.findall(p.name)}
+        if role == "base" and versions and versions != {0}:
+            raise ValueError("invalid base version marker")
+        if role == "update" and versions and versions != {327680}:
+            raise ValueError("update filename version not registered")
+        size = p.stat().st_size
+        if role == "base" and not 128 * 1024**2 < size < 24 * 1024**3:
+            raise ValueError("XCI base size outside bounded range")
+        if role == "update" and not 100 * 1024 < size < 8 * 1024**3:
+            raise ValueError("NSP update size outside bounded range")
+        with p.open("rb") as stream:
+            if role == "base":
+                stream.seek(0x100)
+                if stream.read(4) != b"HEAD":
+                    raise ValueError("XCI gamecard header missing")
+            elif stream.read(4) != b"PFS0":
+                raise ValueError("NSP PFS0 header missing")
+        result[role] = p
+    if set(result) != {"base", "update"}:
+        raise ValueError("XCI base and NSP update required")
+    return result
 
 def private_keys():
     if KEYS.is_symlink() or not KEYS.is_file() or not KEYS.stat().st_size:
@@ -178,7 +165,7 @@ def diagnose_detailed():
         package_ok = True
     except (OSError, ValueError) as exc:
         issue = str(exc).casefold()
-        if "exactly two" in issue:
+        if "exactly two" in issue or "one xci" in issue:
             reason = "count"
         elif "size" in issue:
             reason = "size_or_role"
@@ -205,6 +192,61 @@ def diagnose_detailed():
     return 0
 
 
+def diagnose_count():
+    """Return fixed numeric source facts; no paths, filenames or key bytes."""
+    source_ok = packages_ok = keys_ok = False
+    reason = "none"
+    top_nsp = nested_nsp = top_nsz = top_xci = 0
+    try:
+        folder = source_folder()
+        source_ok = True
+        # One level of children is enough to distinguish a nested dump from
+        # a bad extension without traversing unrelated Documents folders.
+        for child in folder.iterdir():
+            suffix = child.suffix.casefold()
+            if suffix == ".nsp":
+                top_nsp += 1
+            elif suffix == ".nsz":
+                top_nsz += 1
+            elif suffix == ".xci":
+                top_xci += 1
+            if child.is_dir() and not child.is_symlink():
+                nested_nsp += sum(p.suffix.casefold() == ".nsp"
+                                  for p in child.iterdir())
+        try:
+            packages()
+            packages_ok = True
+        except (OSError, ValueError) as exc:
+            issue = str(exc).casefold()
+            if "exactly two" in issue or "one xci" in issue:
+                reason = "count"
+            elif "size" in issue:
+                reason = "size_or_role"
+            elif "pfs0" in issue:
+                reason = "header"
+            elif "title id" in issue:
+                reason = "title_id"
+            elif "version" in issue:
+                reason = "version_or_name"
+            elif "regular" in issue or "symlink" in issue:
+                reason = "file_type"
+            else:
+                reason = "role"
+    except (OSError, ValueError):
+        reason = "source"
+    try:
+        private_keys()
+        keys_ok = True
+    except (OSError, ValueError):
+        pass
+    print(f"DREAD_DIAG_V3 source={'ok' if source_ok else 'fail'} "
+          f"packages={'ok' if packages_ok else 'fail'} "
+          f"keys={'ok' if keys_ok else 'fail'} reason={reason} "
+          f"top_nsp={top_nsp} nested_nsp={nested_nsp} "
+          f"top_nsz={top_nsz} top_xci={top_xci}")
+    return 0
+
+
 def dispatch(command, parent):
     if command not in ROUTES:
         return 126
@@ -212,6 +254,8 @@ def dispatch(command, parent):
         return diagnose()
     if command == "dread-diagnose-v2":
         return diagnose_detailed()
+    if command == "dread-diagnose-v3":
+        return diagnose_count()
     if command == "dread-probe-v1":
         packages()
         private_keys()

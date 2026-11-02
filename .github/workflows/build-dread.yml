@@ -41,7 +41,7 @@ jobs:
       - name: Verifier les scripts avant tout transfert prive
         run: |
           set -euo pipefail
-          python3 -m py_compile security/ffr_ssh_gate.py security/dread_gateway.py security/dread_transfer.py security/cache_export.py security/run_mina.py security/test_cache_import.py security/test_dread_gateway.py security/test_dread_transfer.py security/dread_identify_update.py security/test_dread_identify_update.py
+          python3 -m py_compile security/ffr_ssh_gate.py security/dread_gateway.py security/dread_transfer.py security/cache_export.py security/run_dread.py security/test_cache_import.py security/test_dread_gateway.py security/test_dread_transfer.py security/dread_identify_update.py security/test_dread_identify_update.py
           python3 -m unittest -v security/test_cache_import.py security/test_dread_gateway.py security/test_dread_transfer.py security/test_dread_identify_update.py
 
       - name: Selectionner Xcode 27.2 et verifier Metal, puis liberer de l'espace
@@ -250,7 +250,7 @@ jobs:
             [ "$(ssh -o ConnectTimeout=15 ffr-cachyos dread-probe-v1)" = 'DREAD_GATEWAY_V1' ]
           fi
 
-      - name: Verifier les NSP Metroid Dread et la capacite sans transfert
+      - name: Verifier le XCI/NSP Metroid Dread et la capacite sans transfert
         if: ${{ inputs.mode != 'keys-check' }}
         run: |
           set -euo pipefail
@@ -286,7 +286,7 @@ jobs:
             exit 1
           fi
 
-      - name: Recuperer et verifier les cles privees AVANT le NSP
+      - name: Recuperer et verifier les cles privees AVANT XCI/NSP
         if: ${{ inputs.mode == 'build' || inputs.mode == 'keys-check' }}
         run: |
           set -euo pipefail
@@ -315,7 +315,7 @@ jobs:
             echo 'DREAD keys-check passed; the game NSP was not transferred.'
           fi
 
-      - name: Transferer les NSP Metroid Dread base et update
+      - name: Transferer le XCI de base et le NSP update Metroid Dread
         if: ${{ inputs.mode == 'build' }}
         run: |
           set -euo pipefail
@@ -323,7 +323,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/dread-nsp"
           read -r TITLE VERSION B U <<< "$(ssh ffr-cachyos dread-manifest-v1)"
           [[ "$TITLE" == "010093801237C000" && "$VERSION" == "unverified" ]]
-          python3 security/dread_transfer.py base "$B" "$RUNNER_TEMP/dread-nsp/Metroid Dread [010093801237C000][v0].nsp"
+          python3 security/dread_transfer.py base "$B" "$RUNNER_TEMP/dread-nsp/Metroid Dread [010093801237C000][v0].xci"
           python3 security/dread_transfer.py update "$U" "$RUNNER_TEMP/dread-nsp/Metroid Dread update [010093801237C800].nsp"
           test -s "$RUNNER_TEMP/dread-prod.keys"
           echo 'DREAD source transfer complete; originals remain on CachyOS.'
@@ -336,7 +336,7 @@ jobs:
         if: ${{ inputs.mode == 'build' }}
         run: |
           set -euo pipefail
-          python3 security/run_mina.py
+          python3 security/run_dread.py
 
       - name: Rapatrier IPA DREAD sur CachyOS
         if: ${{ inputs.mode == 'build' }}
