@@ -3,7 +3,7 @@ name: Mina the Hollower nxnative - synthetic security tests
 on:
   push:
     branches:
-      - feature/mina-the-hollower-nxnative
+      - feature/mina-hollower-nxnative
     paths:
       - '.github/workflows/build-mina.yml'
       - '.github/workflows/test-mina.yml'
