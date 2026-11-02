@@ -13,7 +13,7 @@ class WONDERGatewayTests(unittest.TestCase):
     def fixtures(self, folder):
         names = {
             "base": "Super Mario Bros Wonder [010015100B514000][v0].nsp",
-            "update": "Super Mario Bros Wonder_Update_v327680.nsp",
+            "update": "Super Mario Bros Wonder_Update_v262144.nsp",
         }
         sizes = {"base": 5 * 1024**3, "update": 500 * 1024**2}
         result = {}
@@ -61,12 +61,12 @@ class WONDERGatewayTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             gw.classify(Path("Super Mario Bros Wonder [010015100B514800][v0].nsp"))
 
-    def test_wonder_v1512620_filenames_and_sparse_sizes(self):
+    def test_wonder_v120_filenames_and_sparse_sizes(self):
         """Synthetic retail-style filenames and sizes; no source game data."""
         with tempfile.TemporaryDirectory() as folder_name:
             folder = Path(folder_name)
             base = folder / "Super Mario Bros Wonder [010015100B514000][v0].nsp"
-            update = folder / "Super Mario Bros Wonder v1.2.1.nsp"
+            update = folder / "Super Mario Bros Wonder v1.2.0.nsp"
             for file, size in (
                 (base, 1455425557),
                 (update, 24497814),
@@ -82,13 +82,13 @@ class WONDERGatewayTests(unittest.TestCase):
 
     def test_retail_version_markers_and_conflicting_explicit_title(self):
         self.assertEqual(gw.classify(Path("Super Mario Bros Wonder 1.0.0.nsp")), "base")
-        self.assertEqual(gw.classify(Path("Super Mario Bros Wonder v1.2.1.nsp")), "update")
+        self.assertEqual(gw.classify(Path("Super Mario Bros Wonder v1.2.0.nsp")), "update")
         self.assertEqual(gw.classify(Path("Super Mario Bros Wonder 1.6.0.nsp")), "update")
         with self.assertRaisesRegex(ValueError, "update marked as base"):
-            gw.classify(Path("Super Mario Bros Wonder [010015100B514000] v1.2.1.nsp")
+            gw.classify(Path("Super Mario Bros Wonder [010015100B514000] v1.2.0.nsp")
             )
         with self.assertRaisesRegex(ValueError, "conflicting displayed"):
-            gw.classify(Path("Wonder 1.2.1 1.0.6.nsp"))
+            gw.classify(Path("Wonder 1.2.0 1.0.6.nsp"))
 
     def test_fallback_for_two_unidentified_nsp_names(self):
         # Unknown filenames are permitted when their sizes are unambiguous;
