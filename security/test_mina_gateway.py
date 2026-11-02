@@ -246,6 +246,9 @@ class MINAGatewayTests(unittest.TestCase):
                     receiver.reset_mock()
                     self.assertEqual(gw.dispatch("mina-write-profile", parent), 0)
                     receiver.assert_called_once_with("mina-profile.tsv", 2 * 1024**2)
+                    receiver.reset_mock()
+                    self.assertEqual(gw.dispatch("mina-write-inspection", parent), 0)
+                    receiver.assert_called_once_with("mina-inspection.log", 8 * 1024**2)
         self.assertEqual((parent.CACHE, parent.CONFLICTS, parent.OUTPUT), original)
 
 
