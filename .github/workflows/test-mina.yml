@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/mina-hollower-nxnative
+      - fix/mina-macos-temp-realpath-test
       - fix/mina-dotnet-apphost-131
       - fix/mina-cnmtdiag-private
       - fix/mina-semver-update-filename

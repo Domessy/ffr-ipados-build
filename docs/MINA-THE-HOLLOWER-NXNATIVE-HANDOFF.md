@@ -65,6 +65,10 @@ This is consistent with .NET runtime discovery when Homebrew supplies the CLI in
 
 **Important:** The private stderr contents have not been inspected; runtime discovery is a strongly supported hypothesis, not yet an empirically confirmed diagnosis. Verify the next real run. If it fails again, use `resultats/mina-inspection.log` on CachyOS, not the public GitHub log or key material.
 
+## 2026-11-02: macOS temporary path alias in synthetic pre-build test
+
+The first workflow on the managed-DLL change completed preparation only as far as synthetic unit tests, then failed **before private transfers**. Its simulated `test_inspector_runs_managed_dll_via_dotnet_not_standalone_apphost` compared `/var/folders/...` and `/private/var/folders/...` as raw strings. macOS resolves `/var` to `/private/var`; these names denote the same DLL. The test now compares `Path(...).resolve(strict=True)` values, includes a symlink regression, and captures simulated `CNMT verified v262144` output instead of emitting it in workflow logs. The simulated v262144 is **not evidence** of the user's real NSP update version. No production extractor or verification logic is loosened.
+
 ## Execute on CachyOS after merge
 
 ```bash

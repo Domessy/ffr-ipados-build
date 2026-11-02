@@ -87,6 +87,8 @@ class MinaPrivateInspectionTests(unittest.TestCase):
 class MinaDotnetHostRegressionTests(unittest.TestCase):
     def test_inspector_runs_managed_dll_via_dotnet_not_standalone_apphost(self):
         import os
+        from contextlib import redirect_stdout
+        from io import StringIO
         from pathlib import Path
         import tempfile
         from unittest.mock import patch
@@ -118,19 +120,45 @@ class MinaDotnetHostRegressionTests(unittest.TestCase):
                     return UPDATE
                 self.fail(f"unexpected stage: {stage}")
 
+            fake_console = StringIO()
+            # Avoid printing a fake "CNMT verified; v262144" in the real
+            # GitHub Actions build log during this synthetic unit test.
             with patch.dict(os.environ, {"RUNNER_TEMP": str(temp)}), \
-                 patch.object(mod, "checked", side_effect=fake_checked):
+                 patch.object(mod, "checked", side_effect=fake_checked), \
+                 redirect_stdout(fake_console):
                 mod.main()
+            self.assertIn("patch v262144", fake_console.getvalue())
 
             self.assertEqual([stage for _, stage in invocations],
                              ["build-inspector", "base-contents", "update-contents"])
-            managed_path = str(temp / "mina-nsp-inspection/nx_extract.dll")
+            # On macOS, /var resolves to /private/var. The runner resolves
+            # RUNNER_TEMP, so compare canonical paths rather than spellings.
+            managed_path = (temp / "mina-nsp-inspection/nx_extract.dll").resolve(strict=True)
             for command, _ in invocations[1:]:
-                self.assertEqual(command[:2], ["dotnet", managed_path])
+                self.assertEqual(command[0], "dotnet")
+                self.assertEqual(Path(command[1]).resolve(strict=True), managed_path)
                 self.assertEqual(command[3], "--contents")
             self.assertFalse(update.exists())
             self.assertTrue((pkg / f"Mina the Hollower update [{mod.UPDATE}][v262144].nsp").exists())
             self.assertTrue((temp / "mina-inspection.log").exists())
+
+
+class MinaCanonicalPathsTest(unittest.TestCase):
+    def test_symlink_and_realpath_denote_identical_dll(self):
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            real = root / "real"
+            real.mkdir()
+            dll = real / "nx_extract.dll"
+            dll.write_bytes(b"synthetic")
+            alias = root / "alias"
+            alias.symlink_to(real, target_is_directory=True)
+            # A structural regression for macOS /var -> /private/var.
+            self.assertEqual((alias / "nx_extract.dll").resolve(strict=True),
+                             dll.resolve(strict=True))
 
 
 if __name__ == "__main__":
