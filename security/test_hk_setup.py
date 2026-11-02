@@ -62,6 +62,23 @@ class HollowKnightSetupTests(unittest.TestCase):
             self.assertIn("directory unavailable", result.stderr)
             self.assertFalse((home / "portage-ipados/hollow-knight").exists())
 
+    def test_mixed_xci_nsp_rejected_before_any_private_transfer(self):
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            docs = home / "Documents"
+            docs.mkdir()
+            folder = docs / "Hollow Knight"
+            self.make_sources(folder)
+            base = folder / "base [0100633007D48000][v0].nsp"
+            wrong = folder / "base [0100633007D48000][v0].xci"
+            base.rename(wrong)
+            result = self.run_setup(home)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("HK_DIAG_V2 source=ok packages=fail keys=ok reason=count", result.stdout)
+            self.assertIn("base [0100633007D48000][v0].xci", result.stderr)
+            self.assertNotIn("synthetic test keys", result.stderr)
+            self.assertTrue(wrong.exists())
+
     def test_unrelated_similar_title_is_not_selected(self):
         with tempfile.TemporaryDirectory() as temp:
             home = Path(temp)
