@@ -19,7 +19,7 @@ class WonderSetupTests(unittest.TestCase):
         with (folder / "base [010015100B514000][v0].nsp").open("wb") as stream:
             stream.write(b"PFS0")
             stream.truncate(600 * 1024**2)
-        with (folder / "update [010015100B514800][v327680].nsp").open("wb") as stream:
+        with (folder / "update [010015100B514800][v262144].nsp").open("wb") as stream:
             stream.write(b"PFS0")
             stream.truncate(8 * 1024**2)
 
@@ -52,7 +52,7 @@ class WonderSetupTests(unittest.TestCase):
                 (game / "prod.keys").read_bytes(),
             )
             self.assertTrue((game / "base [010015100B514000][v0].nsp").exists())
-            self.assertTrue((game / "update [010015100B514800][v327680].nsp").exists())
+            self.assertTrue((game / "update [010015100B514800][v262144].nsp").exists())
 
     def test_ambiguous_case_variants_are_not_selected(self):
         with tempfile.TemporaryDirectory() as temp:
