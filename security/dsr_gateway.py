@@ -57,7 +57,7 @@ def classify(path):
             raise ValueError("update version not 1.0.3")
         return "update"
     base_hint = (
-        TITLE.casefold() in name or "base" in name or "super mario odyssey" in name or
+        TITLE.casefold() in name or "base" in name or "dark souls remastered" in name or
         "[v0]" in name or "version 1.0.0" in name
     )
     if base_hint and not update_hint and UPDATE_TITLE.casefold() not in name:
