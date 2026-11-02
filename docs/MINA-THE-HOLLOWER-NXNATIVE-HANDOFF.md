@@ -26,6 +26,14 @@ The one-time `bash security/setup_mina.sh` creates, under `~/portage-ipados/mina
 
 The forced-command gateway accepts only fixed `mina-*` routes, recognizes `PFS0` NSP headers and optional title ID/version *filename hints*, and validates the presence of exactly two regular NSP files. It does not decrypt Nintendo content or verify the internal version. nxnative itself makes those checks after transfer. The transfer uses atomic private temporary files and numeric-only public progress. File names and private keys are not printed into public Actions logs.
 
+## Nonstandard local NSP filenames — 2026-11-02
+
+The first `setup_mina.sh` reported `MINA_DIAG_V1 source=ok packages=fail keys=ok`. The old gateway classified both files by rigid filename hints, even for unprofiled games with no stable filename convention. The fix retains exactly two regular, bounded PFS0 files and checks explicit title/version hints, but when a role remains unidentified it can infer **the larger NSP as base and the smaller as update only when the sizes differ by more than 2×**. Conflicting explicit role tags still fail. This is an admission heuristic, **not** proof of NSP identities.
+
+The Mac's `mina_identify_update.py` still uses the pinned encrypted `nx_extract --contents` reader and rejects a mismatched Application/Patch CNMT pair or invalid update version **before starting the game build**. Original NSP names and content never change.
+
+Setup calls the redacted `mina-diagnose-v2` route. It reports source/packages/keys and one fixed reason category (count, size_or_role, header, title_id, version_or_name, file_type, source, role). If the local check still fails, collect that category plus a local listing of the two NSP basenames/sizes, **never the keys or NSP bytes**.
+
 ## Execute on CachyOS after merge
 
 ```bash
