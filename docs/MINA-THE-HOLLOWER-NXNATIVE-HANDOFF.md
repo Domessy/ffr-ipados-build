@@ -45,6 +45,14 @@ The issue was not the volume or the keys. The update filename contained the game
 
 Synthetic tests now use exactly these two basenames and sparse files with the reported byte lengths. The actual encrypted update CNMT remains the authoritative check on the ephemeral Mac runner. Never equate displayed 1.0.5 with an assumed numeric Nintendo update version.
 
+## 2026-11-02: encrypted CNMT inspector failure on first real transfer
+
+The first actual `mode=build` passed Xcode 27.2, keys verification, local gateway and **both private NSP transfers** (875425557 and 34497814 bytes). It then failed before nxnative itself started: `MINA: encrypted package identification failed (RuntimeError)`. The old inspector swallowed the precise upstream .NET/LibHac error and did not preserve an inspection log, so the available public run does not identify whether `dotnet build`, the base `--contents` read or update `--contents` read failed.
+
+Fix: `security/mina_identify_update.py` now performs the same strictly pinned `nx_extract` operations but emits only fixed `stage=build-inspector|base-contents|update-contents|validate-metadata|rename-update` and numeric statuses to public CI. It writes bounded (at most 1 MiB of each stdout/stderr per subprocess) detailed logs to the runner's `mina-inspection.log`. The workflow's `always()` cleanup uses the new fixed route `mina-write-inspection` to transmit that log privately to `~/portage-ipados/mina-the-hollower/resultats/mina-inspection.log`.
+
+If the next run fails at the same location, inspect the **private** file locally and report only errors with secret/file paths removed. Never post `prod.keys`, tickets or NSP content. Unlike the previous `RuntimeError` summary, stage + exit status should identify which part of the tool failed. The inspector still must verify base Application CNMT and update Patch CNMT before renaming the runner's update copy; neither bypass this step nor assume that commercial `1.0.5` equals a specific integer Nintendo update revision.
+
 ## Execute on CachyOS after merge
 
 ```bash
