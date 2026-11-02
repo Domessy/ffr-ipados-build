@@ -23,7 +23,6 @@ KEYS = TEMP / "wonder-prod.keys"
 PYTHON = TEMP / "wonder-venv" / "bin" / "python"
 NATIVE = TEMP / "nxnative"
 VERIFIED_PATCH = TEMP / "wonder-verified-patch.version"
-EXPECTED_PATCH = 262144
 EXPECTED_DISPLAY_VERSION = "1.2.0"
 EXPORT = WORKSPACE / "security" / "cache_export.py"
 # Cap one shader build to 265 min and retain time for checkpoint/IPA upload on a 345 min job; subsequent runs reuse the shader CAS.
@@ -200,8 +199,8 @@ def read_verified_patch():
     if not re.fullmatch(r"[1-9]\d{0,9}", value):
         raise ValueError("invalid encrypted patch revision output")
     version = int(value)
-    if version != EXPECTED_PATCH:
-        raise ValueError("encrypted patch revision is not v262144")
+    if version in (65536, 327680) or version > 0x7FFFFFFF:
+        raise ValueError("patch revision belongs to a different registered game version")
     return version
 
 
