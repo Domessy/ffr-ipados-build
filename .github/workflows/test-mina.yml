@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/mina-hollower-nxnative
+      - fix/mina-nsp-detection
     paths:
       - '.github/workflows/build-mina.yml'
       - '.github/workflows/test-mina.yml'
