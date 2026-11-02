@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""No-retail-asset tests for Echoes setup case-variant source discovery."""
+"""No-retail-asset tests for Dark Souls setup case-variant source discovery."""
 import os
 from pathlib import Path
 import subprocess
@@ -56,7 +56,7 @@ class DarkSoulsSetupTests(unittest.TestCase):
             documents = home / "Documents"
             documents.mkdir()
             self.make_sources(documents / "DARK SOULS REMASTERED")
-            self.make_sources(documents / "Dark Souls Remastered")
+            self.make_sources(documents / "Dark Souls REMASTERED")
             result = self.run_setup(home)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("directory unavailable", result.stderr)
