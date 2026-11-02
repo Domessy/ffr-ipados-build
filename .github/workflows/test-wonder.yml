@@ -3,7 +3,7 @@ name: Super Mario Bros. Wonder nxnative - synthetic security tests
 on:
   push:
     branches:
-      - feature/super-mario-bros-wonder-nxnative
+      - feature/wonder-nxnative
     paths:
       - '.github/workflows/build-wonder.yml'
       - '.github/workflows/test-wonder.yml'
