@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Receive two WONDER NSPs over SSH with numeric-only live progress in public CI.
+"""Receive one WONDER XCI base and NSP patch over SSH with numeric-only live progress in public CI.
 
 No NSP bytes, private filenames, credentials, IPs or local paths are logged.
 Only fixed, allowlisted forced SSH commands are executed.
@@ -43,7 +43,7 @@ def transfer(role, expected, output):
     folder = runner_temp / "wonder-nsp"
     if output.parent.resolve(strict=True) != folder.resolve(strict=True):
         raise ValueError("output must be in the dedicated WONDER NSP directory")
-    if output.suffix.lower() != ".nsp" or output.is_symlink():
+    if output.suffix.lower() != (".xci" if role == "base" else ".nsp") or output.is_symlink():
         raise ValueError("invalid output filename")
 
     # Progress comes from how many bytes the receiving Mac has written, not

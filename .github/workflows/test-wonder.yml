@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/wonder-nxnative
+      - fix/wonder-xci-base-nsp-update
     paths:
       - '.github/workflows/build-wonder.yml'
       - '.github/workflows/test-wonder.yml'
@@ -74,6 +75,11 @@ jobs:
           assert "DM_ALLOW_OTHER_METAL" not in workflow
           assert '65501fbbaf8526f7aab0a1edd028135888590f8' in workflow
           assert 'security/wonder_identify_update.py' in workflow
+          assert 'Super Mario Bros. Wonder [010015100B514000][v0].xci' in workflow
+          assert 'Super Mario Bros. Wonder update [010015100B514800].nsp' in workflow
+          gateway = Path('security/wonder_gateway.py').read_text()
+          assert 'stream.seek(0x100)' in gateway and 'b"HEAD"' in gateway
+          assert '(".xci", ".nsp")' in gateway
           verify = Path('security/wonder_identify_update.py').read_text()
           assert 'version in (65536, 327680)' in verify
           assert '010015100B514000' in verify and '010015100B514800' in verify

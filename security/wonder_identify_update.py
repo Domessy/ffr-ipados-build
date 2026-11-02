@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Verify encrypted Super Mario Bros. Wonder base/update CNMT and tag only the runner's patch NSP.
+"""Verify encrypted Super Mario Bros. Wonder XCI base/NSP update CNMT and tag only the runner's patch NSP.
 
 Private diagnostics go to RUNNER_TEMP/wonder-inspection.log, returned by a fixed
 SSH route. Public GitHub logs show only fixed stage labels and numeric statuses.
-Never modify the user's CachyOS source NSPs or reveal keys to Actions logs.
+Never modify the user's CachyOS source XCI/NSP or reveal keys to Actions logs.
 """
 import os
 from pathlib import Path
@@ -34,7 +34,7 @@ def validate_metadata(base_stdout, update_stdout):
     base = meta_rows(base_stdout)
     patch = meta_rows(update_stdout)
     if base != [("Application", TITLE, 0)]:
-        raise ValueError("base NSP CNMT does not match the expected application")
+        raise ValueError("XCI base CNMT does not match the expected application")
     if len(patch) != 1 or patch[0][:2] != ("Patch", UPDATE):
         raise ValueError("update NSP CNMT does not match the expected patch title")
     version = patch[0][2]
@@ -81,7 +81,7 @@ def main():
     temp = Path(os.environ["RUNNER_TEMP"]).resolve(strict=True)
     folder = temp / "wonder-nsp"
     keys = temp / "wonder-prod.keys"
-    base = folder / f"Super Mario Bros. Wonder [{TITLE}][v0].nsp"
+    base = folder / f"Super Mario Bros. Wonder [{TITLE}][v0].xci"
     update = folder / f"Super Mario Bros. Wonder update [{UPDATE}].nsp"
     upstream = temp / "nxnative" / "dm" / "tools" / "nx_extract"
     output = temp / "wonder-nsp-inspection"
