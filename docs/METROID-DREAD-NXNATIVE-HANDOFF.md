@@ -13,7 +13,7 @@ The pinned upstream `seedds/nxnative@e5620b1a05a5b7374e0135d6312d3e90994eab81` c
 
 ## Isolation and transport
 
-Original source folder: `/home/syssy/Documents/Metroid Dread/`, with exactly **two NSPs (base and update)** and a local `prod.keys`.
+Original source folder: `/home/syssy/Documents/Metroid Dread/`, with exactly **one XCI base and one NSP update** and a local `prod.keys`.
 
 `bash security/setup_dread.sh` uses a unique direct Documents folder matching the game name (case-insensitive only if unambiguous), preserves the existing NSPs without rename/move, and makes these private resources:
 
@@ -24,9 +24,9 @@ Original source folder: `/home/syssy/Documents/Metroid Dread/`, with exactly **t
 - `~/portage-ipados/metroid-dread/resultats/dread-build.log` — private nxnative diagnostic.
 - `~/portage-ipados/metroid-dread/resultats/dread-inspection.log` — bounded private encrypted CNMT / .NET inspector diagnostic.
 
-The fixed-command `dread-*` SSH gateway is title-scoped and separate from previous projects. The local admission phase checks two regular `.nsp` files with `PFS0` headers, filenames/role hints, bounded file sizes and the private key copy. It can resolve ambiguous *filenames* using the clearly larger NSP as base only when the second is less than half as big; this heuristic is **never the final title verification**.
+The fixed-command `dread-*` SSH gateway is title-scoped and separate from previous projects. The local check accepts exactly one XCI and one NSP: the XCI must have the HEAD signature at offset 0x100, and the NSP must start with PFS0. The base/update roles follow the extensions; encrypted metadata confirms their identities on the runner.
 
-On the ephemeral GitHub Xcode runner, `security/dread_identify_update.py` builds the pinned `nx_extract` and runs its managed `nx_extract.dll` through the installed `dotnet` CLI (avoids macOS Homebrew apphost exit 131). It reads encrypted CNMT for the base Application and the Patch, verifies both expected title IDs and **exactly v327680**, then renames **only the runner's update copy** to `[v327680].nsp`. A different patch stops before shader compilation; private diagnostics return by fixed `dread-write-inspection` route.
+On the ephemeral GitHub Xcode runner, `security/dread_identify_update.py` builds the pinned `nx_extract` and runs its managed `nx_extract.dll` through the installed `dotnet` CLI (avoids macOS Homebrew apphost exit 131). It reads encrypted CNMT for the XCI base Application and the NSP Patch, verifies both expected title IDs and **exactly v327680**, then renames **only the runner's update copy** to `[v327680].nsp`. A different patch stops before shader compilation; private diagnostics return by fixed `dread-write-inspection` route.
 
 The build selects Xcode 27.2 and requires **Apple metal 32023.922** for macOS and iPhoneOS, as required by the pinned nxnative shader lock. It does not override a mismatch. The shader CAS is checkpointed periodically and the IPA is returned only over the private Tailscale/SSH channel. No system-level CachyOS packages, permanent services or original NSPs are modified.
 
@@ -62,7 +62,7 @@ The command intentionally stops on a modified/non-main local checkout rather tha
 
 ## Diagnostics and rollback
 
-If a source check fails, use the fixed `DREAD_DIAG_V2` reason code plus *names and sizes only* of the two NSPs. Do not publish keys or raw file content. If encrypted CNMT inspection fails, inspect `dread-inspection.log` privately. For nxnative compile/runtime failure, inspect `dread-build.log` or return it as a private attachment after removing secrets.
+If a source check fails, use the fixed `DREAD_DIAG_V2` reason code plus *names and sizes only* of the XCI and NSP. Do not publish keys or raw file content. If encrypted CNMT inspection fails, inspect `dread-inspection.log` privately. For nxnative compile/runtime failure, inspect `dread-build.log` or return it as a private attachment after removing secrets.
 
 On a successful IPA, test actual launch, title/menu, in-game movement/shooting, input and audio, movie transitions, saves, thermal throttling and memory use on the iPad. The upstream Mac gameplay report does not replace this test.
 
