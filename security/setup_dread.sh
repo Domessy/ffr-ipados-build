@@ -57,8 +57,8 @@ if ! probe="$(SSH_ORIGINAL_COMMAND=dread-probe-v1 python3 "$GATE")"; then
   echo "DREAD: source validation failed; see DREAD_DIAG_V3 counts above." >&2
   echo "DREAD: local package inventory (names/sizes only, no keys or content):" >&2
   find "$SRC" -mindepth 1 -maxdepth 2 -type f \
-    \\( -iname '*.nsp' -o -iname '*.nsz' -o -iname '*.xci' -o -iname '*.xcz' \\) \
-    -printf '  %P (%s bytes)\\n' >&2 || true
+    \( -iname '*.nsp' -o -iname '*.nsz' -o -iname '*.xci' -o -iname '*.xcz' \) \
+    -printf '  %P (%s bytes)\n' >&2 || true
   echo "DREAD: no source files were changed. Resolve source layout before a new GitHub build." >&2
   exit 1
 fi
