@@ -58,6 +58,14 @@ Premier build réel XCI/NSP : Xcode/Homebrew et dotnet étaient installés, puis
 
 Aucun NSP, XCI ni fichier de clés n'avait été transféré au moment de cet échec. Conserver la logique de profil dérivé pour Wonder 1.2.0 et la validation CNMT/NACP intactes.
 
+## Correctif d'authentification Tailscale (2026-11-02)
+
+Le run réel [#41498323980](https://github.com/Domessy/ffr-ipados-build/actions/runs/41498323980) a passé la récupération nxnative, Homebrew, dotnet, Xcode 27.2, Metal 32023.922 et l'installation de Tailscale. Il a échoué avant le transfert XCI/NSP sur `test -n "$TS_AUTWONDEREY"` : le template généré depuis Hollow Knight avait remplacé **HK** à l'intérieur de **AUTHKEY**, créant le secret inexistant `secrets.FFR_TS_AUTWONDEREY` et sa variable locale `TS_AUTWONDEREY`. La valeur transmise par GitHub était donc vide.
+
+La variable et le secret d'origine sont restaurés : `TS_AUTHKEY` provenant de `secrets.FFR_TS_AUTHKEY`, identiques à ceux du workflow Metroid Dread. Une nouvelle étape vérifie les cinq secrets réseaux requis **avant** de préparer Xcode, Metal ou Homebrew, sans jamais afficher les valeurs. `security/test_wonder_workflow.py` compare les noms au workflow Dread et valide le branchement de `tailscale up --authkey`, les chemins XCI/NSP et le SHA amont complet. Ces tests sont exécutés sur Linux et durant les contrôles synthétiques ; un oubli de secret ne doit plus consommer un run de compilation long.
+
+Le contenu des fichiers locaux n'est pas en cause : aucun fichier du jeu ni clé n'avait été transféré au moment de l'échec. Relancer après fusion du correctif ; l'accès Tailscale lui-même ne peut être vérifié avec les seuls tests synthétiques sans disposer du secret réel.
+
 ## Reversibilité
 
 Tous les fichiers additionnels sur CachyOS sont confinés à `~/portage-ipados/super-mario-bros-wonder/`; sauvegarder l'IPA et les caches souhaités avant une éventuelle suppression de ce seul répertoire. La branche/PR documente le routage `wonder-*` ajouté à `security/ffr_ssh_gate.py`, à révoquer séparément si ce jeu est abandonné.
