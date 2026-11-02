@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/metroid-dread-nxnative
+      - fix/dread-source-count-diagnostics
     paths:
       - '.github/workflows/build-mina.yml'
       - '.github/workflows/test-mina.yml'
