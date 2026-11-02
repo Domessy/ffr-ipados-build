@@ -78,7 +78,7 @@ def main():
     temp = Path(os.environ["RUNNER_TEMP"]).resolve(strict=True)
     folder = temp / "dread-nsp"
     keys = temp / "dread-prod.keys"
-    base = folder / f"Metroid Dread [{TITLE}][v0].nsp"
+    base = folder / f"Metroid Dread [{TITLE}][v0].xci"
     update = folder / f"Metroid Dread update [{UPDATE}].nsp"
     upstream = temp / "nxnative" / "dm" / "tools" / "nx_extract"
     output = temp / "dread-nsp-inspection"
