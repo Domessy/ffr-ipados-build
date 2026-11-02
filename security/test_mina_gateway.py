@@ -61,6 +61,28 @@ class MINAGatewayTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             gw.classify(Path("Mina the Hollower [0100DCD01F306800][v0].nsp"))
 
+    def test_fallback_for_two_unidentified_nsp_names(self):
+        # Unknown filenames are permitted when their sizes are unambiguous;
+        # nx_extract performs the definitive encrypted CNMT identity check.
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            sources = self.fixtures(folder)
+            base = folder / "game dump.nsp"
+            update = folder / "additional content.nsp"
+            sources["base"].rename(base)
+            sources["update"].rename(update)
+            with patch.object(gw, "source_folder", return_value=folder):
+                self.assertEqual(gw.packages(), {"base": base, "update": update})
+
+    def test_fallback_for_one_unidentified_update(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            sources = self.fixtures(folder)
+            update = folder / "Unknown package.nsp"
+            sources["update"].rename(update)
+            with patch.object(gw, "source_folder", return_value=folder):
+                self.assertEqual(gw.packages(), {"base": sources["base"], "update": update})
+
     def test_reject_additional_or_unrelated_package(self):
         with tempfile.TemporaryDirectory() as d:
             folder = Path(d)
@@ -70,9 +92,51 @@ class MINAGatewayTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     gw.packages()
                 (folder / "Other.nsp").unlink()
-                sources["update"].rename(folder / "Unknown package.nsp")
+                wrong = folder / "wrong [0100123456789000][v123].nsp"
+                sources["update"].rename(wrong)
                 with self.assertRaises(ValueError):
                     gw.packages()
+
+    def test_reject_ambiguous_size_heuristic(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            sources = self.fixtures(folder)
+            base = folder / "unknown A.nsp"
+            update = folder / "unknown B.nsp"
+            sources["base"].rename(base)
+            sources["update"].rename(update)
+            with update.open("r+b") as stream:
+                stream.truncate(4 * 1024**3)
+            with patch.object(gw, "source_folder", return_value=folder):
+                with self.assertRaisesRegex(ValueError, "ambiguous"):
+                    gw.packages()
+
+    def test_reject_explicit_role_conflicting_with_size(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            sources = self.fixtures(folder)
+            # Explicit role says the larger file is the update, contrary to
+            # the only feasible size-based assignment.
+            large = folder / "Mina update [0100DCD01F306800].nsp"
+            small = folder / "ambiguous.nsp"
+            sources["base"].rename(large)
+            sources["update"].rename(small)
+            with patch.object(gw, "source_folder", return_value=folder):
+                with self.assertRaisesRegex(ValueError, "contradicts"):
+                    gw.packages()
+
+    def test_reason_coded_diagnostic_does_not_print_filenames(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            keys = folder / "keys"
+            keys.write_text("synthetic")
+            with patch.object(gw, "source_folder", return_value=folder), \
+                 patch.object(gw, "KEYS", keys), \
+                 patch("builtins.print") as output:
+                self.assertEqual(gw.dispatch("mina-diagnose-v2", parent), 0)
+                output.assert_called_once_with(
+                    "MINA_DIAG_V2 source=ok packages=fail keys=ok reason=count"
+                )
 
     def test_reject_symlink_package_and_private_key(self):
         with tempfile.TemporaryDirectory() as d:
