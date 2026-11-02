@@ -29,5 +29,60 @@ class MinaContentMetadataTests(unittest.TestCase):
         self.assertEqual(meta_rows("content Patch 0100dcd01f306800 262144 injected\n"), [])
 
 
+class MinaPrivateInspectionTests(unittest.TestCase):
+    """Private diagnostic regressions; no real NSP, key or .NET tool needed."""
+
+    def test_nonzero_exit_raises_stage_and_retains_private_stderr(self):
+        import subprocess
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        from security.mina_identify_update import checked, InspectionError
+
+        with tempfile.TemporaryDirectory() as folder:
+            log = Path(folder) / "private.log"
+            result = subprocess.CompletedProcess(
+                ["synthetic"], 5, stdout="stdout sample", stderr="secret filename")
+            with patch("security.mina_identify_update.subprocess.run", return_value=result):
+                with self.assertRaises(InspectionError) as failure:
+                    checked(["synthetic"], "base-contents", log, 10)
+            self.assertEqual(failure.exception.stage, "base-contents")
+            self.assertEqual(failure.exception.status, "exit-5")
+            self.assertIn("secret filename", log.read_text())
+            self.assertIn("stage=base-contents; exit_code=5", log.read_text())
+
+    def test_success_returns_stdout_and_diagnostics_remain_private(self):
+        import subprocess
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        from security.mina_identify_update import checked
+
+        with tempfile.TemporaryDirectory() as folder:
+            log = Path(folder) / "private.log"
+            result = subprocess.CompletedProcess(
+                ["synthetic"], 0, stdout=BASE, stderr="")
+            with patch("security.mina_identify_update.subprocess.run", return_value=result):
+                self.assertEqual(checked(["synthetic"], "base-contents", log, 10), BASE)
+            self.assertIn(BASE, log.read_text())
+
+    def test_timeout_is_redacted_to_stage_and_status(self):
+        import subprocess
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        from security.mina_identify_update import checked, InspectionError
+
+        with tempfile.TemporaryDirectory() as folder:
+            log = Path(folder) / "private.log"
+            with patch("security.mina_identify_update.subprocess.run",
+                       side_effect=subprocess.TimeoutExpired("private-cmd", 5)):
+                with self.assertRaises(InspectionError) as failure:
+                    checked(["synthetic"], "update-contents", log, 5)
+            self.assertEqual(failure.exception.stage, "update-contents")
+            self.assertEqual(failure.exception.status, "timeout")
+            self.assertIn("stage=update-contents; timeout", log.read_text())
+
+
 if __name__ == "__main__":
     unittest.main()
