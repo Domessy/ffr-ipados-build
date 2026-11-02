@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - feature/dark-souls-remastered-nxnative
-      - feature/dark-souls-remastered-nxnative
     paths:
       - '.github/workflows/build-dsr.yml'
       - '.github/workflows/test-dsr.yml'
@@ -40,12 +39,13 @@ jobs:
             security/ffr_ssh_gate.py security/dsr_gateway.py \
             security/dsr_transfer.py security/run_dsr.py \
             security/cache_export.py security/test_cache_import.py \
-            security/test_dsr_gateway.py security/test_dsr_transfer.py
+            security/test_dsr_gateway.py security/test_dsr_transfer.py security/test_dsr_setup.py
           bash -n security/setup_dsr.sh
           python3 -m unittest -v \
             security/test_cache_import.py \
             security/test_dsr_gateway.py \
-            security/test_dsr_transfer.py
+            security/test_dsr_transfer.py \
+            security/test_dsr_setup.py
       - name: Verify compiler selection stays pinned to upstream Metal 32023.922
         shell: bash
         run: |
