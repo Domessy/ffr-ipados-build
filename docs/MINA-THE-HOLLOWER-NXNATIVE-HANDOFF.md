@@ -1,0 +1,53 @@
+# Mina the Hollower — native iPadOS exploration through nxnative
+
+## Status and limits (2 November 2026)
+
+The game is available on Nintendo Switch, but as of the pinned upstream revision there is **no curated nxnative profile** for base title ID `0100DCD01F306000`. The upstream `scripts/build_ipa_from_nsp.py` supports *unknown titles*: it surveys the extracted game, writes a proposed `game.tsv`, and attempts a best-effort iOS IPA. This is an experimental port; a successful job or generated IPA does **not** establish that the game boots or plays correctly.
+
+Public title identification: `0100DCD01F306000`, update title `0100DCD01F306800`, to be checked against the user's source NSP by the native extractor. **No update version is assumed**. The setup/gateway never claim that the update version has been verified from an encrypted NSP.
+
+- Original game folder: `/home/syssy/Documents/Mina the Hollower/` with **exactly two NSP files** (base and update) and `prod.keys`.
+- Pinned nxnative upstream: `seedds/nxnative@54ab7b1059eae8524ff60a320ea66f6ebac16506`.
+- Toolchain: Xcode 27.2 + Metal `32023.922`, verified for both macOS and iPhoneOS before contacting the local computer; no unsupported compiler bypass.
+- Workflow: `.github/workflows/build-mina.yml`, modes `preflight`, `keys-check`, `build`. Build repeats preflight admission before accessing source files.
+- Mac build runner is temporary and has no persistent access to Nintendo content. No source NSP or keys are committed to GitHub; no public IPA artifact is produced.
+
+## Data isolation
+
+The one-time `bash security/setup_mina.sh` creates, under `~/portage-ipados/mina-the-hollower/`:
+
+- `source` — read-only access via symlink to the existing original Documents folder; the script checks the exact name, allowing a unique capitalization variant.
+- `private/prod.keys` — local regular 0600 copy only; no symlink and never overwrite mismatching existing keys.
+- `shader-cache/` and `shader-cache-conflicts/` — separate append-only CAS and conflicts, saved about every 12 minutes in long runs.
+- `resultats/MinaTheHollower-nxnative.ipa` — expected output, **only if a full build succeeds**.
+- `resultats/mina-build.log` — private diagnostic.
+- `resultats/mina-survey.md` and `resultats/mina-profile.tsv` — when the upstream exploratory survey/provisional profile exist, returned privately even on compile failure.
+
+The forced-command gateway accepts only fixed `mina-*` routes, recognizes `PFS0` NSP headers and optional title ID/version *filename hints*, and validates the presence of exactly two regular NSP files. It does not decrypt Nintendo content or verify the internal version. nxnative itself makes those checks after transfer. The transfer uses atomic private temporary files and numeric-only public progress. File names and private keys are not printed into public Actions logs.
+
+## Execute on CachyOS after merge
+
+```bash
+(
+set -euo pipefail
+cd "$HOME/portage-ipados/ff-resonance/github-build"
+test "$(git branch --show-current)" = main
+test -z "$(git status --porcelain)"
+git pull --ff-only origin main
+bash security/setup_mina.sh
+python3 -m unittest -v security/test_cache_import.py security/test_mina_gateway.py security/test_mina_transfer.py security/test_mina_setup.py
+gh workflow run build-mina.yml -R Domessy/ffr-ipados-build --ref main -f mode=build
+gh run list -R Domessy/ffr-ipados-build --workflow build-mina.yml --limit 3
+)
+```
+
+The GitHub runner selects Xcode 27.2, verifies the pinned nxnative compiler, checks the game source via fixed SSH routes, restores the Mina-specific shader cache, transfers the base and update NSP plus keys, and runs the upstream auto-survey + provisional build. It streams the IPA back to CachyOS only on success; diagnostics (including the survey) are private and can guide future revisions.
+
+If the workflow fails, inspect **only the private** `resultats/mina-build.log`, `resultats/mina-survey.md`, and `resultats/mina-profile.tsv`. A failed exploratory build is evidence of a missing or incorrect profile, unsupported rendering technique or incompatible binary, not automatically an NSP or keys issue. Do not disable compiler fingerprint verification or game file integrity to force success.
+
+## Recovery, rollback and next steps
+
+- No system packages, permanent services or original files change on CachyOS.
+- To revert the workspace, remove only the Mina project directory *after saving any desired IPA, logs and shader CAS*. Revert the `mina-` gateway dispatch by Git commit only when there is no active build.
+- If an IPA is produced, verify iPad Pro M5 first launch, input, menus, game saves, sound, shader rendering and memory before calling it playable.
+- If no IPA is produced, use the survey/profile and compile logs to build and test a proper game profile or needed engine hooks; don't promise performance before device testing.
