@@ -327,6 +327,11 @@ jobs:
           python3 security/mina_transfer.py update "$U" "$RUNNER_TEMP/mina-nsp/Mina the Hollower update [0100DCD01F306800].nsp"
           test -s "$RUNNER_TEMP/mina-prod.keys"
           echo 'MINA source transfer complete; originals remain on CachyOS.'
+          # A provisional profile has no registered version. Read the encrypted
+          # CNMT and give the runner's update copy its real [vN] tag so nxnative
+          # does not silently ignore this update.
+          python3 security/mina_identify_update.py
+
 
       - name: Compiler IPA MINA et checkpoint shaders regulierement
         if: ${{ inputs.mode == 'build' }}
