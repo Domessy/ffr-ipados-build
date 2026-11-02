@@ -62,6 +62,28 @@ class MetroidSetupTests(unittest.TestCase):
             self.assertIn("directory unavailable", result.stderr)
             self.assertFalse((home / "portage-ipados/metroid-dread").exists())
 
+    def test_wrong_count_has_actionable_local_inventory_and_no_key_leak(self):
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            docs = home / "Documents"
+            docs.mkdir()
+            game = docs / "Metroid Dread"
+            self.make_sources(game)
+            (game / "update [010093801237C800][v327680].nsp").unlink()
+            (game / "archive").mkdir()
+            nested = game / "archive" / "update [010093801237C800][v327680].nsp"
+            with nested.open("wb") as stream:
+                stream.write(b"PFS0")
+                stream.truncate(8 * 1024**2)
+            result = self.run_setup(home)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("DREAD_DIAG_V3 source=ok packages=fail keys=ok reason=count", result.stdout)
+            self.assertIn("top_nsp=1 nested_nsp=1", result.stdout)
+            self.assertIn("archive/update [010093801237C800][v327680].nsp", result.stderr)
+            self.assertNotIn("synthetic test keys", result.stderr)
+            self.assertTrue((game / "base [010093801237C000][v0].nsp").exists())
+            self.assertTrue(nested.exists())
+
     def test_unrelated_similar_title_is_not_selected(self):
         with tempfile.TemporaryDirectory() as temp:
             home = Path(temp)
