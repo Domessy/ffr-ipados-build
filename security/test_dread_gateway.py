@@ -106,7 +106,8 @@ class DreadGatewayTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as name:
             folder = Path(name)
             pair = self.fixtures(folder)
-            moved = folder / "moved.xci"
+            moved = folder / "archive" / "moved.xci"
+            moved.parent.mkdir()
             pair["base"].rename(moved)
             pair["base"].symlink_to(moved)
             with patch.object(gw, "source_folder", return_value=folder):
