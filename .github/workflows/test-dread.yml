@@ -13,6 +13,18 @@ on:
       - 'security/run_mina.py'
       - 'security/cache_export.py'
       - 'security/setup_mina.sh'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/build-dread.yml'
+      - '.github/workflows/test-dread.yml'
+      - 'security/ffr_ssh_gate.py'
+      - 'security/dread_*.py'
+      - 'security/test_dread_*.py'
+      - 'security/run_dread.py'
+      - 'security/cache_export.py'
+      - 'security/setup_dread.sh'
   workflow_dispatch:
 
 permissions:
