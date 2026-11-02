@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: Preflight or build Hollow Knight (provisional profile) with isolated shader cache and keys
+        description: Preflight or build Hollow Knight (registered 1.5.12620 profile) with isolated shader cache and keys
         type: choice
         required: true
         default: preflight
@@ -41,7 +41,7 @@ jobs:
       - name: Verifier les scripts avant tout transfert prive
         run: |
           set -euo pipefail
-          python3 -m py_compile security/ffr_ssh_gate.py security/hk_gateway.py security/hk_transfer.py security/cache_export.py security/run_mina.py security/test_cache_import.py security/test_hk_gateway.py security/test_hk_transfer.py security/hk_identify_update.py security/test_hk_identify_update.py
+          python3 -m py_compile security/ffr_ssh_gate.py security/hk_gateway.py security/hk_transfer.py security/cache_export.py security/run_hk.py security/test_cache_import.py security/test_hk_gateway.py security/test_hk_transfer.py security/hk_identify_update.py security/test_hk_identify_update.py
           python3 -m unittest -v security/test_cache_import.py security/test_hk_gateway.py security/test_hk_transfer.py security/test_hk_identify_update.py
 
       - name: Selectionner Xcode 27.2 et verifier Metal, puis liberer de l'espace
@@ -327,9 +327,9 @@ jobs:
           python3 security/hk_transfer.py update "$U" "$RUNNER_TEMP/hk-nsp/Hollow Knight update [0100633007D48800].nsp"
           test -s "$RUNNER_TEMP/hk-prod.keys"
           echo 'HK source transfer complete; originals remain on CachyOS.'
-          # A provisional profile has no registered version. Read the encrypted
+          # A registered 1.5.12620 profile has no registered version. Read the encrypted
           # CNMT and give the runner's update copy its real [vN] tag so nxnative
-          # does not silently ignore this update.
+          # uses the exact registered 1.5.12620 update.
           python3 security/hk_identify_update.py
 
 
@@ -337,7 +337,7 @@ jobs:
         if: ${{ inputs.mode == 'build' }}
         run: |
           set -euo pipefail
-          python3 security/run_mina.py
+          python3 security/run_hk.py
 
       - name: Rapatrier IPA HK sur CachyOS
         if: ${{ inputs.mode == 'build' }}
@@ -366,7 +366,7 @@ jobs:
           fi
 
           # No game files or secrets in GitHub artifacts. Preserve only the
-          # upstream's best-effort survey and provisional profile privately.
+          # upstream's best-effort survey and registered 1.5.12620 profile privately.
           SURVEY="$RUNNER_TEMP/hk-nsp/0100633007D48000_survey/survey.md"
           PROFILE="$RUNNER_TEMP/hk-nsp/0100633007D48000_build/profile/0100633007D48000/game.tsv"
           if [ -s "$SURVEY" ]; then
@@ -375,7 +375,7 @@ jobs:
           fi
           if [ -s "$PROFILE" ]; then
             head -c 2097152 "$PROFILE" | ssh -o ConnectTimeout=20 ffr-cachyos hk-write-profile || true
-            echo 'HK diagnostic: private provisional profile upload attempted.'
+            echo 'HK diagnostic: private registered 1.5.12620 profile upload attempted.'
           fi
           rm -f "$RUNNER_TEMP/hk-prod.keys" "$RUNNER_TEMP/hk_ssh_key" || true
 
