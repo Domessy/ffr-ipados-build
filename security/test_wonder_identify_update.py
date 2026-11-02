@@ -100,9 +100,9 @@ class WonderDotnetHostRegressionTests(unittest.TestCase):
             temp = Path(home)
             pkg = temp / "wonder-nsp"
             pkg.mkdir()
-            base = pkg / f"Super Mario Bros. Wonder [{mod.TITLE}][v0].nsp"
+            base = pkg / f"Super Mario Bros. Wonder [{mod.TITLE}][v0].xci"
             update = pkg / f"Super Mario Bros. Wonder update [{mod.UPDATE}].nsp"
-            base.write_bytes(b"PFS0")
+            base.write_bytes(b"\0" * 0x100 + b"HEAD")
             update.write_bytes(b"PFS0")
             (temp / "wonder-prod.keys").write_text("synthetic - no actual keys")
             upstream = temp / "nxnative/dm/tools/nx_extract"
@@ -140,6 +140,8 @@ class WonderDotnetHostRegressionTests(unittest.TestCase):
                 self.assertEqual(command[0], "dotnet")
                 self.assertEqual(Path(command[1]).resolve(strict=True), managed_path)
                 self.assertEqual(command[3], "--contents")
+            self.assertEqual(Path(invocations[1][0][-1]).suffix, ".xci")
+            self.assertEqual(Path(invocations[2][0][-1]).suffix, ".nsp")
             self.assertFalse(update.exists())
             self.assertTrue((pkg / f"Super Mario Bros. Wonder update [{mod.UPDATE}][v262144].nsp").exists())
             self.assertTrue((temp / "wonder-inspection.log").exists())
