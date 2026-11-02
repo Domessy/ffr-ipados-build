@@ -91,7 +91,7 @@ def packages():
     """
     files = sorted(p for p in source_folder().iterdir()
                    if p.suffix.casefold() in (".xci", ".nsp"))
-    if len(files) != 2:
+    if len(files) != 2 or sum(p.suffix.casefold() == ".xci" for p in files) != 1:
         raise ValueError("exactly one XCI base and one NSP update required")
     result = {}
     for p in files:
