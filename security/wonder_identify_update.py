@@ -38,11 +38,11 @@ def validate_metadata(base_stdout, update_stdout):
     if len(patch) != 1 or patch[0][:2] != ("Patch", UPDATE):
         raise ValueError("update NSP CNMT does not match the expected patch title")
     version = patch[0][2]
-    # The user has the 1.2.0 patch, not nxnative's registered 1.2.1
-    # build. Check the encrypted revision; the game display version is
-    # independently checked from the extracted NACP before shader work.
-    if version != 262144:
-        raise ValueError("expected user patch revision v262144 for 1.2.0; see private CNMT if different")
+    # We do not know the source's numeric revision in advance. The displayed
+    # version 1.2.0 is independently verified from the extracted NACP.
+    # Reject registered 1.0.1/1.2.1 builds: those would not derive profiles.
+    if not 0 < version <= 0x7FFFFFFF or version in (65536, 327680):
+        raise ValueError("patch revision invalid or registered to a different display version")
     return version
 
 
