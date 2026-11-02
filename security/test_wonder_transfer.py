@@ -41,7 +41,7 @@ class WONDERTransferTests(unittest.TestCase):
     def test_success_atomic_and_numeric_log(self):
         with tempfile.TemporaryDirectory() as temp:
             folder = self.setup_folder(temp)
-            dest = folder / "Super Mario Bros. Wonder [010015100B514000][v0].nsp"
+            dest = folder / "Super Mario Bros. Wonder [010015100B514000][v0].xci"
             data = b"NSP-test-payload"
             output = io.StringIO()
             with patch.dict(os.environ, {"RUNNER_TEMP": temp}), \
@@ -70,7 +70,7 @@ class WONDERTransferTests(unittest.TestCase):
     def test_mismatch_never_publishes_partial_file(self):
         with tempfile.TemporaryDirectory() as temp:
             folder = self.setup_folder(temp)
-            dest = folder / "WONDER [01007EF00011E800][v1114112].nsp"
+            dest = folder / "WONDER base.xci"
             with patch.dict(os.environ, {"RUNNER_TEMP": temp}), \
                  patch.object(transfer.subprocess, "Popen",
                               return_value=DummySSH(b"underfilled")), \
@@ -83,7 +83,7 @@ class WONDERTransferTests(unittest.TestCase):
     def test_nonzero_ssh_never_publishes_file(self):
         with tempfile.TemporaryDirectory() as temp:
             folder = self.setup_folder(temp)
-            dest = folder / "WONDER [01007EF00011F001][v131072].nsp"
+            dest = folder / "WONDER base.xci"
             with patch.dict(os.environ, {"RUNNER_TEMP": temp}), \
                  patch.object(transfer.subprocess, "Popen",
                               return_value=DummySSH(b"data", returncode=255)), \
@@ -97,11 +97,20 @@ class WONDERTransferTests(unittest.TestCase):
             folder = self.setup_folder(temp)
             with patch.dict(os.environ, {"RUNNER_TEMP": temp}):
                 with self.assertRaises(ValueError):
-                    transfer.transfer("base", 3, Path(temp) / "outside.nsp")
+                    transfer.transfer("base", 3, Path(temp) / "outside.xci")
                 with self.assertRaises(ValueError):
                     transfer.transfer("keys", 3, folder / "keys.nsp")
                 with self.assertRaises(ValueError):
-                    transfer.transfer("base", 0, folder / "base.nsp")
+                    transfer.transfer("base", 0, folder / "base.xci")
+
+    def test_reject_cross_role_file_extensions(self):
+        with tempfile.TemporaryDirectory() as temp:
+            folder = self.setup_folder(temp)
+            with patch.dict(os.environ, {"RUNNER_TEMP": temp}):
+                with self.assertRaisesRegex(ValueError, "filename"):
+                    transfer.transfer("base", 5, folder / "game.nsp")
+                with self.assertRaisesRegex(ValueError, "filename"):
+                    transfer.transfer("update", 5, folder / "game.xci")
 
     def test_progress_numeric_and_finite_at_start(self):
         output = io.StringIO()
