@@ -250,7 +250,7 @@ jobs:
             [ "$(ssh -o ConnectTimeout=15 ffr-cachyos dread-probe-v1)" = 'DREAD_GATEWAY_V1' ]
           fi
 
-      - name: Verifier les NSP Mina et la capacite sans transfert
+      - name: Verifier les NSP Metroid Dread et la capacite sans transfert
         if: ${{ inputs.mode != 'keys-check' }}
         run: |
           set -euo pipefail
