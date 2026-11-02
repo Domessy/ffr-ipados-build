@@ -41,11 +41,11 @@ jobs:
       - name: Verifier les scripts avant tout transfert prive
         run: |
           set -euo pipefail
-          python3 -m py_compile security/ffr_ssh_gate.py security/wonder_gateway.py security/wonder_transfer.py security/cache_export.py security/run_wonder.py security/test_cache_import.py security/test_wonder_gateway.py security/test_wonder_transfer.py security/test_wonder_setup.py security/wonder_identify_update.py security/test_wonder_identify_update.py security/test_wonder_run.py
+          python3 -m py_compile security/ffr_ssh_gate.py security/wonder_gateway.py security/wonder_transfer.py security/cache_export.py security/run_wonder.py security/test_cache_import.py security/test_wonder_gateway.py security/test_wonder_transfer.py security/test_wonder_setup.py security/wonder_identify_update.py security/test_wonder_identify_update.py security/test_wonder_run.py security/test_wonder_workflow.py
           bash -n security/setup_wonder.sh
           # The source discovery shell runs on CachyOS (Linux); its directory
           # semantics are covered by Linux CI. Do not run it on costly macOS.
-          python3 -m unittest -v security/test_cache_import.py security/test_wonder_gateway.py security/test_wonder_transfer.py security/test_wonder_identify_update.py security/test_wonder_run.py
+          python3 -m unittest -v security/test_cache_import.py security/test_wonder_gateway.py security/test_wonder_transfer.py security/test_wonder_identify_update.py security/test_wonder_run.py security/test_wonder_workflow.py
 
       - name: Verifier les secrets reseau avant toute installation couteuse
         env:
