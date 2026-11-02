@@ -75,7 +75,7 @@ jobs:
           assert '65501fbbaf8526f7aab0a1edd028135888590f8' in workflow
           assert 'security/wonder_identify_update.py' in workflow
           verify = Path('security/wonder_identify_update.py').read_text()
-          assert 'if version != 262144:' in verify
+          assert 'version in (65536, 327680)' in verify
           assert '010015100B514000' in verify and '010015100B514800' in verify
           runner = Path('security/run_wonder.py').read_text()
           assert 'f"v{revision}"' in runner and 'read_verified_patch()' in runner
