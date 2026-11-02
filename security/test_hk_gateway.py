@@ -13,7 +13,7 @@ class HKGatewayTests(unittest.TestCase):
     def fixtures(self, folder):
         names = {
             "base": "Hollow Knight [0100633007D48000][v0].nsp",
-            "update": "Hollow Knight_Update_v131072.nsp",
+            "update": "Hollow Knight_Update_v589824.nsp",
         }
         sizes = {"base": 5 * 1024**3, "update": 500 * 1024**2}
         result = {}
@@ -62,14 +62,14 @@ class HKGatewayTests(unittest.TestCase):
             gw.classify(Path("Hollow Knight [0100633007D48800][v0].nsp"))
 
     def test_hk_v1512620_filenames_and_sparse_sizes(self):
-        """Regression for the user's two names; never read real NSP contents."""
+        """Synthetic retail-style filenames and sizes; no source game data."""
         with tempfile.TemporaryDirectory() as folder_name:
             folder = Path(folder_name)
             base = folder / "Hollow Knight [0100633007D48000][v0].nsp"
             update = folder / "Hollow Knight v1.5.12620.nsp"
             for file, size in (
-                (base, 875425557),
-                (update, 34497814),
+                (base, 1455425557),
+                (update, 24497814),
             ):
                 with file.open("wb") as stream:
                     stream.write(b"PFS0")
