@@ -75,9 +75,9 @@ jobs:
           assert '65501fbbaf8526f7aab0a1edd028135888590f8' in workflow
           assert 'security/wonder_identify_update.py' in workflow
           verify = Path('security/wonder_identify_update.py').read_text()
-          assert 'if version != 327680:' in verify
+          assert 'if version != 262144:' in verify
           assert '010015100B514000' in verify and '010015100B514800' in verify
-          print("Super Mario Bros. Wonder: Xcode 27.2, locked shader compiler, pinned nxnative and strict update 1.2.1.")
+          print("Super Mario Bros. Wonder: Xcode 27.2, locked shader compiler, pinned nxnative and strict update 1.2.0.")
           PY
       - name: Confirm this run performed only synthetic checks
         run: echo 'No SSH connection, private keys, NSP or game data used.'
