@@ -53,7 +53,7 @@ def classify(path):
     displayed_versions = {
         tuple(map(int, match.groups()))
         for match in re.finditer(
-            r"(?<![a-z0-9])v?(\\d+)\\.(\\d+)\\.(\\d+)(?![a-z0-9])",
+            r"(?<![a-z0-9])v?(\d+)\.(\d+)\.(\d+)(?![a-z0-9])",
             name,
         )
     }
