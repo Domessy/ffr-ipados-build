@@ -41,11 +41,31 @@ jobs:
       - name: Verifier les scripts avant tout transfert prive
         run: |
           set -euo pipefail
-          python3 -m py_compile security/ffr_ssh_gate.py security/wonder_gateway.py security/wonder_transfer.py security/cache_export.py security/run_wonder.py security/test_cache_import.py security/test_wonder_gateway.py security/test_wonder_transfer.py security/test_wonder_setup.py security/wonder_identify_update.py security/test_wonder_identify_update.py security/test_wonder_run.py
+          python3 -m py_compile security/ffr_ssh_gate.py security/wonder_gateway.py security/wonder_transfer.py security/cache_export.py security/run_wonder.py security/test_cache_import.py security/test_wonder_gateway.py security/test_wonder_transfer.py security/test_wonder_setup.py security/wonder_identify_update.py security/test_wonder_identify_update.py security/test_wonder_run.py security/test_wonder_workflow.py
           bash -n security/setup_wonder.sh
           # The source discovery shell runs on CachyOS (Linux); its directory
           # semantics are covered by Linux CI. Do not run it on costly macOS.
-          python3 -m unittest -v security/test_cache_import.py security/test_wonder_gateway.py security/test_wonder_transfer.py security/test_wonder_identify_update.py security/test_wonder_run.py
+          python3 -m unittest -v security/test_cache_import.py security/test_wonder_gateway.py security/test_wonder_transfer.py security/test_wonder_identify_update.py security/test_wonder_run.py security/test_wonder_workflow.py
+
+      - name: Verifier les secrets reseau avant toute installation couteuse
+        env:
+          TS_AUTHKEY: ${{ secrets.FFR_TS_AUTHKEY }}
+          SSH_KEY: ${{ secrets.FFR_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.FFR_SSH_KNOWN_HOSTS }}
+          TS_HOST: ${{ secrets.FFR_TS_HOST }}
+          SSH_USER: ${{ secrets.FFR_SSH_USER }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Never echo tokens or private SSH material. GitHub provides empty
+          # strings for missing secrets, so fail before Xcode/Metal/Homebrew.
+          for name in TS_AUTHKEY SSH_KEY SSH_KNOWN_HOSTS TS_HOST SSH_USER; do
+            if [ -z "${!name}" ]; then
+              echo "WONDER preflight: missing required network secret: ${name}" >&2
+              exit 1
+            fi
+          done
+          echo 'WONDER network secrets: declared and nonempty (values hidden).'
 
       - name: Selectionner Xcode 27.2 et verifier Metal, puis liberer de l'espace
         run: |
@@ -191,10 +211,10 @@ jobs:
 
       - name: Connecter Tailscale sans modifier les DNS macOS
         env:
-          TS_AUTWONDEREY: ${{ secrets.FFR_TS_AUTWONDEREY }}
+          TS_AUTHKEY: ${{ secrets.FFR_TS_AUTHKEY }}
         run: |
           set -euo pipefail
-          test -n "$TS_AUTWONDEREY"
+          test -n "$TS_AUTHKEY"
           TS_CLI="$(command -v tailscale)"
           TS_DAEMON="$(command -v tailscaled)"
           TS_SOCKET="$RUNNER_TEMP/wonder-tailscaled.sock"
@@ -216,7 +236,7 @@ jobs:
           fi
           # No MagicDNS required: the host is reached by its Tailscale IPv4 address.
           sudo -n "$TS_CLI" --socket="$TS_SOCKET" up \
-            --authkey="$TS_AUTWONDEREY" \
+            --authkey="$TS_AUTHKEY" \
             --accept-dns=false \
             --timeout=120s \
             --hostname="wonder-ci-${GITHUB_RUN_ID}"

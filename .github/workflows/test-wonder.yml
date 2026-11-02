@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/wonder-nxnative
+      - fix/wonder-tailscale-authkey-preflight
       - fix/wonder-upstream-sha-40
       - fix/wonder-xci-base-nsp-update
     paths:
@@ -53,14 +54,14 @@ jobs:
             security/ffr_ssh_gate.py security/wonder_gateway.py \
             security/wonder_transfer.py security/run_wonder.py \
             security/cache_export.py security/test_cache_import.py \
-            security/test_wonder_gateway.py security/test_wonder_transfer.py security/test_wonder_setup.py security/wonder_identify_update.py security/test_wonder_identify_update.py security/test_wonder_run.py
+            security/test_wonder_gateway.py security/test_wonder_transfer.py security/test_wonder_setup.py security/wonder_identify_update.py security/test_wonder_identify_update.py security/test_wonder_run.py security/test_wonder_workflow.py
           bash -n security/setup_wonder.sh
           python3 -m unittest -v \
             security/test_cache_import.py \
             security/test_wonder_gateway.py \
             security/test_wonder_transfer.py \
             security/test_wonder_setup.py \
-            security/test_wonder_identify_update.py security/test_wonder_run.py
+            security/test_wonder_identify_update.py security/test_wonder_run.py security/test_wonder_workflow.py
       - name: Verify compiler selection stays pinned to upstream Metal 32023.922
         shell: bash
         run: |
@@ -115,6 +116,6 @@ jobs:
           python3 -m unittest -v \
             security/test_wonder_gateway.py \
             security/test_wonder_setup.py \
-            security/test_wonder_identify_update.py security/test_wonder_run.py
+            security/test_wonder_identify_update.py security/test_wonder_run.py security/test_wonder_workflow.py
       - name: No retail data required
         run: echo 'Synthetic macOS test complete; no game files or keys were used.'
