@@ -52,9 +52,9 @@ cmp -s -- "$SRC/prod.keys" "$ROOT/private/prod.keys" || {
 chmod 600 "$ROOT/private/prod.keys"
 
 echo "MINA: fixed-code diagnostics (no filenames or key bytes)"
-SSH_ORIGINAL_COMMAND=mina-diagnose-v1 python3 "$GATE"
+SSH_ORIGINAL_COMMAND=mina-diagnose-v2 python3 "$GATE"
 if ! probe="$(SSH_ORIGINAL_COMMAND=mina-probe-v1 python3 "$GATE")"; then
-  echo "MINA: source package identities unrecognized; check the NSP base/update filenames, headers and identifiers (no registered nxnative game profile)" >&2
+  echo "MINA: source validation failed; inspect MINA_DIAG_V2 reason above (count/header/title_id/size_or_role/version_or_name). No files changed." >&2
   exit 1
 fi
 [[ "$probe" == MINA_GATEWAY_V1 ]] || exit 1
