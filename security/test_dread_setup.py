@@ -7,7 +7,7 @@ import tempfile
 import unittest
 
 
-SCRIPT = Path(__file__).with_name("setup_mina.sh")
+SCRIPT = Path(__file__).with_name("setup_dread.sh")
 
 
 class MetroidSetupTests(unittest.TestCase):
