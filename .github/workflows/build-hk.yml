@@ -1,0 +1,393 @@
+name: Hollow Knight - native iPadOS build
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Preflight or build Hollow Knight (registered 1.5.12620 profile) with isolated shader cache and keys
+        type: choice
+        required: true
+        default: preflight
+        options:
+          - preflight
+          - keys-check
+          - build
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hk-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # Explicitly enabled only by security/harden-cachyos.sh on the user's PC.
+    if: vars.FFR_SECURITY_READY == 'true'
+    # Apple Silicon standard, public repositories: GitHub Xcode 27 image.
+    runs-on: xcode-27
+    # GitHub-hosted jobs may run up to 360 min. Keep a margin for private log upload and cleanup.
+    timeout-minutes: 345
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Recuperer les scripts de cache du meme commit GitHub
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Verifier les scripts avant tout transfert prive
+        run: |
+          set -euo pipefail
+          python3 -m py_compile security/ffr_ssh_gate.py security/hk_gateway.py security/hk_transfer.py security/cache_export.py security/run_hk.py security/test_cache_import.py security/test_hk_gateway.py security/test_hk_transfer.py security/test_hk_setup.py security/hk_identify_update.py security/test_hk_identify_update.py
+          bash -n security/setup_hk.sh
+          python3 -m unittest -v security/test_cache_import.py security/test_hk_gateway.py security/test_hk_transfer.py security/test_hk_setup.py security/test_hk_identify_update.py
+
+      - name: Selectionner Xcode 27.2 et verifier Metal, puis liberer de l'espace
+        run: |
+          set -euo pipefail
+          echo 'Espace initial :'
+          df -h "$RUNNER_TEMP"
+          # The pinned nxnative commit requires Apple Metal 32023.922.
+          # xcode-27 images may expose Xcode 27.2 as an alias to its RC app.
+          CANDIDATE=''
+          for app in /Applications/Xcode_27.2.app /Applications/Xcode_27.2.0.app /Applications/Xcode_27.2_Release_Candidate.app; do
+            if [ -d "$app/Contents/Developer" ]; then
+              CANDIDATE="$app"
+              break
+            fi
+          done
+          if [ -z "$CANDIDATE" ]; then
+            echo 'Xcode 27.2 is unavailable on this GitHub runner image.' >&2
+            exit 1
+          fi
+          # Resolve aliases before cleanup: never remove the actual selected Xcode.
+          KEEP="$(cd "$CANDIDATE" && pwd -P)"
+          echo "Xcode conserve : $KEEP"
+          sudo xcode-select -s "$KEEP/Contents/Developer"
+          xcodebuild -version
+          xcodebuild -version | grep -Eq '^Xcode 27\.2(\.|$)'
+          for app in /Applications/Xcode_*.app; do
+            [ -d "$app" ] || continue
+            [ -L "$app" ] && continue
+            [ "$(cd "$app" && pwd -P)" = "$KEEP" ] && continue
+            echo "Suppression sur runner ephemere : $app"
+            sudo rm -rf -- "$app"
+          done
+          # Metal is an optional Xcode component; fetch only if not installed.
+          if ! xcodebuild -showComponent metalToolchain 2>/dev/null | grep -qi 'Status: installed'; then
+            echo 'Installation du Metal Toolchain correspondant a Xcode 27.2.'
+            xcodebuild -downloadComponent metalToolchain
+          fi
+          echo 'Compilateurs Metal selectionnes :'
+          xcrun -sdk macosx metal --version
+          xcrun -sdk iphoneos metal --version
+          for sdk in macosx iphoneos; do
+            xcrun -sdk "$sdk" metal --version \
+              | grep -Fq 'Apple metal version 32023.922 (metalfe-32023.922.4)' || {
+                echo "Incorrect Metal compiler for $sdk; stopping before private transfers." >&2
+                exit 1
+              }
+          done
+          echo 'Metal 32023.922 verified for macOS and iPhoneOS SDKs.'
+
+          # xcodebuild uses the iOS DEVICE SDK, not an Android SDK or
+          # simulator runtime. All cleanup is confined to this ephemeral runner,
+          # never to CachyOS or any developer workstation.
+          echo 'Liberation espace temporaire pour HK.'
+          if [ "$HOME" = "/Users/runner" ]; then
+            for sdk in "$HOME/Library/Android/sdk" "$HOME/Library/Android/Sdk"; do
+              if [ -d "$sdk" ] && [ ! -L "$sdk" ]; then
+                du -sh "$sdk" || true
+                sudo rm -rf -- "$sdk"
+              fi
+            done
+          fi
+          free_kb=$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')
+          if [ "$free_kb" -lt 42000000 ]; then
+            echo 'Espace encore limite: nettoyage des runtimes de simulateurs GitHub inutilises.'
+            xcrun simctl runtime list || true
+            # On Xcode 27 this supported simctl operation removes simulator
+            # runtime disk images, not the iOS device SDK or Metal compiler.
+            # Bound its runtime to avoid hanging a hosted job indefinitely.
+            python3 - <<'PY'
+          import subprocess
+          try:
+              p = subprocess.run(
+                  ["xcrun", "simctl", "runtime", "delete", "all"],
+                  capture_output=True, text=True, timeout=240, check=False)
+              print(f"Simulator runtime cleanup exit code: {p.returncode}")
+              if p.returncode:
+                  print("Simulator runtime cleanup unavailable; continuing to disk preflight.")
+          except (OSError, subprocess.TimeoutExpired):
+              print("Simulator runtime cleanup timed out/unavailable; continuing to disk preflight.")
+          PY
+            xcrun simctl delete unavailable || true
+          fi
+          df -h "$RUNNER_TEMP"
+          free_kb=$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')
+          # Sufficient space for provisional Hollow Knight game data, extracted RomFS, shader CAS and IPA.
+          if [ "$free_kb" -lt 42000000 ]; then
+            echo 'HK runner disk below initial 42 GB admission guard.' >&2
+            exit 1
+          fi
+
+      - name: Installer les dependances nxnative
+        run: |
+          set -euo pipefail
+          export HOMEBREW_NO_AUTO_UPDATE=1
+          # Homebrew passe par ghcr.io : attendre si le DNS est temporairement indisponible.
+          for attempt in 1 2 3 4; do
+            echo "Installation Homebrew, tentative ${attempt}/4"
+            if brew install xcodegen zstd spirv-cross glslang; then
+              break
+            fi
+            if [ "$attempt" -eq 4 ]; then
+              echo "Installation Homebrew impossible apres 4 tentatives." >&2
+              exit 1
+            fi
+            echo "Echec transitoire, nouvel essai dans 20 secondes."
+            sleep 20
+          done
+          dotnet --version
+          python3 -m venv "$RUNNER_TEMP/hk-venv"
+          "$RUNNER_TEMP/hk-venv/bin/python" -m pip install -q lz4 capstone fonttools
+          # Pin the upstream code that will process local Nintendo key material.
+          NXNATIVE_SHA="0a759de7864b8c22bc0d9f596bb6b9a6f1c45486"
+          git init -q "$RUNNER_TEMP/nxnative"
+          git -C "$RUNNER_TEMP/nxnative" remote add origin https://github.com/seedds/nxnative.git
+          git -C "$RUNNER_TEMP/nxnative" fetch -q --depth 1 origin "$NXNATIVE_SHA"
+          git -C "$RUNNER_TEMP/nxnative" checkout -q --detach FETCH_HEAD
+          test "$(git -C "$RUNNER_TEMP/nxnative" rev-parse HEAD)" = "$NXNATIVE_SHA"
+          # Verify the compiler before transferring any private game data.
+          # reject Metal versions incompatible with the pinned nxnative shader chain.
+          "$RUNNER_TEMP/hk-venv/bin/python" "$RUNNER_TEMP/nxnative/dm/gfx/tools/own_compilers.py" --check-metal
+          free_kb=$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')
+          if [ "$free_kb" -lt 38000000 ]; then
+            echo "Espace restant insuffisant apres installation ($free_kb Ko, objectif 38000000 Ko)." >&2
+            exit 1
+          fi
+
+      - name: Installer Tailscale en ligne de commande (sans action DNS)
+        run: |
+          set -euo pipefail
+          export HOMEBREW_NO_AUTO_UPDATE=1
+          for attempt in 1 2 3; do
+            if brew install --formula tailscale; then break; fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep 15
+          done
+          command -v tailscale
+          command -v tailscaled
+
+      - name: Connecter Tailscale sans modifier les DNS macOS
+        env:
+          TS_AUTHKEY: ${{ secrets.FFR_TS_AUTHKEY }}
+        run: |
+          set -euo pipefail
+          test -n "$TS_AUTHKEY"
+          TS_CLI="$(command -v tailscale)"
+          TS_DAEMON="$(command -v tailscaled)"
+          TS_SOCKET="$RUNNER_TEMP/hk-tailscaled.sock"
+          # Temporary daemon with in-memory state; no persistent login data.
+          nohup sudo -n "$TS_DAEMON" --state=mem: --socket="$TS_SOCKET" \
+            > "$RUNNER_TEMP/hk-tailscaled.log" 2>&1 < /dev/null &
+          echo "$!" > "$RUNNER_TEMP/hk-tailscaled.pid"
+          daemon_ready=0
+          for attempt in $(seq 1 30); do
+            if sudo -n "$TS_CLI" --socket="$TS_SOCKET" status --json > /dev/null 2>&1; then
+              daemon_ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$daemon_ready" -ne 1 ]; then
+            echo 'Tailscale daemon did not become ready.' >&2
+            exit 1
+          fi
+          # No MagicDNS required: the host is reached by its Tailscale IPv4 address.
+          sudo -n "$TS_CLI" --socket="$TS_SOCKET" up \
+            --authkey="$TS_AUTHKEY" \
+            --accept-dns=false \
+            --timeout=120s \
+            --hostname="hk-ci-${GITHUB_RUN_ID}"
+          sudo -n "$TS_CLI" --socket="$TS_SOCKET" status --json \
+            | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("BackendState") == "Running"; print("Tailscale running; macOS system DNS unchanged.")'
+
+      - name: Configurer SSH avec cle d'hote epinglee
+        env:
+          SSH_KEY: ${{ secrets.FFR_SSH_KEY }}
+          HOSTKEY: ${{ secrets.FFR_SSH_KNOWN_HOSTS }}
+          PC_IP: ${{ secrets.FFR_TS_HOST }}
+          PC_USER: ${{ secrets.FFR_SSH_USER }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$SSH_KEY" > "$RUNNER_TEMP/hk_ssh_key"
+          printf '%s\n' "$HOSTKEY" > "$RUNNER_TEMP/hk_known_hosts"
+          chmod 600 "$RUNNER_TEMP/hk_ssh_key" "$RUNNER_TEMP/hk_known_hosts"
+          {
+            echo 'Host ffr-cachyos'
+            printf '  HostName %s\n' "$PC_IP"
+            printf '  User %s\n' "$PC_USER"
+            echo '  Port 22'
+            printf '  IdentityFile %s\n' "$RUNNER_TEMP/hk_ssh_key"
+            printf '  UserKnownHostsFile %s\n' "$RUNNER_TEMP/hk_known_hosts"
+            echo '  StrictHostKeyChecking yes'
+            echo '  IdentitiesOnly yes'
+            echo '  BatchMode yes'
+          } > "$HOME/.ssh/config"
+          chmod 600 "$HOME/.ssh/config"
+          # Require the local path-scoped HK gateway, before any private data.
+          # Key-only checks must not depend on the local game directory:
+          # key-only checks deliberately skip source probing.
+          if [ "${{ inputs.mode }}" = "keys-check" ]; then
+            [ "$(ssh -o ConnectTimeout=15 ffr-cachyos probe)" = 'FFR_GATEWAY_OK' ]
+          else
+            # Safe fixed-code diagnostics, intentionally no paths or key data.
+            ssh -o ConnectTimeout=15 ffr-cachyos hk-diagnose-v1
+            [ "$(ssh -o ConnectTimeout=15 ffr-cachyos hk-probe-v1)" = 'HK_GATEWAY_V1' ]
+          fi
+
+      - name: Verifier les deux NSP Hollow Knight et la capacite sans transfert
+        if: ${{ inputs.mode != 'keys-check' }}
+        run: |
+          set -euo pipefail
+          read -r TITLE VERSION B U <<< "$(ssh ffr-cachyos hk-manifest-v1)"
+          [[ "$TITLE" == "0100633007D48000" && "$VERSION" == "unverified" ]]
+          [[ "$B" =~ ^[1-9][0-9]*$ && "$U" =~ ^[1-9][0-9]*$ ]]
+          total=$((B + U))
+          free=$(( $(df -Pk "$RUNNER_TEMP" | awk 'NR==2 {print $4}') * 1024 ))
+          required=$(( 2 * total + 16 * 1024**3 ))
+          if (( required < 34 * 1024**3 )); then required=$(( 34 * 1024**3 )); fi
+          echo "HK title=$TITLE; update_version=$VERSION (resolved by nxnative extraction); package_bytes=$total"
+          echo "HK free_bytes=$free; required_bytes=$required"
+          if (( free < required )); then
+            echo 'HK: insufficient disk; no source transferred.' >&2
+            exit 1
+          fi
+          echo 'HK preflight passed.'
+
+      - name: Restaurer cache prive Hollow Knight nxnative
+        if: ${{ inputs.mode == 'build' }}
+        run: |
+          set -euo pipefail
+          export DMSH_CAS="$RUNNER_TEMP/hk-shader-cas"
+          umask 077
+          mkdir -p "$DMSH_CAS"
+          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 ffr-cachyos hk-read-cache | tar -xz -C "$DMSH_CAS"
+          echo "HK shader cache files=$(find "$DMSH_CAS" -type f | wc -l | tr -d ' ')"
+          du -sh "$DMSH_CAS"
+          read -r TITLE VERSION B U <<< "$(ssh ffr-cachyos hk-manifest-v1)"
+          free=$(( $(df -Pk "$RUNNER_TEMP" | awk 'NR==2 {print $4}') * 1024 ))
+          if (( free < B + U + 14 * 1024**3 )); then
+            echo 'HK cache consumed disk reserve; no NSP transferred.' >&2
+            exit 1
+          fi
+
+      - name: Recuperer et verifier les cles privees AVANT le NSP
+        if: ${{ inputs.mode == 'build' || inputs.mode == 'keys-check' }}
+        run: |
+          set -euo pipefail
+          umask 077
+          # Restricted Hollow Knight nxnative-only key route; no dependence on deleted FFR folders.
+          # The key is a local file owned by the HK project on CachyOS.
+          # Never print key bytes, only private validation status.
+          ssh -o ConnectTimeout=20 -o ServerAliveInterval=30 -o ServerAliveCountMax=6 \
+            ffr-cachyos hk-read-keys > "$RUNNER_TEMP/hk-prod.keys"
+          chmod 600 "$RUNNER_TEMP/hk-prod.keys"
+          test -s "$RUNNER_TEMP/hk-prod.keys"
+          # Only sanity-check the key-file structure, without disclosing values.
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          p = Path(os.environ["RUNNER_TEMP"]) / "hk-prod.keys"
+          lines = p.read_bytes().splitlines()
+          if len(lines) < 4 or not any(
+              line.strip().startswith(b"header_key =") or line.strip().startswith(b"header_key=")
+              for line in lines
+          ):
+              raise SystemExit("HK private key file is missing expected header_key")
+          print("HK private keys: received and structurally verified before source transfer.")
+          PY
+          if [ "${{ inputs.mode }}" = "keys-check" ]; then
+            echo 'HK keys-check passed; the game NSP was not transferred.'
+          fi
+
+      - name: Transferer les NSP Hollow Knight base et update
+        if: ${{ inputs.mode == 'build' }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$RUNNER_TEMP/hk-nsp"
+          read -r TITLE VERSION B U <<< "$(ssh ffr-cachyos hk-manifest-v1)"
+          [[ "$TITLE" == "0100633007D48000" && "$VERSION" == "unverified" ]]
+          python3 security/hk_transfer.py base "$B" "$RUNNER_TEMP/hk-nsp/Hollow Knight [0100633007D48000][v0].nsp"
+          python3 security/hk_transfer.py update "$U" "$RUNNER_TEMP/hk-nsp/Hollow Knight update [0100633007D48800].nsp"
+          test -s "$RUNNER_TEMP/hk-prod.keys"
+          echo 'HK source transfer complete; originals remain on CachyOS.'
+          # A registered 1.5.12620 profile has no registered version. Read the encrypted
+          # CNMT and give the runner's update copy its real [vN] tag so nxnative
+          # uses the exact registered 1.5.12620 update.
+          python3 security/hk_identify_update.py
+
+
+      - name: Compiler IPA HK et checkpoint shaders regulierement
+        if: ${{ inputs.mode == 'build' }}
+        run: |
+          set -euo pipefail
+          python3 security/run_hk.py
+
+      - name: Rapatrier IPA HK sur CachyOS
+        if: ${{ inputs.mode == 'build' }}
+        run: |
+          set -euo pipefail
+          test -s "$RUNNER_TEMP/HollowKnight-nxnative.ipa"
+          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 \
+            ffr-cachyos hk-write-ipa < "$RUNNER_TEMP/HollowKnight-nxnative.ipa"
+          shasum -a 256 "$RUNNER_TEMP/HollowKnight-nxnative.ipa"
+          echo 'HK IPA transferred privately; no public artifact.'
+
+      - name: Retourner le log prive apres succes ou echec
+        if: always()
+        run: |
+          if [ -s "$RUNNER_TEMP/hk-build.log" ]; then
+            tail -c 16777216 "$RUNNER_TEMP/hk-build.log" \
+              | ssh -o ConnectTimeout=20 ffr-cachyos hk-write-log || true
+          fi
+          # The inspector ran before nxnative itself. Retain its raw bounded
+          # diagnostic through a separate fixed private SSH route, especially
+          # when the encrypted CNMT reader fails before hk-build.log exists.
+          if [ -s "$RUNNER_TEMP/hk-inspection.log" ]; then
+            head -c 8388608 "$RUNNER_TEMP/hk-inspection.log" \
+              | ssh -o ConnectTimeout=20 ffr-cachyos hk-write-inspection || true
+            echo 'HK: private inspection diagnostic transfer attempted.'
+          fi
+
+          # No game files or secrets in GitHub artifacts. Preserve only the
+          # upstream's best-effort survey and registered 1.5.12620 profile privately.
+          SURVEY="$RUNNER_TEMP/hk-nsp/0100633007D48000_survey/survey.md"
+          PROFILE="$RUNNER_TEMP/hk-nsp/0100633007D48000_build/profile/0100633007D48000/game.tsv"
+          if [ -s "$SURVEY" ]; then
+            head -c 4194304 "$SURVEY" | ssh -o ConnectTimeout=20 ffr-cachyos hk-write-survey || true
+            echo 'HK diagnostic: private survey upload attempted.'
+          fi
+          if [ -s "$PROFILE" ]; then
+            head -c 2097152 "$PROFILE" | ssh -o ConnectTimeout=20 ffr-cachyos hk-write-profile || true
+            echo 'HK diagnostic: private registered 1.5.12620 profile upload attempted.'
+          fi
+          rm -f "$RUNNER_TEMP/hk-prod.keys" "$RUNNER_TEMP/hk_ssh_key" || true
+
+      - name: Fermer la connexion Tailscale ephemere
+        if: always()
+        run: |
+          TS_SOCKET="$RUNNER_TEMP/hk-tailscaled.sock"
+          if command -v tailscale >/dev/null 2>&1; then
+            sudo -n tailscale --socket="$TS_SOCKET" logout > /dev/null 2>&1 || true
+          fi
+          if [ -s "$RUNNER_TEMP/hk-tailscaled.pid" ]; then
+            sudo -n kill "$(cat "$RUNNER_TEMP/hk-tailscaled.pid")" > /dev/null 2>&1 || true
+          fi
+          rm -f "$RUNNER_TEMP/hk-prod.keys" "$RUNNER_TEMP/hk_ssh_key" || true
