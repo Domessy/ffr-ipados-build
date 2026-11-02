@@ -61,7 +61,7 @@ class DREADGatewayTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             gw.classify(Path("Metroid Dread [010093801237C800][v0].nsp"))
 
-    def test_actual_dread_v105_filenames_and_sparse_sizes(self):
+    def test_dread_v210_filenames_and_sparse_sizes(self):
         """Synthetic title and semver naming; no user NSP contents."""
         with tempfile.TemporaryDirectory() as folder_name:
             folder = Path(folder_name)
