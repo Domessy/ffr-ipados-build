@@ -3,8 +3,8 @@
 import unittest
 from security.hk_identify_update import validate_metadata, meta_rows
 
-BASE = "content Application 0100dcd01f306000 0\n"
-UPDATE = "content Patch 0100dcd01f306800 589824\n"
+BASE = "content Application 0100633007d48000 0\n"
+UPDATE = "content Patch 0100633007d48800 589824\n"
 
 
 class HollowKnightContentMetadataTests(unittest.TestCase):
@@ -13,12 +13,12 @@ class HollowKnightContentMetadataTests(unittest.TestCase):
 
     def test_wrong_base_or_update_id_rejected(self):
         for base, update in (
-            ("content Application 0100dcd01f306001 0\n", UPDATE),
-            (BASE, "content Patch 0100dcd01f305800 589824\n"),
-            (BASE, "content Patch 0100dcd01f306800 0\n"),
+            ("content Application 0100633007d48001 0\n", UPDATE),
+            (BASE, "content Patch 0100633007d47800 589824\n"),
+            (BASE, "content Patch 0100633007d48800 0\n"),
             (BASE, ""),
-            (BASE, UPDATE + "content Patch 0100dcd01f306800 131072\n"),
-            ("content Patch 0100dcd01f306800 589824\n", UPDATE),
+            (BASE, UPDATE + "content Patch 0100633007d48800 131072\n"),
+            ("content Patch 0100633007d48800 589824\n", UPDATE),
         ):
             with self.subTest(base=base, update=update):
                 with self.assertRaises(ValueError):
@@ -26,7 +26,7 @@ class HollowKnightContentMetadataTests(unittest.TestCase):
 
     def test_parser_ignores_untrusted_lines(self):
         self.assertEqual(meta_rows("debug text\n" + UPDATE), [("Patch", "0100633007D48800", 589824)])
-        self.assertEqual(meta_rows("content Patch 0100dcd01f306800 589824 injected\n"), [])
+        self.assertEqual(meta_rows("content Patch 0100633007d48800 589824 injected\n"), [])
 
 
 class HollowKnightPrivateInspectionTests(unittest.TestCase):
