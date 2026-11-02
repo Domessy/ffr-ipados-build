@@ -17,6 +17,7 @@ class WonderContentMetadataTests(unittest.TestCase):
             (BASE, "content Patch 010015100b513800 262144\n"),
             (BASE, "content Patch 010015100b514800 0\n"),
             (BASE, "content Patch 010015100b514800 327680\n"),
+            (BASE, "content Patch 010015100b514800 65536\n"),
             (BASE, ""),
             (BASE, UPDATE + "content Patch 010015100b514800 131072\n"),
             ("content Patch 010015100b514800 262144\n", UPDATE),
