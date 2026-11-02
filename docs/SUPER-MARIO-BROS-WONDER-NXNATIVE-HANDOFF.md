@@ -7,7 +7,7 @@ Date : 2026-11-02. État : préparation et tests synthétiques du pipeline. **Au
 - Emplacement original : `/home/syssy/Documents/Super Mario Bros Wonder/`.
 - Deux NSP : jeu de base et mise à jour, ainsi qu'un `prod.keys` local en lecture privée.
 - Titre principal : `010015100B514000` ; titre mise à jour : `010015100B514800`.
-- Version utilisateur annoncée : **1.2.0** (Nintendo l'a publiée le 25 mars 2026). Elle doit être confirmée par les métadonnées réelles des NSP : révision CNMT attendue **v262144**, puis version affichée dans le NACP **1.2.0** après extraction. Si ces identifications diffèrent, le build s'interrompt et les journaux privés permettent le diagnostic. Le chiffre v262144 est un mapping attendu, pas une valeur déjà vérifiée dans les fichiers de l'utilisateur.
+- Version utilisateur annoncée : **1.2.0** (Nintendo l'a publiée le 25 mars 2026). Elle doit être confirmée par les métadonnées réelles des NSP : révision CNMT à lire dans le NSP, puis version affichée dans le NACP **1.2.0** après extraction. La révision Nintendo exacte n'a pas été fournie : le pipeline la lit et interdit les numéros déjà associés aux versions enregistrées 1.0.1 et 1.2.1, afin de générer un profil dérivé. Si les métadonnées ne correspondent pas à la version annoncée, le build s'interrompt.
 
 ## Profil nxnative et variante 1.2.0
 
@@ -15,7 +15,7 @@ Dépôt amont figé : `seedds/nxnative@65501fbbaf8526f7aab0a1edd028135888590f8` 
 
 Le mécanisme `scripts/build_ipa_from_nsp.py` prend une version non enregistrée, puis produit un **profil dérivé** sous le répertoire temporaire du runner, à partir des identifiants réels des modules et de la mise à jour. Les tables de shaders sont créées avec les fichiers de la version dérivée, au lieu de reprendre sans contrôle celles de 1.2.1. Ne pas réétiqueter la version 1.2.0 comme une 1.2.1 pour forcer la sélection du profil amont.
 
-`security/wonder_identify_update.py` vérifie les identifiants chiffrés Application/Patch et le numéro de révision, puis écrit uniquement `wonder-verified-patch.version` (entier) sur le runner. `security/run_wonder.py` lit cette preuve locale et passe explicitement `-p v262144` à nxnative ; après l'extraction, le script vérifie la ligne NACP de la version affichée `1.2.0` **avant** de laisser la compilation continuer. Les erreurs sont transmises au poste uniquement par le canal privé. La génération des shaders peut nécessiter davantage de travail que pour une version officiellement enregistrée ; le fait de compiler une IPA ne prouve pas qu'elle démarrera correctement.
+`security/wonder_identify_update.py` vérifie les identifiants chiffrés Application/Patch et le numéro de révision, puis écrit uniquement `wonder-verified-patch.version` (entier) sur le runner. `security/run_wonder.py` lit cette preuve locale et passe explicitement `-p v<révision vérifiée>` à nxnative ; après l'extraction, le script vérifie la ligne NACP de la version affichée `1.2.0` **avant** de laisser la compilation continuer. Les erreurs sont transmises au poste uniquement par le canal privé. La génération des shaders peut nécessiter davantage de travail que pour une version officiellement enregistrée ; le fait de compiler une IPA ne prouve pas qu'elle démarrera correctement.
 
 ## Isolation, sécurité et fonctionnement
 
