@@ -207,6 +207,9 @@ def main() -> int:
         elif command.startswith("totk-mng-"):
             import totk_mng_gateway
             return totk_mng_gateway.dispatch(command, sys.modules[__name__])
+        elif command.startswith("mina-"):
+            import mina_gateway
+            return mina_gateway.dispatch(command, sys.modules[__name__])
         elif command.startswith("dsr-"):
             import dsr_gateway
             return dsr_gateway.dispatch(command, sys.modules[__name__])
