@@ -41,8 +41,8 @@ jobs:
       - name: Verifier les scripts avant tout transfert prive
         run: |
           set -euo pipefail
-          python3 -m py_compile security/ffr_ssh_gate.py security/mina_gateway.py security/mina_transfer.py security/cache_export.py security/run_mina.py security/test_cache_import.py security/test_mina_gateway.py security/test_mina_transfer.py
-          python3 -m unittest -v security/test_cache_import.py security/test_mina_gateway.py security/test_mina_transfer.py
+          python3 -m py_compile security/ffr_ssh_gate.py security/mina_gateway.py security/mina_transfer.py security/cache_export.py security/run_mina.py security/test_cache_import.py security/test_mina_gateway.py security/test_mina_transfer.py security/mina_identify_update.py security/test_mina_identify_update.py
+          python3 -m unittest -v security/test_cache_import.py security/test_mina_gateway.py security/test_mina_transfer.py security/test_mina_identify_update.py
 
       - name: Selectionner Xcode 27.2 et verifier Metal, puis liberer de l'espace
         run: |
