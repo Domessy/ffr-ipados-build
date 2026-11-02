@@ -128,7 +128,7 @@ jobs:
           fi
           df -h "$RUNNER_TEMP"
           free_kb=$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')
-          # Sufficient space for provisional Super Mario Bros. Wonder game data, extracted RomFS, shader CAS and IPA.
+          # Sufficient space for derived Super Mario Bros. Wonder game data, extracted RomFS, shader CAS and IPA.
           if [ "$free_kb" -lt 42000000 ]; then
             echo 'WONDER runner disk below initial 42 GB admission guard.' >&2
             exit 1
@@ -328,9 +328,9 @@ jobs:
           python3 security/wonder_transfer.py update "$U" "$RUNNER_TEMP/wonder-nsp/Super Mario Bros. Wonder update [010015100B514800].nsp"
           test -s "$RUNNER_TEMP/wonder-prod.keys"
           echo 'WONDER source transfer complete; originals remain on CachyOS.'
-          # A registered 1.2.1 profile has no registered version. Read the encrypted
+          # Read the encrypted update's actual version before selecting a derived profile.
           # CNMT and give the runner's update copy its real [vN] tag so nxnative
-          # uses the exact registered 1.2.1 update.
+          # uses the actual user 1.2.0 update (numeric revision verified on the runner).
           python3 security/wonder_identify_update.py
 
 
@@ -367,7 +367,7 @@ jobs:
           fi
 
           # No game files or secrets in GitHub artifacts. Preserve only the
-          # upstream's best-effort survey and registered 1.2.1 profile privately.
+          # upstream's derived version profile privately, if created.
           SURVEY="$RUNNER_TEMP/wonder-nsp/010015100B514000_survey/survey.md"
           PROFILE="$RUNNER_TEMP/wonder-nsp/010015100B514000_build/profile/010015100B514000/game.tsv"
           if [ -s "$SURVEY" ]; then
@@ -376,7 +376,7 @@ jobs:
           fi
           if [ -s "$PROFILE" ]; then
             head -c 2097152 "$PROFILE" | ssh -o ConnectTimeout=20 ffr-cachyos wonder-write-profile || true
-            echo 'WONDER diagnostic: private registered 1.2.1 profile upload attempted.'
+            echo 'WONDER diagnostic: private derived version profile upload attempted.'
           fi
           rm -f "$RUNNER_TEMP/wonder-prod.keys" "$RUNNER_TEMP/wonder_ssh_key" || true
 
