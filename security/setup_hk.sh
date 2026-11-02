@@ -21,8 +21,10 @@ fi
 if [[ ! -d "$SRC" || -L "$SRC" ]]; then
   echo "HK: original game directory unavailable or symbolic link rejected." >&2
   echo "HK: candidate directories (name only):" >&2
-  find "$HOME/Documents" -mindepth 1 -maxdepth 1 -iname '*hollow*knight*' \
-    -printf '  %f (%y)\n' >&2 || true
+  find "$HOME/Documents" -mindepth 1 -maxdepth 1 -iname '*hollow*knight*' -print0 |
+    while IFS= read -r -d '' candidate; do
+      printf '  %s\n' "${candidate##*/}" >&2
+    done
   exit 1
 fi
 [[ -s "$SRC/prod.keys" && -f "$SRC/prod.keys" && ! -L "$SRC/prod.keys" ]] || {
@@ -56,9 +58,28 @@ SSH_ORIGINAL_COMMAND=hk-diagnose-v2 python3 "$GATE"
 if ! probe="$(SSH_ORIGINAL_COMMAND=hk-probe-v1 python3 "$GATE")"; then
   echo "HK: source validation failed; inspect HK_DIAG_V2 reason above." >&2
   echo "HK: local game files (names/sizes only; no keys or file contents):" >&2
-  find "$SRC" -mindepth 1 -maxdepth 2 -type f \
-    \( -iname '*.nsp' -o -iname '*.xci' -o -iname '*.nsz' \) \
-    -printf '  %P (%s bytes)\n' >&2 || true
+  python3 - "$SRC" <<'PY' >&2
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+suffixes = {".nsp", ".xci", ".nsz", ".xcz"}
+try:
+    entries = sorted(root.iterdir(), key=lambda p: p.name.casefold())
+    files = []
+    for entry in entries:
+        if entry.is_symlink():
+            continue
+        if entry.is_file():
+            files.append(entry)
+        elif entry.is_dir():
+            files.extend(p for p in entry.iterdir() if p.is_file() and not p.is_symlink())
+    for path in sorted(files, key=lambda p: str(p).casefold()):
+        if path.suffix.casefold() in suffixes:
+            print(f"  {path.relative_to(root)} ({path.stat().st_size} bytes)")
+except OSError as exc:
+    print(f"  inventory unavailable ({type(exc).__name__})")
+PY
   echo "HK: originals unchanged. Resolve the source layout before starting GitHub Actions." >&2
   exit 1
 fi
