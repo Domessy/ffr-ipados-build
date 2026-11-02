@@ -3,8 +3,8 @@
 import unittest
 from security.dread_identify_update import validate_metadata, meta_rows
 
-BASE = "content Application 0100dcd01f306000 0\n"
-UPDATE = "content Patch 0100dcd01f306800 327680\n"
+BASE = "content Application 010093801237c000 0\n"
+UPDATE = "content Patch 010093801237c800 327680\n"
 
 
 class MetroidContentMetadataTests(unittest.TestCase):
@@ -13,12 +13,13 @@ class MetroidContentMetadataTests(unittest.TestCase):
 
     def test_wrong_base_or_update_id_rejected(self):
         for base, update in (
-            ("content Application 0100dcd01f306001 0\n", UPDATE),
-            (BASE, "content Patch 0100dcd01f305800 327680\n"),
-            (BASE, "content Patch 0100dcd01f306800 0\n"),
+            ("content Application 010093801237c001 0\n", UPDATE),
+            (BASE, "content Patch 010093801237b800 327680\n"),
+            (BASE, "content Patch 010093801237c800 0\n"),
+            (BASE, "content Patch 010093801237c800 196608\n"),
             (BASE, ""),
-            (BASE, UPDATE + "content Patch 0100dcd01f306800 327680\n"),
-            ("content Patch 0100dcd01f306800 327680\n", UPDATE),
+            (BASE, UPDATE + "content Patch 010093801237c800 327680\n"),
+            ("content Patch 010093801237c800 327680\n", UPDATE),
         ):
             with self.subTest(base=base, update=update):
                 with self.assertRaises(ValueError):
@@ -26,7 +27,7 @@ class MetroidContentMetadataTests(unittest.TestCase):
 
     def test_parser_ignores_untrusted_lines(self):
         self.assertEqual(meta_rows("debug text\n" + UPDATE), [("Patch", "010093801237C800", 327680)])
-        self.assertEqual(meta_rows("content Patch 0100dcd01f306800 327680 injected\n"), [])
+        self.assertEqual(meta_rows("content Patch 010093801237c800 327680 injected\n"), [])
 
 
 class MetroidPrivateInspectionTests(unittest.TestCase):
