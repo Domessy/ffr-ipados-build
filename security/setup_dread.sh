@@ -51,10 +51,15 @@ cmp -s -- "$SRC/prod.keys" "$ROOT/private/prod.keys" || {
 }
 chmod 600 "$ROOT/private/prod.keys"
 
-echo "DREAD: fixed-code diagnostics (no filenames or key bytes)"
-SSH_ORIGINAL_COMMAND=dread-diagnose-v2 python3 "$GATE"
+echo "DREAD: fixed-code diagnostics with package counts (no filenames or key bytes)"
+SSH_ORIGINAL_COMMAND=dread-diagnose-v3 python3 "$GATE"
 if ! probe="$(SSH_ORIGINAL_COMMAND=dread-probe-v1 python3 "$GATE")"; then
-  echo "DREAD: source validation failed; inspect DREAD_DIAG_V2 reason above (count/header/title_id/size_or_role/version_or_name). No files changed." >&2
+  echo "DREAD: source validation failed; see DREAD_DIAG_V3 counts above." >&2
+  echo "DREAD: local package inventory (names/sizes only, no keys or content):" >&2
+  find "$SRC" -mindepth 1 -maxdepth 2 -type f \
+    \\( -iname '*.nsp' -o -iname '*.nsz' -o -iname '*.xci' -o -iname '*.xcz' \\) \
+    -printf '  %P (%s bytes)\\n' >&2 || true
+  echo "DREAD: no source files were changed. Resolve source layout before a new GitHub build." >&2
   exit 1
 fi
 [[ "$probe" == DREAD_GATEWAY_V1 ]] || exit 1
