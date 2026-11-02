@@ -157,7 +157,12 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/wonder-venv"
           "$RUNNER_TEMP/wonder-venv/bin/python" -m pip install -q lz4 capstone fonttools
           # Pin the upstream code that will process local Nintendo key material.
-          NXNATIVE_SHA="65501fbbaf8526f7aab0a1edd028135888590f8"
+          NXNATIVE_SHA="65501fbbaf8526f7aab0a1edd028135888590f8e"
+          # Use a complete, immutable Git object ID (not a 39-digit prefix).
+          [[ "$NXNATIVE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo 'WONDER: invalid pinned upstream commit ID (expected full 40-hex SHA).' >&2
+            exit 1
+          }
           git init -q "$RUNNER_TEMP/nxnative"
           git -C "$RUNNER_TEMP/nxnative" remote add origin https://github.com/seedds/nxnative.git
           git -C "$RUNNER_TEMP/nxnative" fetch -q --depth 1 origin "$NXNATIVE_SHA"
