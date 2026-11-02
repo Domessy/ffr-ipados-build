@@ -147,6 +147,12 @@ class MINAGatewayTests(unittest.TestCase):
                 with patch.object(parent, "receive_file") as receiver:
                     self.assertEqual(gw.dispatch("mina-write-ipa", parent), 0)
                     receiver.assert_called_once_with("MinaTheHollower-nxnative.ipa", 16 * 1024**3)
+                    receiver.reset_mock()
+                    self.assertEqual(gw.dispatch("mina-write-survey", parent), 0)
+                    receiver.assert_called_once_with("mina-survey.md", 4 * 1024**2)
+                    receiver.reset_mock()
+                    self.assertEqual(gw.dispatch("mina-write-profile", parent), 0)
+                    receiver.assert_called_once_with("mina-profile.tsv", 2 * 1024**2)
         self.assertEqual((parent.CACHE, parent.CONFLICTS, parent.OUTPUT), original)
 
 
