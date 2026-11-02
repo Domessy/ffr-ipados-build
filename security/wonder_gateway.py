@@ -167,7 +167,7 @@ def diagnose_detailed():
         package_ok = True
     except (OSError, ValueError) as exc:
         issue = str(exc).casefold()
-        if "exactly two" in issue:
+        if "exactly two" in issue or "exactly one xci" in issue:
             reason = "count"
         elif "size" in issue:
             reason = "size_or_role"
