@@ -253,7 +253,7 @@ jobs:
             [ "$(ssh -o ConnectTimeout=15 ffr-cachyos wonder-probe-v1)" = 'WONDER_GATEWAY_V1' ]
           fi
 
-      - name: Verifier les deux NSP Super Mario Bros. Wonder et la capacite sans transfert
+      - name: Verifier les XCI/NSP Super Mario Bros. Wonder et la capacite sans transfert
         if: ${{ inputs.mode != 'keys-check' }}
         run: |
           set -euo pipefail
@@ -318,7 +318,7 @@ jobs:
             echo 'WONDER keys-check passed; the game NSP was not transferred.'
           fi
 
-      - name: Transferer les NSP Super Mario Bros. Wonder base et update
+      - name: Transferer le XCI de base et le NSP update Super Mario Bros. Wonder
         if: ${{ inputs.mode == 'build' }}
         run: |
           set -euo pipefail
@@ -326,7 +326,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/wonder-nsp"
           read -r TITLE VERSION B U <<< "$(ssh ffr-cachyos wonder-manifest-v1)"
           [[ "$TITLE" == "010015100B514000" && "$VERSION" == "unverified" ]]
-          python3 security/wonder_transfer.py base "$B" "$RUNNER_TEMP/wonder-nsp/Super Mario Bros. Wonder [010015100B514000][v0].nsp"
+          python3 security/wonder_transfer.py base "$B" "$RUNNER_TEMP/wonder-nsp/Super Mario Bros. Wonder [010015100B514000][v0].xci"
           python3 security/wonder_transfer.py update "$U" "$RUNNER_TEMP/wonder-nsp/Super Mario Bros. Wonder update [010015100B514800].nsp"
           test -s "$RUNNER_TEMP/wonder-prod.keys"
           echo 'WONDER source transfer complete; originals remain on CachyOS.'
