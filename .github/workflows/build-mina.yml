@@ -351,6 +351,18 @@ jobs:
             tail -c 16777216 "$RUNNER_TEMP/mina-build.log" \
               | ssh -o ConnectTimeout=20 ffr-cachyos mina-write-log || true
           fi
+          # No game files or secrets in GitHub artifacts. Preserve only the
+          # upstream's best-effort survey and provisional profile privately.
+          SURVEY="$RUNNER_TEMP/mina-nsp/0100DCD01F306000_survey/survey.md"
+          PROFILE="$RUNNER_TEMP/mina-nsp/0100DCD01F306000_build/profile/0100DCD01F306000/game.tsv"
+          if [ -s "$SURVEY" ]; then
+            head -c 4194304 "$SURVEY" | ssh -o ConnectTimeout=20 ffr-cachyos mina-write-survey || true
+            echo 'MINA diagnostic: private survey upload attempted.'
+          fi
+          if [ -s "$PROFILE" ]; then
+            head -c 2097152 "$PROFILE" | ssh -o ConnectTimeout=20 ffr-cachyos mina-write-profile || true
+            echo 'MINA diagnostic: private provisional profile upload attempted.'
+          fi
           rm -f "$RUNNER_TEMP/mina-prod.keys" "$RUNNER_TEMP/mina_ssh_key" || true
 
       - name: Fermer la connexion Tailscale ephemere
