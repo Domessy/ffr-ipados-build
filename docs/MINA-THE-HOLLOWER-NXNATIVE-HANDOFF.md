@@ -10,6 +10,7 @@ Public title identification: `0100DCD01F306000`, update title `0100DCD01F306800`
 - Pinned nxnative upstream: `seedds/nxnative@54ab7b1059eae8524ff60a320ea66f6ebac16506`.
 - Toolchain: Xcode 27.2 + Metal `32023.922`, verified for both macOS and iPhoneOS before contacting the local computer; no unsupported compiler bypass.
 - Workflow: `.github/workflows/build-mina.yml`, modes `preflight`, `keys-check`, `build`. Build repeats preflight admission before accessing source files.
+- **Unknown update version is handled without guessing.** Immediately after the two private NSP copies arrive on the runner, `security/mina_identify_update.py` builds the pinned `nx_extract` reader and checks encrypted base/patch CNMT records. It refuses an unexpected title, malformed metadata or nonpositive update version, then renames **only the runner's update copy** to `[v<N>].nsp` with its verified integer. This matters because the upstream script otherwise ignores a versionless update for a title without a registered profile.
 - Mac build runner is temporary and has no persistent access to Nintendo content. No source NSP or keys are committed to GitHub; no public IPA artifact is produced.
 
 ## Data isolation
@@ -35,13 +36,13 @@ test "$(git branch --show-current)" = main
 test -z "$(git status --porcelain)"
 git pull --ff-only origin main
 bash security/setup_mina.sh
-python3 -m unittest -v security/test_cache_import.py security/test_mina_gateway.py security/test_mina_transfer.py security/test_mina_setup.py
+python3 -m unittest -v security/test_cache_import.py security/test_mina_gateway.py security/test_mina_transfer.py security/test_mina_setup.py security/test_mina_identify_update.py
 gh workflow run build-mina.yml -R Domessy/ffr-ipados-build --ref main -f mode=build
 gh run list -R Domessy/ffr-ipados-build --workflow build-mina.yml --limit 3
 )
 ```
 
-The GitHub runner selects Xcode 27.2, verifies the pinned nxnative compiler, checks the game source via fixed SSH routes, restores the Mina-specific shader cache, transfers the base and update NSP plus keys, and runs the upstream auto-survey + provisional build. It streams the IPA back to CachyOS only on success; diagnostics (including the survey) are private and can guide future revisions.
+The GitHub runner selects Xcode 27.2, verifies the pinned nxnative compiler, checks the game source via fixed SSH routes, restores the Mina-specific shader cache, transfers the base and update NSP plus keys, verifies the encrypted package identities and the real update version, and runs the upstream auto-survey + provisional build. It streams the IPA back to CachyOS only on success; diagnostics (including the survey) are private and can guide future revisions.
 
 If the workflow fails, inspect **only the private** `resultats/mina-build.log`, `resultats/mina-survey.md`, and `resultats/mina-profile.tsv`. A failed exploratory build is evidence of a missing or incorrect profile, unsupported rendering technique or incompatible binary, not automatically an NSP or keys issue. Do not disable compiler fingerprint verification or game file integrity to force success.
 
