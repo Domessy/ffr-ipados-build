@@ -53,6 +53,18 @@ Fix: `security/mina_identify_update.py` now performs the same strictly pinned `n
 
 If the next run fails at the same location, inspect the **private** file locally and report only errors with secret/file paths removed. Never post `prod.keys`, tickets or NSP content. Unlike the previous `RuntimeError` summary, stage + exit status should identify which part of the tool failed. The inspector still must verify base Application CNMT and update Patch CNMT before renaming the runner's update copy; neither bypass this step nor assume that commercial `1.0.5` equals a specific integer Nintendo update revision.
 
+## 2026-11-02: dotnet apphost exit 131 — runtime discovery
+
+The follow-up real run `41439393008` confirmed:
+
+- `stage=build-inspector; exit_code=0` — `dotnet build` successfully compiled nx_extract.
+- `stage=base-contents; exit_code=131` — executing the generated native macOS `nx_extract` apphost failed before reading any metadata; it wrote 701 bytes to stderr.
+- `update-contents` was not reached.
+
+This is consistent with .NET runtime discovery when Homebrew supplies the CLI in a non-default installation directory. The pinned upstream nxnative script explicitly computes a `DOTNET_ROOT` for its own apphosts, while the previous standalone Mina inspector did not. To avoid changing the runner's global environment, the Mina inspector now invokes `dotnet <runner>/mina-nsp-inspection/nx_extract.dll <keys> --contents <package>`. The `dotnet` CLI (already used to build the tool successfully) finds the appropriate runtime relative to itself; the CNMT validation and private diagnostics remain unchanged. A synthetic regression test verifies the exact managed-DLL invocation and update copy rename.
+
+**Important:** The private stderr contents have not been inspected; runtime discovery is a strongly supported hypothesis, not yet an empirically confirmed diagnosis. Verify the next real run. If it fails again, use `resultats/mina-inspection.log` on CachyOS, not the public GitHub log or key material.
+
 ## Execute on CachyOS after merge
 
 ```bash
