@@ -10,7 +10,7 @@ import unittest
 SCRIPT = Path(__file__).with_name("setup_mina.sh")
 
 
-class DarkSoulsSetupTests(unittest.TestCase):
+class MinaSetupTests(unittest.TestCase):
     @staticmethod
     def make_sources(folder):
         folder.mkdir()
@@ -56,7 +56,7 @@ class DarkSoulsSetupTests(unittest.TestCase):
             documents = home / "Documents"
             documents.mkdir()
             self.make_sources(documents / "Mina The HOLLowER")
-            self.make_sources(documents / "Mina REMASTERED")
+            self.make_sources(documents / "MINA THE HOLLOWER")
             result = self.run_setup(home)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("directory unavailable", result.stderr)
