@@ -167,6 +167,42 @@ class DREADGatewayTests(unittest.TestCase):
                     "DREAD_DIAG_V2 source=ok packages=fail keys=ok reason=count"
                 )
 
+    def test_count_diagnostic_distinguishes_nested_nsp_and_other_formats(self):
+        with tempfile.TemporaryDirectory() as folder_name:
+            folder = Path(folder_name)
+            (folder / "base.nsp").write_bytes(b"PFS0")
+            (folder / "other.nsz").write_bytes(b"synthetic")
+            (folder / "other.xci").write_bytes(b"synthetic")
+            nested = folder / "backup"
+            nested.mkdir()
+            (nested / "patch.nsp").write_bytes(b"PFS0")
+            keys = folder / "keys"
+            keys.write_text("synthetic only")
+            with patch.object(gw, "source_folder", return_value=folder), \
+                 patch.object(gw, "KEYS", keys), \
+                 patch("builtins.print") as output:
+                self.assertEqual(gw.dispatch("dread-diagnose-v3", parent), 0)
+                output.assert_called_once_with(
+                    "DREAD_DIAG_V3 source=ok packages=fail keys=ok reason=count "
+                    "top_nsp=1 nested_nsp=1 top_nsz=1 top_xci=1"
+                )
+
+    def test_count_diagnostic_reports_extra_nsp_without_disclosing_names(self):
+        with tempfile.TemporaryDirectory() as folder_name:
+            folder = Path(folder_name)
+            self.fixtures(folder)
+            (folder / "extra unrelated.nsp").write_bytes(b"PFS0")
+            keys = folder / "keys"
+            keys.write_text("synthetic only")
+            with patch.object(gw, "source_folder", return_value=folder), \
+                 patch.object(gw, "KEYS", keys), \
+                 patch("builtins.print") as output:
+                self.assertEqual(gw.dispatch("dread-diagnose-v3", parent), 0)
+                output.assert_called_once_with(
+                    "DREAD_DIAG_V3 source=ok packages=fail keys=ok reason=count "
+                    "top_nsp=3 nested_nsp=0 top_nsz=0 top_xci=0"
+                )
+
     def test_reject_symlink_package_and_private_key(self):
         with tempfile.TemporaryDirectory() as d:
             folder = Path(d)
