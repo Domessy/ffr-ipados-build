@@ -18,7 +18,7 @@ TITLE = "0100DCD01F306000"
 UPDATE_TITLE = "0100DCD01F306800"
 VERSION = 'unverified'
 ROUTES = frozenset({
-    "mina-probe-v1", "mina-diagnose-v1", "mina-manifest-v1",
+    "mina-probe-v1", "mina-diagnose-v1", "mina-diagnose-v2", "mina-manifest-v1",
     "mina-read-base", "mina-read-update", "mina-read-keys",
     "mina-read-cache", "mina-write-cache", "mina-write-ipa", "mina-write-log",
     "mina-write-survey", "mina-write-profile",
@@ -69,28 +69,59 @@ def classify(path):
 
 
 def packages():
-    files = sorted(p for p in source_folder().iterdir() if p.suffix.lower() == ".nsp")
+    """Resolve the two NSP roles without requiring particular filename conventions.
+
+    A size-based fallback is acceptable only for an unambiguous pair. The
+    encrypted Application/Patch identities are then checked with nx_extract
+    on the runner before the provisional build starts.
+    """
+    files = sorted(p for p in source_folder().iterdir() if p.suffix.casefold() == ".nsp")
     if len(files) != 2:
         raise ValueError("exactly two NSPs expected")
-    result = {}
+
+    identified = {}
+    unidentified = []
     for p in files:
         if p.is_symlink() or not p.is_file():
             raise ValueError("source is not a regular NSP")
-        role = classify(p)
-        size = p.stat().st_size
-        if role == "base" and not 512 * 1024**2 < size < 18 * 1024**3:
-            raise ValueError("base NSP size outside bounded range")
-        if role == "update" and not 100 * 1024 < size < 5 * 1024**3:
-            raise ValueError("update NSP size outside bounded range")
-        if role in result:
-            raise ValueError("duplicate package role")
+        if not 100 * 1024 < p.stat().st_size < 18 * 1024**3:
+            raise ValueError("NSP size outside bounded range")
         with p.open("rb") as stream:
             if stream.read(4) != b"PFS0":
                 raise ValueError("NSP PFS0 header absent")
-        result[role] = p
-    if set(result) != {"base", "update"}:
+        try:
+            role = classify(p)
+        except ValueError as exc:
+            # Never use a size fallback to override contradictory title or
+            # version tags. Unknown naming alone is not proof of bad data.
+            if str(exc) != "unidentified package role; explicit title/version required":
+                raise
+            unidentified.append(p)
+            continue
+        if role in identified:
+            raise ValueError("duplicate package role")
+        identified[role] = p
+
+    if unidentified:
+        ordered = sorted(files, key=lambda p: p.stat().st_size, reverse=True)
+        largest, smallest = ordered
+        # An update is generally much smaller for this title. If sizes are
+        # close, the source role must be established by an explicit marker.
+        if smallest.stat().st_size * 2 >= largest.stat().st_size:
+            raise ValueError("ambiguous base/update package sizes")
+        inferred = {"base": largest, "update": smallest}
+        if any(identified.get(role, path) != path
+               for role, path in inferred.items()):
+            raise ValueError("filename identity contradicts package sizes")
+        identified = inferred
+
+    if set(identified) != {"base", "update"}:
         raise ValueError("incomplete base/update pair")
-    return result
+    if not 128 * 1024**2 < identified["base"].stat().st_size < 18 * 1024**3:
+        raise ValueError("base NSP size outside bounded range")
+    if not 100 * 1024 < identified["update"].stat().st_size < 5 * 1024**3:
+        raise ValueError("update NSP size outside bounded range")
+    return identified
 
 
 def private_keys():
@@ -121,11 +152,51 @@ def diagnose():
     return 0
 
 
+def diagnose_detailed():
+    """Report a fixed error category, without echoing source names or paths."""
+    source = package_ok = key_ok = False
+    reason = "none"
+    try:
+        source_folder()
+        source = True
+        packages()
+        package_ok = True
+    except (OSError, ValueError) as exc:
+        issue = str(exc).casefold()
+        if "exactly two" in issue:
+            reason = "count"
+        elif "size" in issue:
+            reason = "size_or_role"
+        elif "pfs0" in issue:
+            reason = "header"
+        elif "title id" in issue:
+            reason = "title_id"
+        elif "version" in issue:
+            reason = "version_or_name"
+        elif "regular" in issue or "symlink" in issue:
+            reason = "file_type"
+        elif not source:
+            reason = "source"
+        else:
+            reason = "role"
+    try:
+        private_keys()
+        key_ok = True
+    except (OSError, ValueError):
+        pass
+    print(f"MINA_DIAG_V2 source={'ok' if source else 'fail'} "
+          f"packages={'ok' if package_ok else 'fail'} "
+          f"keys={'ok' if key_ok else 'fail'} reason={reason}")
+    return 0
+
+
 def dispatch(command, parent):
     if command not in ROUTES:
         return 126
     if command == "mina-diagnose-v1":
         return diagnose()
+    if command == "mina-diagnose-v2":
+        return diagnose_detailed()
     if command == "mina-probe-v1":
         packages()
         private_keys()
