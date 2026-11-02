@@ -22,6 +22,9 @@ NSPS = TEMP / "wonder-nsp"
 KEYS = TEMP / "wonder-prod.keys"
 PYTHON = TEMP / "wonder-venv" / "bin" / "python"
 NATIVE = TEMP / "nxnative"
+VERIFIED_PATCH = TEMP / "wonder-verified-patch.version"
+EXPECTED_PATCH = 262144
+EXPECTED_DISPLAY_VERSION = "1.2.0"
 EXPORT = WORKSPACE / "security" / "cache_export.py"
 # Cap one shader build to 265 min and retain time for checkpoint/IPA upload on a 345 min job; subsequent runs reuse the shader CAS.
 MAX_BUILD_SECONDS = 265 * 60
@@ -182,6 +185,26 @@ def handler(_signum, _frame):
     raise KeyboardInterrupt
 
 
+def confirmed_display_version():
+    """Inspect early NACP result, without publishing raw game metadata."""
+    if not LOG.is_file():
+        return None
+    with LOG.open("rb") as stream:
+        front = stream.read(512 * 1024)
+    match = re.search(rb"(?m)^.*app name: .*; version: ([^;\r\n]+); bundle ID: org\.nxnative\.010015100b514000(?:;|\s|$)", front)
+    return match.group(1).decode("ascii", errors="replace").strip() if match else None
+
+
+def read_verified_patch():
+    value = VERIFIED_PATCH.read_text(encoding="ascii").strip()
+    if not re.fullmatch(r"[1-9]\d{0,9}", value):
+        raise ValueError("invalid encrypted patch revision output")
+    version = int(value)
+    if version != EXPECTED_PATCH:
+        raise ValueError("encrypted patch revision is not v262144")
+    return version
+
+
 def compile_ipa():
     global active
     CACHE.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -192,8 +215,15 @@ def compile_ipa():
     last_sync = time.monotonic()
     started = time.monotonic()
     nsps_reclaimed = False
+    display_verified = False
+    try:
+        revision = read_verified_patch()
+    except (OSError, UnicodeError, ValueError):
+        print("WONDER: missing or invalid encrypted patch verification; no build started.", flush=True)
+        return 1
     cmd = [str(PYTHON), str(NATIVE / "scripts" / "build_ipa_from_nsp.py"),
            str(NSPS), "-k", str(KEYS), "-o", str(OUTPUT),
+           "-p", f"v{revision}",
            "--no-keep-extracted", "--show-fps", "--gpu", "none"]
     print("nxnative started; full diagnostic remains private.", flush=True)
     planned_stop = False
@@ -203,14 +233,23 @@ def compile_ipa():
                                   stderr=subprocess.STDOUT, start_new_session=True)
         try:
             while active.poll() is None:
-                time.sleep(60)
+                time.sleep(10)
+                display = confirmed_display_version()
+                if display is not None and not display_verified:
+                    if display != EXPECTED_DISPLAY_VERSION:
+                        print("WONDER: extracted NACP version is not 1.2.0; stopping.", flush=True)
+                        stop_build(active)
+                        break
+                    display_verified = True
+                    print("WONDER: extracted NACP version 1.2.0 verified; derived build continues.", flush=True)
                 elapsed = int((time.monotonic() - started) / 60)
                 log_bytes = LOG.stat().st_size if LOG.exists() else 0
                 if not nsps_reclaimed:
                     nsps_reclaimed = reclaim_runner_nsps()
                 free_gib = shutil.disk_usage(TEMP).free / 1024**3
-                print(f"nxnative: {elapsed} min; private log {log_bytes} bytes; "
-                      f"free disk {free_gib:.1f} GiB.", flush=True)
+                if int(time.monotonic() - started) % 60 < 10:
+                    print(f"nxnative: {elapsed} min; private log {log_bytes} bytes; "
+                          f"free disk {free_gib:.1f} GiB.", flush=True)
                 if elapsed % 5 == 0:
                     public_shader_progress()
                 if time.monotonic() - last_sync >= SNAPSHOT_SECONDS:
@@ -229,6 +268,9 @@ def compile_ipa():
             stop_build(active)
             rc = active.wait()
     active = None
+    if rc == 0 and not display_verified:
+        print("WONDER: no confirmed NACP version 1.2.0 in private build log.", flush=True)
+        rc = 1
     public_shader_progress()
     checkpoint(since_ns, final=True)
     sync_private_diagnostic()
