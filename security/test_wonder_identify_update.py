@@ -4,29 +4,30 @@ import unittest
 from security.wonder_identify_update import validate_metadata, meta_rows
 
 BASE = "content Application 010015100b514000 0\n"
-UPDATE = "content Patch 010015100b514800 327680\n"
+UPDATE = "content Patch 010015100b514800 262144\n"
 
 
 class WonderContentMetadataTests(unittest.TestCase):
     def test_real_update_version_is_selected(self):
-        self.assertEqual(validate_metadata(BASE, UPDATE), 327680)
+        self.assertEqual(validate_metadata(BASE, UPDATE), 262144)
 
     def test_wrong_base_or_update_id_rejected(self):
         for base, update in (
             ("content Application 010015100b514001 0\n", UPDATE),
-            (BASE, "content Patch 010015100b513800 327680\n"),
+            (BASE, "content Patch 010015100b513800 262144\n"),
             (BASE, "content Patch 010015100b514800 0\n"),
+            (BASE, "content Patch 010015100b514800 327680\n"),
             (BASE, ""),
             (BASE, UPDATE + "content Patch 010015100b514800 131072\n"),
-            ("content Patch 010015100b514800 327680\n", UPDATE),
+            ("content Patch 010015100b514800 262144\n", UPDATE),
         ):
             with self.subTest(base=base, update=update):
                 with self.assertRaises(ValueError):
                     validate_metadata(base, update)
 
     def test_parser_ignores_untrusted_lines(self):
-        self.assertEqual(meta_rows("debug text\n" + UPDATE), [("Patch", "010015100B514800", 327680)])
-        self.assertEqual(meta_rows("content Patch 010015100b514800 327680 injected\n"), [])
+        self.assertEqual(meta_rows("debug text\n" + UPDATE), [("Patch", "010015100B514800", 262144)])
+        self.assertEqual(meta_rows("content Patch 010015100b514800 262144 injected\n"), [])
 
 
 class WonderPrivateInspectionTests(unittest.TestCase):
@@ -121,13 +122,13 @@ class WonderDotnetHostRegressionTests(unittest.TestCase):
                 self.fail(f"unexpected stage: {stage}")
 
             fake_console = StringIO()
-            # Avoid printing a fake "CNMT verified; v327680" in the real
+            # Avoid printing a fake "CNMT verified; v262144" in the real
             # GitHub Actions build log during this synthetic unit test.
             with patch.dict(os.environ, {"RUNNER_TEMP": str(temp)}), \
                  patch.object(mod, "checked", side_effect=fake_checked), \
                  redirect_stdout(fake_console):
                 mod.main()
-            self.assertIn("patch v327680", fake_console.getvalue())
+            self.assertIn("patch v262144", fake_console.getvalue())
 
             self.assertEqual([stage for _, stage in invocations],
                              ["build-inspector", "base-contents", "update-contents"])
@@ -139,8 +140,9 @@ class WonderDotnetHostRegressionTests(unittest.TestCase):
                 self.assertEqual(Path(command[1]).resolve(strict=True), managed_path)
                 self.assertEqual(command[3], "--contents")
             self.assertFalse(update.exists())
-            self.assertTrue((pkg / f"Super Mario Bros. Wonder update [{mod.UPDATE}][v327680].nsp").exists())
+            self.assertTrue((pkg / f"Super Mario Bros. Wonder update [{mod.UPDATE}][v262144].nsp").exists())
             self.assertTrue((temp / "wonder-inspection.log").exists())
+            self.assertEqual((temp / "wonder-verified-patch.version").read_text(), "262144\n")
 
 
 class WonderCanonicalPathsTest(unittest.TestCase):
