@@ -1,20 +1,28 @@
 #!/usr/bin/env python3
-"""Inspect encrypted NSP CNMT locally on the ephemeral Mac and name update correctly.
+"""Verify encrypted Mina base/update CNMT and tag only the runner's patch NSP.
 
-This is required for titles without an nxnative profile: a versionless update
-file is silently omitted by nsp_versions() when no build is registered.
-Nothing modifies the original CachyOS NSPs, and no private metadata is logged
-to public GitHub Actions beyond an integer version.
+Private diagnostics go to RUNNER_TEMP/mina-inspection.log, returned by a fixed
+SSH route. Public GitHub logs show only fixed stage labels and numeric statuses.
+Never modify the user's CachyOS source NSPs or reveal keys to Actions logs.
 """
 import os
 from pathlib import Path
 import re
 import subprocess
-import sys
 
 TITLE = "0100DCD01F306000"
 UPDATE = "0100DCD01F306800"
 CONTENT = re.compile(r"^content (Application|Patch|AddOnContent) ([0-9A-Fa-f]{16}) (\d+)$", re.M)
+STAGES = frozenset({"build-inspector", "base-contents", "update-contents", "validate-metadata", "rename-update", "prepare"})
+MAX_DIAGNOSTIC_BYTES = 1024 * 1024
+
+
+class InspectionError(RuntimeError):
+    def __init__(self, stage, status):
+        assert stage in STAGES
+        self.stage = stage
+        self.status = status
+        super().__init__(f"{stage}: {status}")
 
 
 def meta_rows(stdout):
@@ -35,6 +43,37 @@ def validate_metadata(base_stdout, update_stdout):
     return version
 
 
+def record(log_path, stage, result):
+    """Only this private file gets subprocess output, never the public logs."""
+    with log_path.open("ab") as stream:
+        stream.write(f"stage={stage}; exit_code={result.returncode}\n".encode("ascii"))
+        for label, value in (("stdout", result.stdout), ("stderr", result.stderr)):
+            value = (value or "").encode("utf-8", errors="replace")
+            stream.write(f"{label}_bytes={len(value)}\n".encode("ascii"))
+            stream.write(value[:MAX_DIAGNOSTIC_BYTES])
+            stream.write(b"\n")
+
+
+def checked(command, stage, log_path, timeout):
+    """Run inspection and preserve bounded private compiler/LibHac diagnostics."""
+    try:
+        result = subprocess.run(
+            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, timeout=timeout, check=False)
+    except subprocess.TimeoutExpired:
+        with log_path.open("ab") as stream:
+            stream.write(f"stage={stage}; timeout\n".encode("ascii"))
+        raise InspectionError(stage, "timeout") from None
+    except OSError as exc:
+        with log_path.open("ab") as stream:
+            stream.write(f"stage={stage}; os_error={type(exc).__name__}\n".encode("ascii"))
+        raise InspectionError(stage, "execution-error") from None
+    record(log_path, stage, result)
+    if result.returncode:
+        raise InspectionError(stage, f"exit-{result.returncode}")
+    return result.stdout
+
+
 def main():
     temp = Path(os.environ["RUNNER_TEMP"]).resolve(strict=True)
     folder = temp / "mina-nsp"
@@ -43,41 +82,49 @@ def main():
     update = folder / f"Mina the Hollower update [{UPDATE}].nsp"
     upstream = temp / "nxnative" / "dm" / "tools" / "nx_extract"
     output = temp / "mina-nsp-inspection"
+    log_path = temp / "mina-inspection.log"
+    with log_path.open("wb") as private_log:
+        private_log.write(b"MINA_INSPECTION_V2\n")
+    log_path.chmod(0o600)
     output.mkdir(mode=0o700, exist_ok=True)
     for path in (base, update, keys):
         if not path.is_file() or path.is_symlink():
-            raise ValueError("source or key not a regular file in the dedicated runner folder")
+            raise InspectionError("prepare", "expected-file-missing")
     if not (upstream / "nx_extract.csproj").is_file():
-        raise ValueError("pinned extractor project is missing")
+        raise InspectionError("prepare", "upstream-project-missing")
 
-    # Build the exact nx_extract used by the pinned nxnative commit.
-    built = subprocess.run(["dotnet", "build", str(upstream), "-c", "Release",
-                            "-o", str(output), "-v", "quiet", "-nologo"],
-                           stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                           text=True, timeout=300, check=False)
+    print("MINA: compiling pinned private NSP inspector.", flush=True)
+    checked(["dotnet", "build", str(upstream), "-c", "Release",
+             "-o", str(output), "-v", "quiet", "-nologo"],
+            "build-inspector", log_path, timeout=300)
     exe = output / "nx_extract"
-    if built.returncode or not exe.is_file():
-        raise RuntimeError("private package inspector compilation failed")
+    if not exe.is_file():
+        raise InspectionError("build-inspector", "executable-missing")
 
-    def inspect(path):
-        result = subprocess.run([str(exe), str(keys), "--contents", str(path)],
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                text=True, timeout=180, check=False)
-        if result.returncode:
-            raise RuntimeError("private NSP CNMT inspection failed")
-        return result.stdout
-
-    version = validate_metadata(inspect(base), inspect(update))
+    print("MINA: verifying encrypted base and patch metadata.", flush=True)
+    base_stdout = checked([str(exe), str(keys), "--contents", str(base)],
+                          "base-contents", log_path, timeout=180)
+    update_stdout = checked([str(exe), str(keys), "--contents", str(update)],
+                            "update-contents", log_path, timeout=180)
+    try:
+        version = validate_metadata(base_stdout, update_stdout)
+    except ValueError:
+        raise InspectionError("validate-metadata", "identity-or-version") from None
     renamed = folder / f"Mina the Hollower update [{UPDATE}][v{version}].nsp"
     if renamed.exists():
-        raise ValueError("refusing to overwrite existing runner NSP")
+        raise InspectionError("rename-update", "destination-exists")
     update.rename(renamed)
-    print(f"MINA: base title and update CNMT verified; update v{version}.", flush=True)
+    print(f"MINA: base/update CNMT verified; patch v{version}.", flush=True)
 
 
 if __name__ == "__main__":
     try:
         main()
-    except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as error:
-        print(f"MINA: encrypted package identification failed ({type(error).__name__}); no game data disclosed.", flush=True)
+    except InspectionError as exc:
+        print(f"MINA: inspection failed at stage={exc.stage}; status={exc.status}; "
+              "detailed log remains private.", flush=True)
+        raise SystemExit(1)
+    except (OSError, ValueError) as exc:
+        print(f"MINA: inspector failed before the build; error_type={type(exc).__name__}; "
+              "see private inspection log.", flush=True)
         raise SystemExit(1)
