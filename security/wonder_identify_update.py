@@ -38,8 +38,11 @@ def validate_metadata(base_stdout, update_stdout):
     if len(patch) != 1 or patch[0][:2] != ("Patch", UPDATE):
         raise ValueError("update NSP CNMT does not match the expected patch title")
     version = patch[0][2]
-    if version != 327680:
-        raise ValueError("update requires registered Super Mario Bros. Wonder profile 1.2.1 (v327680)")
+    # The user has the 1.2.0 patch, not nxnative's registered 1.2.1
+    # build. Check the encrypted revision; the game display version is
+    # independently checked from the extracted NACP before shader work.
+    if version != 262144:
+        raise ValueError("expected user patch revision v262144 for 1.2.0; see private CNMT if different")
     return version
 
 
@@ -118,7 +121,13 @@ def main():
     if renamed.exists():
         raise InspectionError("rename-update", "destination-exists")
     update.rename(renamed)
-    print(f"WONDER: base/update CNMT verified; patch v{version}.", flush=True)
+    # This file contains ONLY the verified numeric patch revision.
+    # The build runner reads it and passes -p vN, ensuring upstream derives
+    # a new profile rather than silently selecting registered 1.2.1.
+    version_path = temp / "wonder-verified-patch.version"
+    version_path.write_text(str(version) + "\n", encoding="ascii")
+    version_path.chmod(0o600)
+    print(f"WONDER: base/update CNMT verified; user patch v{version} (derived profile required).", flush=True)
 
 
 if __name__ == "__main__":
