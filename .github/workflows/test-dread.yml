@@ -53,14 +53,19 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          workflow = Path(".github/workflows/build-mina.yml").read_text()
+          workflow = Path(".github/workflows/build-dread.yml").read_text()
           assert "/Applications/Xcode_27.2.app" in workflow
           assert "/Applications/Xcode_27.2_Release_Candidate.app" in workflow
           assert "Apple metal version 32023.922 (metalfe-32023.922.4)" in workflow
           assert "own_compilers.py" in workflow and "--check-metal" in workflow
           assert "Xcode 27.1" not in workflow
           assert "DM_ALLOW_OTHER_METAL" not in workflow
-          print("Metroid Dread build targets Xcode 27.2 and strictly validated Metal 32023.922.")
+          assert 'e5620b1a05a5b7374e0135d6312d3e90994eab81' in workflow
+          assert 'security/dread_identify_update.py' in workflow
+          verify = Path('security/dread_identify_update.py').read_text()
+          assert 'if version != 327680:' in verify
+          assert '010093801237C000' in verify and '010093801237C800' in verify
+          print("Metroid Dread: Xcode 27.2, locked shader compiler, pinned nxnative and strict update 2.1.0.")
           PY
       - name: Confirm this run performed only synthetic checks
         run: echo 'No SSH connection, private keys, NSP or game data used.'
