@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/wonder-nxnative
+      - fix/wonder-upstream-sha-40
       - fix/wonder-xci-base-nsp-update
     paths:
       - '.github/workflows/build-wonder.yml'
@@ -73,7 +74,11 @@ jobs:
           assert "own_compilers.py" in workflow and "--check-metal" in workflow
           assert "Xcode 27.1" not in workflow
           assert "DM_ALLOW_OTHER_METAL" not in workflow
-          assert '65501fbbaf8526f7aab0a1edd028135888590f8' in workflow
+          import re
+          pin = re.search(r'NXNATIVE_SHA="([^"]+)"', workflow)
+          assert pin is not None, "Missing nxnative SHA pin"
+          assert re.fullmatch(r'[0-9a-f]{40}', pin.group(1)), "nxnative pin must be 40 lowercase hexadecimal digits"
+          assert pin.group(1) == '65501fbbaf8526f7aab0a1edd028135888590f8e', "nxnative pin mismatch"
           assert 'security/wonder_identify_update.py' in workflow
           assert 'Super Mario Bros. Wonder [010015100B514000][v0].xci' in workflow
           assert 'Super Mario Bros. Wonder update [010015100B514800].nsp' in workflow
