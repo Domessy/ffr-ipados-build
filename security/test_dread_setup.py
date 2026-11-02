@@ -16,8 +16,9 @@ class MetroidSetupTests(unittest.TestCase):
         folder.mkdir()
         with (folder / "prod.keys").open("w") as key:
             key.write("synthetic test keys; not usable for any Nintendo package\n")
-        with (folder / "base [010093801237C000][v0].nsp").open("wb") as stream:
-            stream.write(b"PFS0")
+        with (folder / "base [010093801237C000][v0].xci").open("wb") as stream:
+            stream.seek(0x100)
+            stream.write(b"HEAD")
             stream.truncate(600 * 1024**2)
         with (folder / "update [010093801237C800][v327680].nsp").open("wb") as stream:
             stream.write(b"PFS0")
@@ -47,7 +48,7 @@ class MetroidSetupTests(unittest.TestCase):
                 (project / "private/prod.keys").read_bytes(),
                 (game / "prod.keys").read_bytes(),
             )
-            self.assertTrue((game / "base [010093801237C000][v0].nsp").exists())
+            self.assertTrue((game / "base [010093801237C000][v0].xci").exists())
             self.assertTrue((game / "update [010093801237C800][v327680].nsp").exists())
 
     def test_ambiguous_case_variants_are_not_selected(self):
@@ -78,10 +79,10 @@ class MetroidSetupTests(unittest.TestCase):
             result = self.run_setup(home)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("DREAD_DIAG_V3 source=ok packages=fail keys=ok reason=count", result.stdout)
-            self.assertIn("top_nsp=1 nested_nsp=1", result.stdout)
+            self.assertIn("top_nsp=0 nested_nsp=1", result.stdout)
             self.assertIn("archive/update [010093801237C800][v327680].nsp", result.stderr)
             self.assertNotIn("synthetic test keys", result.stderr)
-            self.assertTrue((game / "base [010093801237C000][v0].nsp").exists())
+            self.assertTrue((game / "base [010093801237C000][v0].xci").exists())
             self.assertTrue(nested.exists())
 
     def test_unrelated_similar_title_is_not_selected(self):
