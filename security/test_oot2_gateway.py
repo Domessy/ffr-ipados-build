@@ -43,6 +43,17 @@ class Oot2GatewayTests(unittest.TestCase):
                 self.assertEqual(gw.dispatch("oot2-read-keys", parent), 126)
                 self.assertEqual(gw.dispatch("oot2-shell", parent), 126)
 
+    def test_real_world_standalone_manifest(self):
+        with tempfile.TemporaryDirectory() as d:
+            home = Path(d)
+            nup, project = self.fixture(home)
+            fake_nup(nup, base=False, standalone=True, reserved=1)
+            with patch.object(gw, "HOME", home), patch.object(gw, "SOURCE_LINK", project/"source"):
+                with patch("builtins.print") as emit:
+                    self.assertEqual(gw.dispatch("oot2-manifest-v1", parent), 0)
+                    emit.assert_called_once_with(
+                        "0400486024DEC000", "v131072", SIZE, 0, 1, 1)
+
     def test_one_container_only_and_bad_version(self):
         with tempfile.TemporaryDirectory() as d:
             home = Path(d)

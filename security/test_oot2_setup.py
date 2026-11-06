@@ -41,6 +41,18 @@ class SetupTests(unittest.TestCase):
                              ["resultats", "shader-cache", "shader-cache-conflicts", "source"])
             self.assertNotIn("fake sensitive marker",r.stdout+r.stderr)
 
+    def test_standalone_update_with_reserved_one_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            docs = home/"Documents"
+            docs.mkdir()
+            game = docs/"The Legend of Zelda Ocarina of TIme"
+            self.make_files(game)
+            fake_nup(game/"original.nup", base=False, standalone=True, reserved=1)
+            r = self.run_setup(home)
+            self.assertEqual(r.returncode, 0, (r.stdout, r.stderr))
+            self.assertIn("base=0 update=v131072 packages=1", r.stdout)
+
     def test_unique_case_variant_on_case_sensitive_filenames(self):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)

@@ -34,6 +34,11 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("required=$(( 2 * NUP_BYTES + 32 * 1024**3 ))",workflow)
         self.assertIn("source_bytes=$NUP_BYTES",workflow)
 
+    def test_standalone_manifest_is_accepted_in_both_gates(self):
+        workflow = BUILD.read_text()
+        self.assertEqual(workflow.count('"$BASE" =~ ^[01]$'), 2)
+        self.assertNotIn('"$BASE" == 1', workflow)
+
     def test_one_nup_without_keys(self):
         workflow=BUILD.read_text()
         self.assertIn("security/oot2_transfer.py nup",workflow)
