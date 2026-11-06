@@ -173,7 +173,7 @@ jobs:
           dotnet --version
           python3 -m venv "$RUNNER_TEMP/oot2-venv"
           "$RUNNER_TEMP/oot2-venv/bin/python" -m pip install -q lz4 "capstone>=5,<6" fonttools nsz zbic "backports.zstd; python_version < '3.14'"
-          # Pin the upstream code that will process local Nintendo key material.
+          # Pin the upstream code that processes the NUP; no keys are transferred.
           NXNATIVE_SHA="c229bd7d52e30f072362e31c7b1e3206d107d4cd"
           # Use a complete, immutable Git object ID (not a 39-digit prefix).
           [[ "$NXNATIVE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
@@ -271,7 +271,7 @@ jobs:
         run: |
           set -euo pipefail
           read -r TITLE VERSION NUP_BYTES BASE PATCHES PKGS <<< "$(ssh -o ConnectTimeout=20 ffr-cachyos oot2-manifest-v1)"
-          [[ "$TITLE" == "0400486024DEC000" && "$VERSION" == "v131072" && "$BASE" == 1 && "$PATCHES" == 1 ]]
+          [[ "$TITLE" == "0400486024DEC000" && "$VERSION" == "v131072" && "$BASE" =~ ^[01]$ && "$PATCHES" == 1 ]]
           [[ "$NUP_BYTES" =~ ^[1-9][0-9]*$ && "$PKGS" =~ ^[1-9][0-9]*$ ]]
           free=$(( $(df -Pk "$RUNNER_TEMP" | awk 'NR==2 {print $4}') * 1024 ))
           required=$(( 2 * NUP_BYTES + 32 * 1024**3 ))
@@ -306,7 +306,7 @@ jobs:
           umask 077
           mkdir -p "$RUNNER_TEMP/oot2-nup"
           read -r TITLE VERSION NUP_BYTES BASE PATCHES PKGS <<< "$(ssh ffr-cachyos oot2-manifest-v1)"
-          [[ "$TITLE" == 0400486024DEC000 && "$VERSION" == v131072 && "$BASE" == 1 && "$PATCHES" == 1 ]]
+          [[ "$TITLE" == 0400486024DEC000 && "$VERSION" == v131072 && "$BASE" =~ ^[01]$ && "$PATCHES" == 1 ]]
           python3 security/oot2_transfer.py nup "$NUP_BYTES" "$RUNNER_TEMP/oot2-nup/OcarinaOfTime.nup"
           python3 security/oot2_nup_info.py "$RUNNER_TEMP/oot2-nup/OcarinaOfTime.nup"
           echo 'OOT2 transfer complete; originals and keys stay on CachyOS.'
