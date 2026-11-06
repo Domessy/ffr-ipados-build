@@ -1,0 +1,66 @@
+name: Zelda Ocarina Switch 2 - synthetic NUP and network tests
+
+on:
+  push:
+    branches:
+      - feature/oot2-nup-native
+    paths:
+      - '.github/workflows/build-oot2.yml'
+      - '.github/workflows/test-oot2.yml'
+      - 'security/oot2_*.py'
+      - 'security/test_oot2_*.py'
+      - 'security/run_oot2.py'
+      - 'security/setup_oot2.sh'
+      - 'security/ffr_ssh_gate.py'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/build-oot2.yml'
+      - '.github/workflows/test-oot2.yml'
+      - 'security/oot2_*.py'
+      - 'security/test_oot2_*.py'
+      - 'security/run_oot2.py'
+      - 'security/setup_oot2.sh'
+      - 'security/ffr_ssh_gate.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oot2-nup-tests-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  linux-synthetic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact changeset
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Python, Bash and NUP fixtures (no retail material)
+        run: |
+          set -euo pipefail
+          python3 -m py_compile security/oot2_nup_info.py security/oot2_gateway.py security/oot2_transfer.py security/run_oot2.py security/test_oot2_nup_info.py security/test_oot2_gateway.py security/test_oot2_transfer.py security/test_oot2_setup.py security/test_oot2_workflow.py
+          bash -n security/setup_oot2.sh
+          python3 -m unittest -v security/test_oot2_nup_info.py security/test_oot2_gateway.py security/test_oot2_transfer.py security/test_oot2_setup.py security/test_oot2_workflow.py
+      - name: Scope
+        run: echo "Synthetic metadata only; no Nintendo game, keys, Tailscale or native IPA build."
+
+  macos-synthetic:
+    if: github.event_name == 'pull_request'
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact changeset
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Verify APFS, NUP metadata and SSH interface
+        run: |
+          set -euo pipefail
+          bash -n security/setup_oot2.sh
+          python3 -m unittest -v security/test_oot2_nup_info.py security/test_oot2_gateway.py security/test_oot2_transfer.py security/test_oot2_setup.py security/test_oot2_workflow.py

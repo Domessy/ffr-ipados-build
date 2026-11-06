@@ -207,6 +207,9 @@ def main() -> int:
         elif command.startswith("totk-mng-"):
             import totk_mng_gateway
             return totk_mng_gateway.dispatch(command, sys.modules[__name__])
+        elif command.startswith("oot2-"):
+            import oot2_gateway
+            return oot2_gateway.dispatch(command, sys.modules[__name__])
         elif command.startswith("wonder-"):
             import wonder_gateway
             return wonder_gateway.dispatch(command, sys.modules[__name__])
