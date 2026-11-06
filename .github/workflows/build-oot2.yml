@@ -40,9 +40,9 @@ jobs:
       - name: Verifier les scripts et tests NUP avant tout transfert prive
         run: |
           set -euo pipefail
-          python3 -m py_compile security/ffr_ssh_gate.py security/oot2_nup_info.py security/oot2_gateway.py security/oot2_transfer.py security/run_oot2.py security/test_oot2_nup_info.py security/test_oot2_gateway.py security/test_oot2_transfer.py security/test_oot2_workflow.py
+          python3 -m py_compile security/ffr_ssh_gate.py security/oot2_nup_info.py security/oot2_gateway.py security/oot2_transfer.py security/run_oot2.py security/test_oot2_nup_info.py security/test_oot2_gateway.py security/test_oot2_transfer.py security/test_oot2_setup.py security/test_oot2_workflow.py
           bash -n security/setup_oot2.sh
-          python3 -m unittest -v security/test_oot2_nup_info.py security/test_oot2_gateway.py security/test_oot2_transfer.py security/test_oot2_workflow.py
+          python3 -m unittest -v security/test_oot2_nup_info.py security/test_oot2_gateway.py security/test_oot2_transfer.py security/test_oot2_setup.py security/test_oot2_workflow.py
 
       - name: Verifier les secrets reseau avant toute installation couteuse
         env:
