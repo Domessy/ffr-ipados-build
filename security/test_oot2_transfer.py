@@ -64,7 +64,7 @@ class OOT2TransferTests(unittest.TestCase):
             with patch.dict(os.environ, {"RUNNER_TEMP": temp}), \
                  patch.object(transfer.subprocess, "Popen", return_value=DummySSH(b"nup")), \
                  contextlib.redirect_stdout(io.StringIO()):
-                transfer.transfer("nup", 6, dest)
+                transfer.transfer("nup", 3, dest)
             self.assertEqual(dest.read_bytes(), b"nup")
 
     def test_mismatch_never_publishes_partial_file(self):
