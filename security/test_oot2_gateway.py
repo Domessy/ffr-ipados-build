@@ -28,7 +28,7 @@ class Oot2GatewayTests(unittest.TestCase):
             home = Path(d)
             nup, project = self.fixture(home)
             with patch.object(gw, "HOME", home), patch.object(gw, "SOURCE_LINK", project/"source"):
-                self.assertEqual(gw.nup_file(), nup)
+                self.assertTrue(gw.nup_file().samefile(nup))
                 with patch("builtins.print") as emit:
                     self.assertEqual(gw.dispatch("oot2-probe-v1", parent), 0)
                     emit.assert_called_once_with("OOT2_GATEWAY_V1")
@@ -38,7 +38,8 @@ class Oot2GatewayTests(unittest.TestCase):
                         "0400486024DEC000", "v131072", SIZE, 1, 1, 2)
                 with patch.object(parent, "send_file") as send:
                     self.assertEqual(gw.dispatch("oot2-read-nup", parent), 0)
-                    send.assert_called_once_with(nup)
+                    send.assert_called_once()
+                    self.assertTrue(send.call_args.args[0].samefile(nup))
                 self.assertEqual(gw.dispatch("oot2-read-keys", parent), 126)
                 self.assertEqual(gw.dispatch("oot2-shell", parent), 126)
 
