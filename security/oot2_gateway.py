@@ -5,7 +5,10 @@ No Nintendo keys are required for a NUP. No shell command or arbitrary path
 is accepted, and output/caches never share another game's workspace.
 """
 from pathlib import Path
-from oot2_nup_info import TITLE, VERSION, inspect, NupInvalid
+try:
+    from .oot2_nup_info import TITLE, VERSION, inspect, NupInvalid
+except ImportError:  # forced-command gateway runs as a standalone script
+    from oot2_nup_info import TITLE, VERSION, inspect, NupInvalid
 
 HOME = Path.home()
 ROOT = HOME / "portage-ipados" / "oot-switch2"
