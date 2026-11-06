@@ -51,6 +51,16 @@ class NupInfoTests(unittest.TestCase):
             fake_nup(p, base=False, standalone=True, reserved=1)
             self.assertEqual(n.inspect(p), (SIZE, 0, 1, 1))
 
+    def test_space_estimate_from_selected_romfs(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "standalone.nup"
+            fake_nup(p, base=False, standalone=True, reserved=1)
+            self.assertEqual(n.selected_romfs_bytes(p), 0)
+            fake_nup(p, base=False, standalone=True, reserved=1,
+                     update_romfs=0xFFFFFFFF)
+            with self.assertRaisesRegex(n.NupInvalid, "romfs"):
+                n.selected_romfs_bytes(p)
+
     def test_standalone_without_complete_metadata_is_rejected(self):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "standalone.nup"
