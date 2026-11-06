@@ -30,7 +30,7 @@ permissions:
 
 concurrency:
   group: oot2-nup-tests-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   linux-synthetic:
