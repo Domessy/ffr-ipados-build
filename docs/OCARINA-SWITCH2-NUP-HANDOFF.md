@@ -1,6 +1,6 @@
 # The Legend of Zelda: Ocarina of Time — Switch 2 NUP → IPA iPadOS
 
-État au 06/11/2026 : NUP utilisateur inspecté **localement par l’utilisateur** (en-tête et TOC seulement), aucune donnée du jeu ni clé transférée à GitHub, IPA non construite. Les tests synthétiques du pipeline initial ont réussi ; correctif de compatibilité standalone en cours de validation. Aucun lancement automatique sur l’iPad.
+État au 06/11/2026 : NUP utilisateur inspecté **localement par l’utilisateur** (en-tête et TOC seulement), aucune donnée du jeu ni clé transférée à GitHub, IPA non construite. Les tests synthétiques du pipeline initial ont réussi ; correctif de compatibilité standalone fusionné (PR #23, commit `409e38d`), validation locale du NUP réussie. Aucun lancement automatique sur l’iPad.
 
 ## Entrées confirmées
 
@@ -52,7 +52,7 @@ Sortie IPA si réussie : `~/portage-ipados/oot-switch2/resultats/ZeldaOcarinaOfT
 2. Profil testé principalement sur Mac. Les travaux communautaires relatent des essais iPad Pro M5 / iPadOS 27, avec des échecs GPU au-delà du **budget Metal d’environ 8 192 Mio**, et parfois un épuisement de stockage par les fichiers de mémoire invitée. La mémoire unifiée physique de 12 Go ne supprime pas cette limite.
 3. Le commit amont épinglé est un point de référence reproductible. Plusieurs corrections mémoire sont encore **en PR ouvertes** (dont #1453, #1484, #1486, #1492) et ne doivent pas être appliquées sans vérification de dépendances et tests. On peut compiler une première IPA sans ces modifications, mais **pas la lancer automatiquement**, pour ne pas risquer de bloquer l’iPad.
 4. Le NUP réel comporte **un paquet de mise à jour autonome** : le précontrôle accepte la forme `base=0 update=v131072` si elle est explicitement marquée `standalone_update` et référence ExeFS/RomFS, ou la forme traditionnelle base + mise à jour. Le drapeau standalone **ne garantit pas à lui seul la complétude des données** ; nxnative effectuera les vérifications profondes au dépaquetage. Un correctif non autonome ou une autre version entraînent un arrêt avant transfert.
-5. Le précontrôle mesure l’espace libre sur le runner **avant** un transfert potentiellement supérieur à 25 Go : budget calculé `2 × taille NUP + 32 Gio`. En cas d’insuffisance, ne pas forcer la compilation sur un runner trop petit.
+5. Le premier précontrôle macOS réel (run #42252325321) a échoué uniquement sur l'admission disque : **60 367 396 864 octets libres** contre le seuil forfaitaire **84 401 220 490 octets** (`2 × NUP + 32 Gio`). Aucun NUP transmis. Le correctif suivant force le nettoyage des runtimes de simulateurs lorsqu'il reste moins de ~95 Go et introduit une commande SSH `oot2-space-v1` : elle calcule uniquement à partir de la TOC locale la somme des tailles de fichiers du RomFS sélectionné. Budget mesuré `NUP + RomFS + 12 Gio` avant transfert et après restauration du CAS. Cette estimation n'est pas une garantie de place suffisante pour le packaging IPA ; le contrôle de seuil en cours de compilation (~7 Gio) reste actif. Les copies NUP ne sont pas supprimées pendant l'utilisation du mapping mémoire nxnative.
 6. Aucune source, clé ou IPA n’est publiée en artifact GitHub. La passerelle SSH et le stockage de sorties restent isolés pour OOT2.
 
 ## Retour arrière
@@ -66,3 +66,7 @@ Supprimer seulement `~/portage-ipados/oot-switch2/` (après sauvegarde éventuel
 - Un seul paquet `update` v131072, `standalone_update=1`, ExeFS/RomFS référencés. Le pipeline initial attendait incorrectement `base=1`.
 - Correctif proposé : alignement sur nxnative pour le champ réservé et acceptation du cas standalone dans le validateur, la configuration locale et les deux vérifications du workflow. Tests de non-régression synthétiques sur les deux variantes.
 - Suite : fusion après CI, `git pull --ff-only`, `bash security/setup_oot2.sh`, puis `mode=preflight` uniquement. Le build reste une action explicite séparée.
+
+## Reprise après échec de capacité macOS — 06/11/2026
+
+Le nettoyage Xcode/Android a libéré ~20 Gio sur le runner (`df` passant de 37 à 57 Gio). Le nettoyage des runtimes de simulateur n'était pas appelé, car son déclenchement était limité à 42 millions de Ko libres. La règle `2 × NUP + 32 Gio` n'était pas dérivée du RomFS de ce jeu. Le nouveau précontrôle peut refuser si `NUP + RomFS calculé + 12 Gio` dépasse la place disponible ; dans ce cas, rechercher une stratégie de stockage supplémentaire avant de lancer `mode=build`. Après fusion, une mise à jour locale de `main` est nécessaire pour exposer la nouvelle commande restreinte `oot2-space-v1` côté SSH. Aucune modification des clés ni du NUP original.
