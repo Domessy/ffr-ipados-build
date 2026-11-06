@@ -48,8 +48,8 @@ def inspect(path):
         h = src.read(SUPER.size)
         if len(h) != SUPER.size:
             raise NupInvalid("header")
-        magic, hsize, reserved, toc_off, toc_size, digest, blob, declared, count, flags, _, trailer = SUPER.unpack(h)
-        if magic != b"NUP\x01" or reserved or flags or declared != size:
+        magic, hsize, _reserved, toc_off, toc_size, digest, blob, declared, count, flags, _, trailer = SUPER.unpack(h)
+        if magic != b"NUP\x01" or flags or declared != size:
             raise NupInvalid("header")
         if hsize < SUPER.size or toc_off != hsize or not 0 < toc_size <= MAX_TOC:
             raise NupInvalid("toc")
@@ -72,10 +72,22 @@ def inspect(path):
     packages = [PKG.unpack_from(toc, TOC.size + i * PKG.size) for i in range(count)]
     bases = [rec for rec in packages if rec[5] == 0]
     updates = [rec for rec in packages if rec[5] == 1]
-    if len(bases) != 1:
+    if len(bases) > 1:
         raise NupInvalid("base")
-    if bases[0][0] != TITLE or bases[0][4] != 0:
-        raise NupInvalid("title_id")
+    if bases:
+        if bases[0][0] != TITLE or bases[0][4] != 0:
+            raise NupInvalid("title_id")
+    else:
+        # nxnative accepts a NUP without a base when every update is
+        # marked standalone_update. This flag does not prove completeness.
+        if not updates or any(not (rec[6] & 1) or rec[6] & ~1 for rec in updates):
+            raise NupInvalid("standalone")
+        selected = [rec for rec in updates if rec[4] == VERSION]
+        if selected and (selected[0][0] != TITLE
+                         or any(selected[0][i] >= num_dirs for i in (1, 2, 3))):
+            # The chosen update must reference a root, ExeFS and RomFS tree.
+            # The upstream parser still validates actual file contents.
+            raise NupInvalid("standalone")
     if any(rec[5] not in (0, 1, 2, 3, 4) for rec in packages):
         raise NupInvalid("role")
     if not any(rec[4] == VERSION for rec in updates):
