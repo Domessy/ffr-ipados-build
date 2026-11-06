@@ -99,6 +99,62 @@ def inspect(path):
     return size, len(bases), sum(rec[4] == VERSION for rec in updates), count
 
 
+
+def selected_romfs_bytes(path):
+    """Read-only sum of the selected update's RomFS file sizes from the NUP TOC.
+
+    This is the unpacked file payload estimate, not an exact RomFS.img or IPA
+    size. nxnative still performs all payload checks on the private runner.
+    """
+    inspect(path)  # Verify signature, TOC digest, title and selected version.
+    with Path(path).open("rb") as src:
+        h = SUPER.unpack(src.read(SUPER.size))
+        src.seek(h[3])
+        toc = src.read(h[4])
+    _magic, count, dirs, files, pool, _pool_size, _ = TOC.unpack_from(toc)
+    p_off = TOC.size
+    d_off = p_off + count * PKG.size
+    f_off = d_off + dirs * DIR.size
+    slot_off = f_off + files * FILE.size
+    if pool < slot_off or (pool - slot_off) % 4:
+        raise NupInvalid("toc")
+    slot_count = (pool - slot_off) // 4
+    packages = [PKG.unpack_from(toc, p_off + i * PKG.size)
+                for i in range(count)]
+    patches = [p for p in packages if p[5] == 1 and p[4] == VERSION]
+    if len(patches) != 1:
+        raise NupInvalid("version")
+    root = patches[0][3]  # The selected update's RomFS directory.
+    if root == 0xFFFFFFFF:
+        bases = [p for p in packages if p[5] == 0]
+        root = bases[0][3] if len(bases) == 1 else 0xFFFFFFFF
+    if root >= dirs:
+        raise NupInvalid("romfs")
+    seen = set()
+    stack = [root]
+    total = 0
+    while stack:
+        index = stack.pop()
+        if index in seen or index >= dirs:
+            raise NupInvalid("tree")
+        seen.add(index)
+        _name, _size, first, number, _extra = DIR.unpack_from(
+            toc, d_off + index * DIR.size)
+        if first + number > slot_count:
+            raise NupInvalid("tree")
+        for slot_index in range(first, first + number):
+            child = struct.unpack_from("<I", toc, slot_off + slot_index * 4)[0]
+            if child < dirs:
+                stack.append(child)
+            else:
+                file_index = child - dirs
+                if file_index >= files:
+                    raise NupInvalid("tree")
+                record = FILE.unpack_from(toc, f_off + file_index * FILE.size)
+                total += record[2]
+    return total
+
+
 def main():
     import argparse
     parser = argparse.ArgumentParser()
