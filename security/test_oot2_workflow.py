@@ -36,7 +36,10 @@ class WorkflowContractTests(unittest.TestCase):
 
     def test_standalone_manifest_is_accepted_in_both_gates(self):
         workflow = BUILD.read_text()
-        self.assertEqual(workflow.count('"$BASE" =~ ^[01]
+        self.assertEqual(workflow.count('"$BASE" =~ ^[01]$'), 2)
+        self.assertNotIn('"$BASE" == 1', workflow)
+
+    def test_one_nup_without_keys(self):
         workflow=BUILD.read_text()
         self.assertIn("security/oot2_transfer.py nup",workflow)
         self.assertIn("security/oot2_nup_info.py",workflow)
