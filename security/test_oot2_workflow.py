@@ -50,6 +50,21 @@ class WorkflowContractTests(unittest.TestCase):
         for forbidden in ("oot2-read-keys","oot2-prod.keys","NSPS","FFR_TS_AUTWONDEREY"):
             self.assertNotIn(forbidden,workflow)
 
+    def test_sqlite_cache_is_validated_before_game_transfer(self):
+        workflow = BUILD.read_text()
+        restore = workflow.index("Restaurer le cache de shaders OOT2")
+        transfer = workflow.index("Transferer uniquement le NUP")
+        self.assertLess(restore, transfer)
+        self.assertIn("oot2_sqlite_cas.py prepare", workflow)
+        self.assertIn('"$RUNNER_TEMP/oot2-shader-cas/cas.db"', workflow)
+        self.assertIn("nxnative/dm/tools/shader_cache.py", workflow)
+        self.assertIn("PRAGMA quick_check", workflow)
+        runner = (ROOT/"security/run_oot2.py").read_text()
+        self.assertIn('CAS_DB = CACHE / "cas.db"', runner)
+        self.assertIn('DMSH_CAS=str(CAS_DB)', runner)
+        self.assertIn('"oot2_sqlite_cas.py"', runner)
+        self.assertNotIn('DMSH_CAS=str(CACHE)', runner)
+
     def test_pin_and_metal_chain(self):
         workflow=BUILD.read_text()
         m=re.search(r'NXNATIVE_SHA="([^"]+)"',workflow)

@@ -16,13 +16,14 @@ import time
 TEMP = Path(os.environ["RUNNER_TEMP"])
 WORKSPACE = Path(os.environ["GITHUB_WORKSPACE"])
 CACHE = TEMP / "oot2-shader-cas"
+CAS_DB = CACHE / "cas.db"
 LOG = TEMP / "oot2-build.log"
 OUTPUT = TEMP / "ZeldaOcarinaOfTime.ipa"
 NUP_FOLDER = TEMP / "oot2-nup"
 NUP = NUP_FOLDER / "OcarinaOfTime.nup"
 PYTHON = TEMP / "oot2-venv" / "bin" / "python"
 NATIVE = TEMP / "nxnative"
-EXPORT = WORKSPACE / "security" / "cache_export.py"
+EXPORT = WORKSPACE / "security" / "oot2_sqlite_cas.py"
 # Cap one shader build to 265 min and retain time for checkpoint/IPA upload on a 345 min job; subsequent runs reuse the shader CAS.
 MAX_BUILD_SECONDS = 265 * 60
 MIN_DISK_BYTES = 7 * (1024 ** 3)
@@ -40,7 +41,8 @@ def checkpoint(since_ns, final=False):
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
     )
     sender = subprocess.Popen(
-        [sys.executable, str(EXPORT), str(CACHE), str(since_ns), str(threshold)],
+        [sys.executable, str(EXPORT), "export", str(CACHE),
+         str(since_ns), str(threshold)],
         stdout=recv.stdin, stderr=subprocess.DEVNULL,
     )
     recv.stdin.close()
@@ -159,7 +161,10 @@ def compile_ipa():
     global active
     CACHE.mkdir(parents=True, exist_ok=True, mode=0o700)
     LOG.parent.mkdir(parents=True, exist_ok=True)
-    env = dict(os.environ, DMSH_CAS=str(CACHE))
+    if not CAS_DB.is_file():
+        print("OOT2: SQLite shader cache not initialized; refusing build.", flush=True)
+        return 1
+    env = dict(os.environ, DMSH_CAS=str(CAS_DB))
     # Preserve the restore's older mtimes; do not re-upload already stored files.
     since_ns = time.time_ns()
     last_sync = time.monotonic()
