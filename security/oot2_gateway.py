@@ -6,9 +6,9 @@ is accepted, and output/caches never share another game's workspace.
 """
 from pathlib import Path
 try:
-    from .oot2_nup_info import TITLE, VERSION, inspect, NupInvalid
+    from .oot2_nup_info import TITLE, VERSION, inspect, selected_romfs_bytes, NupInvalid
 except ImportError:  # forced-command gateway runs as a standalone script
-    from oot2_nup_info import TITLE, VERSION, inspect, NupInvalid
+    from oot2_nup_info import TITLE, VERSION, inspect, selected_romfs_bytes, NupInvalid
 
 HOME = Path.home()
 ROOT = HOME / "portage-ipados" / "oot-switch2"
@@ -18,7 +18,7 @@ CONFLICTS = ROOT / "shader-cache-conflicts"
 OUTPUT = ROOT / "resultats"
 
 ROUTES = frozenset({
-    "oot2-diagnose-v1", "oot2-probe-v1", "oot2-manifest-v1",
+    "oot2-diagnose-v1", "oot2-probe-v1", "oot2-manifest-v1", "oot2-space-v1",
     "oot2-read-nup", "oot2-read-cache", "oot2-write-cache",
     "oot2-write-ipa", "oot2-write-log",
 })
@@ -74,6 +74,11 @@ def dispatch(command, parent):
     if command == "oot2-manifest-v1":
         size, base, selected, count = inspect(nup_file())
         print(f"{TITLE:016X}", f"v{VERSION}", size, base, selected, count)
+        return 0
+    if command == "oot2-space-v1":
+        path = nup_file()
+        # Numeric-only reply, no filenames, path disclosure or game payload.
+        print("OOT2_SPACE_V1", path.stat().st_size, selected_romfs_bytes(path))
         return 0
     if command == "oot2-read-nup":
         parent.send_file(nup_file())
