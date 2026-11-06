@@ -125,8 +125,8 @@ jobs:
             done
           fi
           free_kb=$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')
-          if [ "$free_kb" -lt 42000000 ]; then
-            echo 'Espace encore limite: nettoyage des runtimes de simulateurs GitHub inutilises.'
+          if [ "$free_kb" -lt 95000000 ]; then
+            echo 'OOT2: nettoyage des runtimes de simulateurs inutiles si l’espace est limite.'
             xcrun simctl runtime list || true
             # On Xcode 27 this supported simctl operation removes simulator
             # runtime disk images, not the iOS device SDK or Metal compiler.
@@ -274,8 +274,13 @@ jobs:
           [[ "$TITLE" == "0400486024DEC000" && "$VERSION" == "v131072" && "$BASE" =~ ^[01]$ && "$PATCHES" == 1 ]]
           [[ "$NUP_BYTES" =~ ^[1-9][0-9]*$ && "$PKGS" =~ ^[1-9][0-9]*$ ]]
           free=$(( $(df -Pk "$RUNNER_TEMP" | awk 'NR==2 {print $4}') * 1024 ))
-          required=$(( 2 * NUP_BYTES + 32 * 1024**3 ))
-          echo "OOT2: source_bytes=$NUP_BYTES; packages=$PKGS; free_bytes=$free; required_bytes=$required"
+          # The NUP is retained while its files are unpacked. Measure the
+          # selected RomFS from the verified TOC, rather than assuming an
+          # arbitrary second NUP copy plus 32 GiB.
+          read -r MARK SOURCE_BYTES ROMFS_BYTES <<< "$(ssh -o ConnectTimeout=25 ffr-cachyos oot2-space-v1)"
+          [[ "$MARK" == OOT2_SPACE_V1 && "$SOURCE_BYTES" == "$NUP_BYTES" && "$ROMFS_BYTES" =~ ^[1-9][0-9]*$ ]]
+          required=$(( NUP_BYTES + ROMFS_BYTES + 12 * 1024**3 ))
+          echo "OOT2: source_bytes=$NUP_BYTES; romfs_bytes=$ROMFS_BYTES; packages=$PKGS; free_bytes=$free; required_bytes=$required"
           if (( free < required )); then
             echo 'OOT2: insufficient temporary disk; NUP not transferred.' >&2
             exit 1
@@ -292,7 +297,10 @@ jobs:
           ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 ffr-cachyos oot2-read-cache | tar -xz -C "$DMSH_CAS"
           read -r TITLE VERSION NUP_BYTES BASE PATCHES PKGS <<< "$(ssh ffr-cachyos oot2-manifest-v1)"
           free=$(( $(df -Pk "$RUNNER_TEMP" | awk 'NR==2 {print $4}') * 1024 ))
-          required=$(( 2 * NUP_BYTES + 20 * 1024**3 ))
+          read -r MARK SOURCE_BYTES ROMFS_BYTES <<< "$(ssh -o ConnectTimeout=25 ffr-cachyos oot2-space-v1)"
+          [[ "$MARK" == OOT2_SPACE_V1 && "$SOURCE_BYTES" == "$NUP_BYTES" && "$ROMFS_BYTES" =~ ^[1-9][0-9]*$ ]]
+          # Same source + unpacked RomFS + reserve, now counting restored CAS.
+          required=$(( NUP_BYTES + ROMFS_BYTES + 12 * 1024**3 ))
           if (( free < required )); then
             echo 'OOT2: cache consumed disk reserve; NUP not transferred.' >&2
             exit 1

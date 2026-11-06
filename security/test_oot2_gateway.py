@@ -54,6 +54,16 @@ class Oot2GatewayTests(unittest.TestCase):
                     emit.assert_called_once_with(
                         "0400486024DEC000", "v131072", SIZE, 0, 1, 1)
 
+    def test_space_probe_is_numeric_and_read_only(self):
+        with tempfile.TemporaryDirectory() as d:
+            home = Path(d)
+            nup, project = self.fixture(home)
+            fake_nup(nup, base=False, standalone=True, reserved=1)
+            with patch.object(gw, "HOME", home), patch.object(gw, "SOURCE_LINK", project/"source"):
+                with patch("builtins.print") as emit:
+                    self.assertEqual(gw.dispatch("oot2-space-v1", parent), 0)
+                    emit.assert_called_once_with("OOT2_SPACE_V1", SIZE, 0)
+
     def test_one_container_only_and_bad_version(self):
         with tempfile.TemporaryDirectory() as d:
             home = Path(d)
