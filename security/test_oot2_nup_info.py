@@ -10,22 +10,27 @@ SIZE = 200 * 1024**2
 TITLE = n.TITLE
 
 
-def fake_nup(path, *, version=n.VERSION, base=True, title=TITLE, broken_toc=False):
+def fake_nup(path, *, version=n.VERSION, base=True, title=TITLE,
+             broken_toc=False, standalone=False, reserved=0,
+             update_romfs=None):
     """A synthetic metadata-only NUP, never a valid game image."""
     recs = []
     if base:
         recs.append(n.PKG.pack(title, 0, n.NO_DIR if hasattr(n, "NO_DIR") else 0xFFFFFFFF,
                                0xFFFFFFFF, 0, 0, 0, 0, 0, 0, 0))
-    recs.append(n.PKG.pack(title, 0, 0xFFFFFFFF, 0xFFFFFFFF,
-                           version, 1, 0, 0, 0, 0, 0))
+    ndirs = 3 if standalone else 1
+    exefs = 1 if standalone else 0xFFFFFFFF
+    romfs = (2 if standalone else 0xFFFFFFFF) if update_romfs is None else update_romfs
+    recs.append(n.PKG.pack(title, 0, exefs, romfs,
+                           version, 1, int(standalone), 0, 0, 0, 0))
     count = len(recs)
-    pool_at = n.TOC.size + count * n.PKG.size + n.DIR.size
-    toc = (n.TOC.pack(b"TOC\x01", count, 1, 0, pool_at, 0, 0)
-           + b"".join(recs) + n.DIR.pack(0, 0, 0, 0, 0))
+    pool_at = n.TOC.size + count * n.PKG.size + ndirs * n.DIR.size
+    toc = (n.TOC.pack(b"TOC\x01", count, ndirs, 0, pool_at, 0, 0)
+           + b"".join(recs) + n.DIR.pack(0, 0, 0, 0, 0) * ndirs)
     dig = hashlib.sha256(toc).digest() if not broken_toc else b"x" * 32
     blob = (n.SUPER.size + len(toc) + 15) & ~15
     header = n.SUPER.pack(
-        b"NUP\x01", n.SUPER.size, 0, n.SUPER.size, len(toc),
+        b"NUP\x01", n.SUPER.size, reserved, n.SUPER.size, len(toc),
         dig, blob, SIZE, count, 0, b"\x00" * 16, b"\x00" * 32)
     with Path(path).open("wb") as stream:
         stream.write(header)
@@ -39,6 +44,22 @@ class NupInfoTests(unittest.TestCase):
             p = Path(d) / "anything.nup"
             fake_nup(p)
             self.assertEqual(n.inspect(p), (SIZE, 1, 1, 2))
+
+    def test_real_world_standalone_update_with_reserved_one(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "standalone.nup"
+            fake_nup(p, base=False, standalone=True, reserved=1)
+            self.assertEqual(n.inspect(p), (SIZE, 0, 1, 1))
+
+    def test_standalone_without_complete_metadata_is_rejected(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "standalone.nup"
+            fake_nup(p, base=False, standalone=True, update_romfs=0xFFFFFFFF)
+            with self.assertRaisesRegex(n.NupInvalid, "standalone"):
+                n.inspect(p)
+            fake_nup(p, base=False, standalone=False)
+            with self.assertRaisesRegex(n.NupInvalid, "standalone"):
+                n.inspect(p)
 
     def test_bad_title_or_update_version_rejected_without_data_reads(self):
         with tempfile.TemporaryDirectory() as d:
