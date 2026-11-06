@@ -345,4 +345,4 @@ jobs:
           if [ -s "$RUNNER_TEMP/oot2-tailscaled.pid" ]; then
             sudo -n kill "$(cat "$RUNNER_TEMP/oot2-tailscaled.pid")" > /dev/null 2>&1 || true
           fi
-          rm -f "$RUNNER_TEMP/oot2-prod.keys" "$RUNNER_TEMP/oot2_ssh_key" || true
+          rm -f "$RUNNER_TEMP/oot2_ssh_key" || true
