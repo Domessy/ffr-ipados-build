@@ -152,6 +152,9 @@ def selected_romfs_bytes(path):
                     raise NupInvalid("tree")
                 record = FILE.unpack_from(toc, f_off + file_index * FILE.size)
                 total += record[2]
+                # Bound untrusted TOC quantities before GitHub shell arithmetic.
+                if total > 512 * 1024**3:
+                    raise NupInvalid("romfs_size")
     return total
 
 
