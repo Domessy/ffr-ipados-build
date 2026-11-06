@@ -31,7 +31,9 @@ class WorkflowContractTests(unittest.TestCase):
         transfer=workflow.index("Transferer uniquement le NUP")
         self.assertTrue(check < install < network < meta < transfer)
         self.assertIn("OOT2_GATEWAY_V1",workflow)
-        self.assertIn("required=$(( 2 * NUP_BYTES + 32 * 1024**3 ))",workflow)
+        self.assertEqual(workflow.count("required=$(( NUP_BYTES + ROMFS_BYTES + 12 * 1024**3 ))"),2)
+        self.assertEqual(workflow.count("oot2-space-v1"),2)
+        self.assertIn('if [ "$free_kb" -lt 95000000 ]; then',workflow)
         self.assertIn("source_bytes=$NUP_BYTES",workflow)
 
     def test_standalone_manifest_is_accepted_in_both_gates(self):
