@@ -51,7 +51,7 @@ class OOT2TransferTests(unittest.TestCase):
                 transfer.transfer("nup", len(data), dest)
             self.assertEqual(dest.read_bytes(), data)
             self.assertEqual(list(folder.glob("*.partial")), [])
-            self.assertIn("OOT2 base:", output.getvalue())
+            self.assertIn("OOT2 nup:", output.getvalue())
             self.assertIn("100.0%", output.getvalue())
             self.assertIn("verified complete", output.getvalue())
             self.assertNotIn(str(dest), output.getvalue())
