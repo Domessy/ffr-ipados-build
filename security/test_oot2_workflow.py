@@ -66,33 +66,3 @@ class WorkflowContractTests(unittest.TestCase):
 
 if __name__=="__main__":
     unittest.main()
-), 2)
-        self.assertNotIn('"$BASE" == 1', workflow)
-
-    def test_one_nup_without_keys(self):
-        workflow=BUILD.read_text()
-        self.assertIn("security/oot2_transfer.py nup",workflow)
-        self.assertIn("security/oot2_nup_info.py",workflow)
-        self.assertIn("OcarinaOfTime.nup",workflow)
-        self.assertIn("security/run_oot2.py",workflow)
-        for forbidden in ("oot2-read-keys","oot2-prod.keys","NSPS","FFR_TS_AUTWONDEREY"):
-            self.assertNotIn(forbidden,workflow)
-
-    def test_pin_and_metal_chain(self):
-        workflow=BUILD.read_text()
-        m=re.search(r'NXNATIVE_SHA="([^"]+)"',workflow)
-        self.assertIsNotNone(m)
-        self.assertRegex(m.group(1),r"^[0-9a-f]{40}$")
-        self.assertEqual(m.group(1),"c229bd7d52e30f072362e31c7b1e3206d107d4cd")
-        self.assertIn("Xcode 27.2",workflow)
-        self.assertIn("Apple metal version 32023.922 (metalfe-32023.922.4)",workflow)
-        self.assertIn("--check-metal",workflow)
-        script=(ROOT/"security/run_oot2.py").read_text()
-        self.assertIn('"--platform", "ios"',script)
-        self.assertIn('"-p", "v131072"',script)
-        self.assertIn('ZeldaOcarinaOfTime.ipa',script)
-        self.assertNotIn('"--platform", "mac-app"',script)
-
-
-if __name__=="__main__":
-    unittest.main()
