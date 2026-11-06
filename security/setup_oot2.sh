@@ -56,7 +56,7 @@ read -r tid ver size bases patches count <<< "$(
   SSH_ORIGINAL_COMMAND=oot2-manifest-v1 python3 "$GATE"
 )"
 [[ "$tid" == 0400486024DEC000 && "$ver" == v131072 ]] || exit 1
-[[ "$bases" == 1 && "$patches" == 1 ]] || exit 1
+[[ "$bases" =~ ^[01]$ && "$patches" == 1 ]] || exit 1
 [[ "$size" =~ ^[1-9][0-9]*$ ]] || exit 1
-echo "OOT2_GATEWAY_V1 source=ok base=1 update=v131072 packages=$count bytes=$size"
+echo "OOT2_GATEWAY_V1 source=ok base=$bases update=v131072 packages=$count bytes=$size"
 echo "OOT2: originals unchanged; private workspace ~/portage-ipados/oot-switch2/"
