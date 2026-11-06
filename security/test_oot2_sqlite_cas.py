@@ -48,8 +48,8 @@ class SQLiteCasTests(unittest.TestCase):
             with sqlite3.connect(root / "cas.db") as db:
                 self.assertEqual(db.execute("PRAGMA quick_check").fetchone()[0],
                                  "ok")
-                self.assertEqual(db.execute("SELECT count(*) FROM entry").
-                                 fetchone()[0], 0)
+                self.assertEqual(
+                    db.execute("SELECT count(*) FROM entry").fetchone()[0], 0)
 
     def test_reject_directory_instead_of_database(self):
         with tempfile.TemporaryDirectory() as d:
@@ -71,8 +71,8 @@ class SQLiteCasTests(unittest.TestCase):
                 cas.prepare(root)
             self.assertFalse((root / "shader").exists())
             with sqlite3.connect(root / "cas.db") as db:
-                self.assertEqual(db.execute("SELECT count(*) FROM entry").
-                                 fetchone()[0], 1)
+                self.assertEqual(
+                    db.execute("SELECT count(*) FROM entry").fetchone()[0], 1)
             # The old restored entry must not be needlessly uploaded again.
             cutoff = time.time_ns() - 30 * 10**9
             start = archive(root, cutoff, time.time_ns())
