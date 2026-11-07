@@ -1,0 +1,29 @@
+diff --git a/dm/gfx/nvn/nvn_mtl.m b/dm/gfx/nvn/nvn_mtl.m
+index 83ae99a2..0e7404d8 100644
+--- a/dm/gfx/nvn/nvn_mtl.m
++++ b/dm/gfx/nvn/nvn_mtl.m
+@@ -3601,7 +3601,24 @@ static id<MTLTexture> tex_mtl_(const tex_t *ct) {
+ // Memory readout line (always on, low frequency, capped): resident memory, GPU allocated, deferred-release queue, residency set object count, registered memory pools / peak / tracking table capacity, cumulative texture re-uploads.
+ // Purpose: pin down "crashes with no log". The system gives no notice before killing a process for memory, so only readouts left beforehand can show which number kept climbing.
+ // Called by the frame hook every 300 frames; printed only when resident or GPU allocated changed by ≥ 64 MB since the last line, otherwise one line every 3000 frames; capped at 400 lines per game. All integers (the frame hook runs on the guest thread's small stack, so no floating-point formatting)
++// Bounded aggregate diagnostics for the OOT2 experiment, before the existing
++// change-based throttle. No resource walk, pointer, game data or GPU wait.
+ void mtl_mem_stat(unsigned long long frame, unsigned long long rss_mb) {
++    static unsigned oot2_samples;
++    if (oot2_samples < 240) {
++        task_vm_info_data_t vi = {0}; mach_msg_type_number_t count = TASK_VM_INFO_COUNT;
++        if (task_info(mach_task_self(), TASK_VM_INFO, (task_info_t)&vi, &count) == KERN_SUCCESS) {
++            unsigned long long available = 0;
++#if TARGET_OS_IPHONE
++            available = (unsigned long long)os_proc_available_memory();
++#endif
++            MLOG("[oot2-mem] sample=%u frame=%llu seconds=%.3f rss_mib=%llu footprint_mib=%llu metal_mib=%llu recommended_mib=%llu available_mib=%llu internal_mib=%llu compressed_mib=%llu",
++                 ++oot2_samples, frame, now_ns() / 1e9,
++                 (unsigned long long)(vi.resident_size >> 20), (unsigned long long)(vi.phys_footprint >> 20),
++                 (unsigned long long)(g_dev.currentAllocatedSize >> 20), (unsigned long long)(g_dev.recommendedMaxWorkingSetSize >> 20),
++                 available >> 20, (unsigned long long)(vi.internal >> 20), (unsigned long long)(vi.compressed >> 20));
++        }
++    }
+     static unsigned long long last_rss, last_gpu, last_frame; static int lines; unsigned long long gpu = (unsigned long long)(g_dev.currentAllocatedSize >> 20);
+     unsigned long long dr = rss_mb > last_rss ? rss_mb - last_rss : last_rss - rss_mb, dg = gpu > last_gpu ? gpu - last_gpu : last_gpu - gpu;
+     if (lines >= 400 || (lines && dr < 64 && dg < 64 && frame - last_frame < 3000)) return; lines++; last_rss = rss_mb; last_gpu = gpu; last_frame = frame;

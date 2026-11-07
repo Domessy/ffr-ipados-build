@@ -8,6 +8,8 @@ on:
       - '.github/workflows/build-oot2.yml'
       - '.github/workflows/test-oot2.yml'
       - 'security/oot2_*.py'
+      - 'security/oot2_*.patch'
+      - 'security/oot2_graphics_manifest.json'
       - 'security/test_oot2_*.py'
       - 'security/run_oot2.py'
       - 'security/setup_oot2.sh'
@@ -19,6 +21,8 @@ on:
       - '.github/workflows/build-oot2.yml'
       - '.github/workflows/test-oot2.yml'
       - 'security/oot2_*.py'
+      - 'security/oot2_*.patch'
+      - 'security/oot2_graphics_manifest.json'
       - 'security/test_oot2_*.py'
       - 'security/run_oot2.py'
       - 'security/setup_oot2.sh'
@@ -44,10 +48,10 @@ jobs:
       - name: Python, Bash and NUP fixtures (no retail material)
         run: |
           set -euo pipefail
-          python3 -m py_compile security/oot2_nup_info.py security/oot2_gateway.py security/oot2_transfer.py security/oot2_sqlite_cas.py security/oot2_patch_nup_release.py security/run_oot2.py security/test_oot2_nup_info.py security/test_oot2_gateway.py security/test_oot2_transfer.py security/test_oot2_sqlite_cas.py security/test_oot2_patch_nup_release.py security/test_oot2_setup.py security/test_oot2_workflow.py
+          python3 -m py_compile security/oot2_nup_info.py security/oot2_gateway.py security/oot2_transfer.py security/oot2_sqlite_cas.py security/oot2_patch_nup_release.py security/run_oot2.py security/test_oot2_nup_info.py security/test_oot2_gateway.py security/test_oot2_transfer.py security/test_oot2_sqlite_cas.py security/test_oot2_patch_nup_release.py security/test_oot2_setup.py security/test_oot2_workflow.py security/test_oot2_memory_report.py
           bash -n security/setup_oot2.sh
-          python3 -m unittest -v security/test_oot2_nup_info.py security/test_oot2_gateway.py security/test_oot2_transfer.py security/test_oot2_sqlite_cas.py security/test_oot2_patch_nup_release.py security/test_oot2_setup.py security/test_oot2_workflow.py
-      - name: Verify NUP release patch against EXACT pinned nxnative source
+          python3 -m unittest -v security/test_oot2_nup_info.py security/test_oot2_gateway.py security/test_oot2_transfer.py security/test_oot2_sqlite_cas.py security/test_oot2_patch_nup_release.py security/test_oot2_setup.py security/test_oot2_workflow.py security/test_oot2_memory_report.py
+      - name: Verify NUP release and runtime patches against EXACT pinned nxnative source
         run: |
           set -euo pipefail
           UPSTREAM_SHA=c229bd7d52e30f072362e31c7b1e3206d107d4cd
@@ -57,6 +61,11 @@ jobs:
           git -C "$SMOKE" fetch -q --depth 1 origin "$UPSTREAM_SHA"
           git -C "$SMOKE" checkout -q --detach FETCH_HEAD
           test "$(git -C "$SMOKE" rev-parse HEAD)" = "$UPSTREAM_SHA"
+          python3 security/oot2_runtime_smoke.py "$SMOKE"
+          git -C "$SMOKE" fetch -q --depth 1 origin 167769131235226c739517a0a3e53fce48025b1f
+          python3 security/oot2_patch_graphics.py "$SMOKE"
+          python3 "$SMOKE/dm/gfx/tests/test_dmsh_meshstage.py"
+          python3 "$SMOKE/dm/gfx/tests/test_dmsh_hmma.py" HmmaRewrite
           python3 security/oot2_patch_nup_release.py "$SMOKE/scripts/build_ipa_from_nsp.py"
           python3 -m py_compile "$SMOKE/scripts/build_ipa_from_nsp.py"
           python3 - "$SMOKE/scripts/build_ipa_from_nsp.py" <<'PY'
@@ -86,8 +95,8 @@ jobs:
         run: |
           set -euo pipefail
           bash -n security/setup_oot2.sh
-          python3 -m unittest -v security/test_oot2_nup_info.py security/test_oot2_gateway.py security/test_oot2_transfer.py security/test_oot2_sqlite_cas.py security/test_oot2_patch_nup_release.py security/test_oot2_setup.py security/test_oot2_workflow.py
-      - name: Verify NUP release patch against EXACT pinned nxnative source
+          python3 -m unittest -v security/test_oot2_nup_info.py security/test_oot2_gateway.py security/test_oot2_transfer.py security/test_oot2_sqlite_cas.py security/test_oot2_patch_nup_release.py security/test_oot2_setup.py security/test_oot2_workflow.py security/test_oot2_memory_report.py
+      - name: Verify NUP release and runtime patches against EXACT pinned nxnative source
         run: |
           set -euo pipefail
           UPSTREAM_SHA=c229bd7d52e30f072362e31c7b1e3206d107d4cd
@@ -97,6 +106,11 @@ jobs:
           git -C "$SMOKE" fetch -q --depth 1 origin "$UPSTREAM_SHA"
           git -C "$SMOKE" checkout -q --detach FETCH_HEAD
           test "$(git -C "$SMOKE" rev-parse HEAD)" = "$UPSTREAM_SHA"
+          python3 security/oot2_runtime_smoke.py "$SMOKE"
+          git -C "$SMOKE" fetch -q --depth 1 origin 167769131235226c739517a0a3e53fce48025b1f
+          python3 security/oot2_patch_graphics.py "$SMOKE"
+          python3 "$SMOKE/dm/gfx/tests/test_dmsh_meshstage.py"
+          python3 "$SMOKE/dm/gfx/tests/test_dmsh_hmma.py" HmmaRewrite
           python3 security/oot2_patch_nup_release.py "$SMOKE/scripts/build_ipa_from_nsp.py"
           python3 -m py_compile "$SMOKE/scripts/build_ipa_from_nsp.py"
           python3 - "$SMOKE/scripts/build_ipa_from_nsp.py" <<'PY'
@@ -110,3 +124,34 @@ jobs:
           assert code.index('fam["nup"].close()') < code.index('candidate.unlink()')
           print("Pinned nxnative patch: anchor, syntax and release order verified (no game data)")
           PY
+
+  runtime-ios-compile:
+    if: github.event_name == 'pull_request'
+    runs-on: xcode-27
+    timeout-minutes: 15
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
+      GAME: '0400486024DEC000'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Fetch exact upstream (no private data)
+        run: |
+          set -euo pipefail
+          git init -q "$RUNNER_TEMP/oot2-compile"
+          git -C "$RUNNER_TEMP/oot2-compile" remote add origin https://github.com/seedds/nxnative.git
+          git -C "$RUNNER_TEMP/oot2-compile" fetch -q --depth 1 origin c229bd7d52e30f072362e31c7b1e3206d107d4cd
+          git -C "$RUNNER_TEMP/oot2-compile" checkout -q --detach FETCH_HEAD
+          git -C "$RUNNER_TEMP/oot2-compile" fetch -q --depth 1 origin 167769131235226c739517a0a3e53fce48025b1f
+          python3 security/oot2_patch_graphics.py "$RUNNER_TEMP/oot2-compile"
+          python3 security/oot2_patch_runtime.py "$RUNNER_TEMP/oot2-compile" --variant memory-v1
+      - name: Compile iOS sources only (no game shaders, no IPA, no signing)
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          xcodebuild -downloadComponent MetalToolchain
+          python3 "$RUNNER_TEMP/oot2-compile/dm/gfx/tools/own_compilers.py" --check-metal
+          python3 "$RUNNER_TEMP/oot2-compile/dm/gfx/tests/test_dmsh_meshstage.py"
+          python3 "$RUNNER_TEMP/oot2-compile/dm/gfx/tests/test_dmsh_hmma.py"
+          python3 "$RUNNER_TEMP/oot2-compile/dm/ios/tools/compile_check.py"

@@ -1,0 +1,28 @@
+{
+  "source_commit": "167769131235226c739517a0a3e53fce48025b1f",
+  "files": {
+    "dm/gfx/tools/dmsh_chain.lock": "d1e18c6ca38a4406d8bc7c0673fc9b0df329cdbf86b32206d715929347cbcaee",
+    "dm/gfx/tools/dmsh_xlate_bin/Ryujinx.Common.dll": "4d69118e2d3adc27b02b3170e225e28aa2d2d4fa7aaac70ddec5ee0f9a2f14ad",
+    "dm/gfx/tools/dmsh_xlate_bin/Ryujinx.Graphics.Shader.dll": "709972104636d064e81bc4634a1b4286612308ab1f5ca3d932b3984a1f2590de",
+    "dm/gfx/tools/dmsh_xlate_bin/Spv.Generator.dll": "3b46255f42c2adbf0db712f75ae9d230ede5e0ed4a536d14f1af0a503a3bdac2",
+    "dm/gfx/tools/dmsh_xlate_bin/dmsh_xlate.dll": "4ad487b0a2c993973e143b6c45ba0bfc30df46dadc362f03726bd12c9a0d2483",
+    "dm/gfx/tools/dmsh_xlate_bin/dmsh_xlate.pdb": "68f2dc2a7c4e3d0a5a0aad53cb01e8f10076eecc66f13dd87289bfb74213d1a7",
+    "dm/third_party/ryujinx/src/Ryujinx.Graphics.Shader/Instructions/InstEmitAmpereMem.cs": "b901502967828ca6881bb41a8aab0339dc627d34e5584f4389a8f90a6869b34a",
+    "dm/third_party/ryujinx/src/Ryujinx.Graphics.Shader/Instructions/InstEmitAmpereTensor.cs": "fa9ad4e5fe4b89246d2d8cb83d8c271b05dc6670606f0a479b173a6e3b23d5e5"
+  },
+  "originals": {
+    "dm/gfx/tools/dmsh_build.py": "efe6f5c655d14d8378a2a8b1a1b1b5ecda6d5e0ca3d7c228f6e07e5f688f44ea",
+    "dm/gfx/tools/dmsh_meshstage.py": "1f13da2792f2276131353604c2b1b2f13966032eea2cab22dec7471a4360285b",
+    "dm/gfx/tests/test_dmsh_meshstage.py": "a9deec06e7ddee7864ad1cd22518fb8b247aacd6c3c00f41f2ed4ba39be5d8f6",
+    "dm/gfx/tests/test_dmsh_hmma.py": "09d9773c1519ee2ac32d7907a227200a4f5bc7c1e6637e243909dfe4f2fce96c",
+    "dm/gfx/tools/dmsh_chain.lock": "7f5271a390fa128aaa31d8116b99d4e53df35927cb1b7f15c2a6e5cf32580adf",
+    "dm/gfx/tools/dmsh_xlate_bin/Ryujinx.Common.dll": "f8e7fc00c9e7585979f5915698c1ca70d0852f9eb9902e3c27fd412855ce9d54",
+    "dm/gfx/tools/dmsh_xlate_bin/Ryujinx.Graphics.Shader.dll": "49eae1cefcaa15b897c37a60926d9c6a94307e52b221488dce64d7bca71385c1",
+    "dm/gfx/tools/dmsh_xlate_bin/Spv.Generator.dll": "2efa492843b80bf524c3b1415a3e792189f77d76a36355458e201c4a3a1f65e9",
+    "dm/gfx/tools/dmsh_xlate_bin/dmsh_xlate.dll": "05a743916a64e9dd9dfe1c7813c94356141fe27a7fd9f78dd662fadb4f985ebf",
+    "dm/gfx/tools/dmsh_xlate_bin/dmsh_xlate.pdb": "e734cd0f66a768a3326413a5dfcb4d2013b20062504c73302b66f03a26b67f91",
+    "dm/third_party/ryujinx/src/Ryujinx.Graphics.Shader/Instructions/InstEmitAmpereMem.cs": "21ed4a4ed2b220a0cb20a7a48226e7b982d2fd3263c598440658b3867de20429",
+    "dm/third_party/ryujinx/src/Ryujinx.Graphics.Shader/Instructions/InstEmitAmpereTensor.cs": "b59b3c5ffeeeca7622d6fe90c07af5a8c7de1416875734f98ba1e31ecdf39f8d"
+  },
+  "expected_chain": "07ebbab64578"
+}
