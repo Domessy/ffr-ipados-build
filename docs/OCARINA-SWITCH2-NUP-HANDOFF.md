@@ -235,3 +235,19 @@ Un essai **sans nouvelle compilation et sans installation** est préparé sur l'
 - Les défauts graphiques restent attendus avec cette IPA originale : le test immédiat évalue la mémoire, pas les corrections `graphics-v2` fusionnées dans les outils.
 
 Un enregistrement syslog privé borné à 240 s a été démarré localement pour cet essai ; sa fin ne démontre pas que le jeu a été lancé ni qu'un test a eu lieu. Le `log.txt` du conteneur OOT2 reste la source principale à récupérer après le retour utilisateur. Aucun log brut ni identifiant de conteneur n'est ajouté à GitHub.
+
+### Résultat iPad du test guest-file — 07/11/2026
+
+Retour utilisateur : **2–3 minutes ingame sans crash**, avec baisses de framerate et glitchs persistants. Lecture USB du journal courant, sauvegardé localement sous `resultats/ipad-audit-20261107/guest-file-live-log.txt` (451 368 octets au prélèvement), confirme `boot: env DM_GUEST_FILE=1 (env.txt)` et `guest memory ... DM_GUEST_FILE 1: in files`. Pas de changement d'IPA, chaîne originale et défauts graphiques encore présents.
+
+Mesures extraites (`guest-file-summary.json`, privé) :
+
+- 25 échantillons de la mesure historique `memory up to frame` = **phys_footprint**, pas RSS ; maximum échantillonné **5 181 Mio = 5,06 Gio**, dernier échantillon **3 978 Mio = 3,88 Gio** ; l'autre mesure guest-file finit à 3,86 Gio. Avant : maximum échantillonné 9 913 Mio = 9,68 Gio. Diminution du maximum observé d'environ **48 %** ; parcours et état des caches non strictement contrôlés, donc ce n'est pas un benchmark isolé reproductible à 48 % garanti ;
+- dernier temps de frame visible **232,64 s** depuis le démarrage du host, frame 10 675 ; confirme une session plus longue que le journal initial (~116 s), sans transformer ce temps de host en durée exacte de déplacement ingame ;
+- zéro ligne `GPU out of memory:` et zéro `XPC_ERROR_CONNECTION_INTERRUPTED` dans ce prélèvement ; le retour utilisateur confirme l'absence de crash jusqu'à son message, pas la stabilité prolongée ;
+- Metal alloué reste élevé : maximum **16 374 Mio**, dernier **15 172 Mio**. Le mode fichiers ne corrige pas cette allocation et ces chiffres ne sont pas du RSS additionnable au footprint ;
+- fichiers guest : 13 fichiers sparse, 12,50 Gio de longueur virtuelle totale ; **7,13 Gio de blocs réellement alloués** en fin de prélèvement ; volume APFS du processus : **38,5 Gio libres initialement, 31,5 Gio ensuite**, garde-fou de 5 Gio non atteint.
+
+**Correction de l'estimation de stockage précédente :** le chiffre `com.apple.disk_usage TotalDataAvailable` de ~207,6 Gio n'est pas la capacité immédiatement disponible observée par `statfs` dans l'app. La mesure du volume vue par le processus (38,5 → 31,5 Gio ici) prime pour le budget de ce test ; ne pas présenter les ~208 Gio comme marge réellement disponible aux fichiers guest. L'écart de méthodes est constaté, son origine exacte (espace récupérable/réservations/comptabilité) n'est pas établie.
+
+Conclusion vérifiable : le choix de mémoire guest anonyme contribuait fortement à l'empreinte comptabilisée ; l'adossement à des fichiers réduit nettement cette empreinte et l'essai dépasse la durée du premier journal. Il ne démontre pas une disparition définitive du Jetsam. Les framerates et glitchs persistants restent distincts : les captures appellent toujours les corrections de shaders de `graphics-v2`, et les deux correctifs Metal restent pertinents. Aucun nouveau build IPA lancé lors de ce point de mesure. Configuration d'essai laissée active, retrait selon la procédure précédente ; aucun autre changement sur l'iPad.
