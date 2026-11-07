@@ -768,7 +768,7 @@ index 112b8ff5..25ff859c 100644
  int nvn_ft_tracked(uint64_t serial);
  int nvn_tex_mirror_b2t(const tex_t *t, unsigned level, unsigned layer0, const NVNcopyRegion *r, const uint8_t *src, size_t row, size_t img);
 diff --git a/dm/gfx/tests/t_cpu_storage.m b/dm/gfx/tests/t_cpu_storage.m
-index 9615863d..94a2d062 100644
+index 9615863d..5aa27805 100644
 --- a/dm/gfx/tests/t_cpu_storage.m
 +++ b/dm/gfx/tests/t_cpu_storage.m
 @@ -1,6 +1,7 @@
@@ -806,7 +806,7 @@ index 9615863d..94a2d062 100644
  }
  static uint8_t first_red(id<MTLTexture> image) {   // the red of texel (3, 5), read through a blit: the texture is private
      static id<MTLCommandQueue> queue; if (!queue) queue = [g_dev newCommandQueue];
-@@ -28,16 +37,31 @@ static uint8_t first_red(id<MTLTexture> image) {   // the red of texel (3, 5), r
+@@ -28,19 +37,68 @@ static uint8_t first_red(id<MTLTexture> image) {   // the red of texel (3, 5), r
  }
  static id<MTLTexture> resolve(tex_t *t) { mtl_sub_begin(); id<MTLTexture> image = tex_mtl(t); CHECK("texture resolves", image != nil); finish(); return image; }
  typedef struct { void *mem; pool_t pool; tex_t t; } fixture;
@@ -842,8 +842,46 @@ index 9615863d..94a2d062 100644
 -static void teardown(fixture *f) { mtl_tex_release(&f->t); mtl_alias_drop_pool(&f->pool); mtl_pool_del(f->mem); mtl_drain(); free(f->mem); }
  static const uint32_t CACHED = NVN_MEMORY_POOL_FLAGS_CPU_CACHED | NVN_MEMORY_POOL_FLAGS_GPU_CACHED;
  
- int main(void) {
-@@ -50,17 +74,87 @@ int main(void) {
+-int main(void) {
++// CPU ownership regression: runs even on CI's GPU without Metal 4. This tests
++// the real range tracker and dirty-page faults, without creating any GPU object.
++static int ownership_only(void) {
++    void crash_install(void); crash_install();
++    size_t pg = (size_t)getpagesize(), len = 8 * pg;
++    uint8_t *mem = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
++    CHECK("ownership fixture maps", mem != MAP_FAILED);
++    if (mem == MAP_FAILED) return 1;
++    nvn_dirty_add_range(mem, len);
++    pool_t pool = {.magic = MAGIC('P', 'O', 'O', 'L'), .mem = mem, .size = len, .flags = CACHED};
++    tex_t t = {.pool = &pool, .mem = mem + pg, .L.size = 2 * pg};
++    uintptr_t base = (uintptr_t)mem;
++    CHECK("untouched storage is CPU-readable", !gws_owned(base, base + len));
++    mtl_tex_gpu_written(&t);
++    CHECK("written texture is GPU-owned", gws_owned(base + pg, base + 3 * pg));
++    CHECK("a neighbour in the same pool stays CPU-owned", !gws_owned(base + 4 * pg, base + 5 * pg));
++    mem[pg] = 7;  // a real protected-page fault; no fake dirty-generation update
++    CHECK("CPU rewrite is seen", !gws_owned(base + pg, base + 2 * pg));
++    tex_t second = {.pool = &pool, .mem = mem + 2 * pg, .L.size = pg};
++    mtl_tex_gpu_written(&second);
++    CHECK("overlapping GPU write owns its own page", gws_owned(base + 2 * pg, base + 3 * pg));
++    CHECK("overlap keeps the CPU-rewritten outside part", !gws_owned(base + pg, base + 2 * pg));
++    mtl_tex_gpu_written(&t);
++    CHECK("new GPU write takes the texture back", gws_owned(base + pg, base + 3 * pg));
++    gws_drop_pool(&pool);
++    CHECK("pool release drops its ownership spans", !gws_owned(base, base + len));
++    pool.flags |= NVN_MEMORY_POOL_FLAGS_VIRTUAL;
++    mtl_tex_gpu_written(&t);
++    CHECK("virtual pools do not acquire CPU ownership spans", !gws_owned(base, base + len));
++    nvn_dirty_remove_range(mem); munmap(mem, len);
++    printf("t_cpu_storage ownership-only: %d checks, %d failed; no GPU execution\n", checks, failed);
++    return failed != 0;
++}
++int main(int argc, const char **argv) {
++    if (argc > 1 && !strcmp(argv[1], "--ownership-only")) return ownership_only();
+     @autoreleasepool {
+         mtl_init();
+         fixture f;
+@@ -50,17 +108,87 @@ int main(void) {
          CHECK("at first use the storage is the content", first_red(resolve(&f.t)) == 40);
          dm_guest_write_prepare(f.mem, f.t.L.size); fill(&f.t, f.mem, 80);
          CHECK("a later CPU write is uploaded", first_red(resolve(&f.t)) == 80);
@@ -859,15 +897,15 @@ index 9615863d..94a2d062 100644
          setup(&f, 7002, CACHED, NVN_FORMAT_RGBA8, 0);
 -        mtl_pool_gpu_written(&f.pool);
 +        mtl_tex_gpu_written(&f.t);
-         fill(&f.t, f.mem, 40);
--        CHECK("in a pool the GPU writes it is not taken from storage", !tex_cpu_content(&f.t));
++        fill(&f.t, f.mem, 40);
 +        CHECK("over storage the GPU writes it is not taken from storage", !tex_cpu_content(&f.t));
 +        teardown(&f);
 +
 +        setup(&f, 7004, CACHED, NVN_FORMAT_RGBA8, 0);
 +        tex_t target = texture_at(&f, 7005, 0x40000, SIZE, NVN_FORMAT_RGBA8, 0);
 +        mtl_tex_gpu_written(&target);
-+        fill(&f.t, f.mem, 40);
+         fill(&f.t, f.mem, 40);
+-        CHECK("in a pool the GPU writes it is not taken from storage", !tex_cpu_content(&f.t));
 +        CHECK("beside storage the GPU writes, in the same pool, it is taken from storage", tex_cpu_content(&f.t));
 +        teardown(&f);
 +
