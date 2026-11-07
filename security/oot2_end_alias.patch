@@ -1,0 +1,20 @@
+diff --git a/dm/gfx/nvn/nvn_mtl.m b/dm/gfx/nvn/nvn_mtl.m
+index 83ae99a2..da75c8cb 100644
+--- a/dm/gfx/nvn/nvn_mtl.m
++++ b/dm/gfx/nvn/nvn_mtl.m
+@@ -1010,9 +1010,14 @@ static void img_fit_upgrade(void); static int g_imfit_npend;   // textures an im
+ static int g_last_end_relaxed, g_game_barrier;   // the last encoder ended was a draw pass with the relaxed end barrier (nothing else since); the game issued nvnCommandBufferBarrier since the last draw pass began
+ static uint64_t g_bar_skip, g_bar_full;            // draw passes begun without / with the consumer barrier (DM_NVN_BARRIER=game)
+ static void gp_end(id e);
++// Backport of seedds/nxnative 5b84d37edbd60e92695eeb0a0015b793a90f5020 (#1556),
++// without its allocator-profiling code. Every consumer keeps its alias barrier;
++// aliased blits keep their producer barrier too. DM_NVN_END_ALIAS=1 restores it.
++static int sw_mode(const char *name, int dflt); static inline int sw_on(int m);
+ static inline void m4_end(id e) {
+     gp_end(e);
+-    MTL4VisibilityOptions vis = e == g_blit ? blit_vis() : resource_vis(); if (e == g_blit) g_blit_alias = 0;
++    static int end_alias = -1; if (end_alias < 0) end_alias = sw_mode("DM_NVN_END_ALIAS", 0);
++    MTL4VisibilityOptions vis = e == g_blit && g_blit_alias ? blit_vis() : end_alias && sw_on(end_alias) ? resource_vis() : MTL4VisibilityOptionDevice; if (e == g_blit) g_blit_alias = 0;
+     if ([e conformsToProtocol:@protocol(MTL4CommandEncoder)]) [(id<MTL4CommandEncoder>)e barrierAfterStages:MTLStageAll beforeQueueStages:MTLStageAll visibilityOptions:vis];
+     [e endEncoding]; g_last_end_relaxed = 0;
+ }

@@ -1,6 +1,6 @@
 # The Legend of Zelda: Ocarina of Time — Switch 2 NUP → IPA iPadOS
 
-État au 06/11/2026 : NUP utilisateur inspecté **localement par l’utilisateur** (en-tête et TOC seulement), aucune donnée du jeu ni clé transférée à GitHub, IPA non construite. Les tests synthétiques du pipeline initial ont réussi ; correctif de compatibilité standalone fusionné (PR #23, commit `409e38d`), validation locale du NUP réussie. Aucun lancement automatique sur l’iPad.
+État historique au 06/11/2026 (supersédé par la reprise du 07/11 en fin de document) : NUP utilisateur inspecté **localement par l’utilisateur** (en-tête et TOC seulement), aucune donnée du jeu ni clé transférée à GitHub, IPA non construite. Les tests synthétiques du pipeline initial ont réussi ; correctif de compatibilité standalone fusionné (PR #23, commit `409e38d`), validation locale du NUP réussie. Aucun lancement automatique sur l’iPad.
 
 ## Entrées confirmées
 
@@ -98,3 +98,97 @@ Run GitHub Actions [#42284986467](https://github.com/Domessy/ffr-ipados-build/ac
 Le correctif de fermeture du `mmap` du NUP a été validé sur des fixtures synthétiques Linux/macOS (PR #26), mais un vrai run `mode=build` n'avait pas encore confirmé son application au code complet nxnative. La suite de tests OOT2 télécharge désormais, **sans données privées**, le commit amont strictement épinglé `seedds/nxnative@c229bd7d52e30f072362e31c7b1e3206d107d4cd`, applique `security/oot2_patch_nup_release.py` dans une copie éphémère puis vérifie la syntaxe, le point d'insertion et l'ordre fermeture du mapping/suppression de la copie. Le test est exécuté sur Linux et macOS. Ce smoke test ne mesure pas le gain disque réel, qui reste à constater sur une prochaine compilation.
 
 Le workflow de production demeure limité à un lancement explicite `workflow_dispatch` ; aucun déclenchement automatique par push n'est ajouté à `main`. Les clés et le NUP restent exclusivement sur CachyOS tant que `mode=build` n'est pas lancé.
+
+## Reprise mémoire et graphique du 07/11/2026 — audit et expérimentation
+
+### État réel et conservation
+
+Le handoff local `HANDOFF_WORK_OOT2_IPADOS_JETSAM_2026-11-07.md` et le retour utilisateur établissent que l'IPA du run [42364126574](https://github.com/Domessy/ffr-ipados-build/actions/runs/42364126574), pipeline `d1b919f1064912f1c07702c7f068f4992424152a`, atteint introduction, chargement et déplacement sur iPad. Des anomalies graphiques puis un Jetsam restent ouverts. Le run 42344930333 avait réussi la compilation mais pas le retour SSH complet. Aucun nouveau build IPA n'a été lancé pendant cet audit.
+
+Les sources et clés sous `/home/syssy/Documents/The Legend of Zelda Ocarina of TIme/`, le cache sous `/home/syssy/portage-ipados/oot-switch2/shader-cache/` et l'IPA sous `resultats/` n'ont pas été modifiés. Travail isolé : `audit-pipeline/` (branche `fix/oot2-ipados-memory-20261107`), `audit-nxnative/` (amont observé), `audit-pinned/` (copie de test patchée). Le checkout historique `ff-resonance/github-build` demeure à son ancien état ; ne pas le réinitialiser brutalement.
+
+### Évidence directe, limites de mesure
+
+Le rapport local `/home/syssy/Téléchargements/JetsamEvent-2026-11-07-175241.ips` est relu par `security/oot2_memory_report.py --jetsam` :
+
+- pages de 16 384 octets ; LiveContainer `vm-pageshortage`, actif au premier plan, 613 605 pages = **9 587,578 Mio / 9,363 Gio résidents** ; maximum 9 597,563 Mio ; pages libres 8 599 = **134,359 Mio** ;
+- six MTLCompilerService = **817,844 Mio résidents cumulés**, cinq `highwater`, un `proc-thrashing` ; les processus du rapport ne forment pas nécessairement une photographie simultanée permettant de reconstituer toute la RAM ;
+- preuve de pression système, pas preuve d'une fuite, d'une limite d'entitlement atteinte ou d'une cause shader unique. Le RSS n'est pas le heap guest ; une allocation Metal peut couvrir des alias et n'est pas une consommation physique supplémentaire indépendante.
+
+L'iPad a ensuite été connecté par l'utilisateur. Lecture USB : `iPad17,1`, iPadOS `27.0.1`, build `24A446`. Les métadonnées InstallationProxy de l'hôte **LiveContainer** indiquent `com.apple.developer.kernel.increased-memory-limit=true`, `get-task-allow=true`, extended-virtual-addressing absent. L'autre hôte LiveContainer2 n'a pas l'autorisation increased-memory-limit. Cela vérifie les métadonnées d'installation, pas le provisioning signé extrait ni une mesure du plafond effectif. Aucun changement d'entitlement n'a été effectué ; une autorisation ne crée pas de RAM physique.
+
+Le conteneur de l'hôte est monté **en lecture seule** pendant l'audit ; `LCAppInfo.plist` identifie le répertoire de données OOT2. Seuls les diagnostics sont copiés dans `resultats/ipad-audit-20261107/`, privés hors Git. Ne pas publier `apps-private.json` (inventaire d'applications et identifiants). Le journal récupéré est le plus récent présent, **sa correspondance exacte avec l'incident Jetsam fourni n'est pas prouvée**, faute d'identifiant d'incident dans le log.
+
+Journal : commit `c229bd7d52e3+dirty`, chaîne `23a1ea1db092`, GPU Apple M5 ; mémoire guest **anonyme**, `DM_GUEST_FILE unset`, pool virtuel 9 Gio, marge initiale 11,96 Gio. L'activation automatique des fichiers guest ne s'est donc pas produite ici.
+
+| Frame | Valeur « resident » du log, en fait phys_footprint (Mio) | Metal currentAllocatedSize (Mio) |
+|---|---:|---:|
+| 300 | 3 634 | 2 682 |
+| 600 | 4 685 | 2 800 |
+| 900 | 9 913 | 11 818 |
+| 1200 | 9 831 | 15 725 |
+
+À frame 1200 : résidence explicitement déclarée 5 510 Mio / 6 672 objets ; 4 284 pools résidents ; file de libération différée 2 ; à frame 1500 résidence 5 492 Mio. Dernier temps de frame visible ~116 s. **Le mot resident est trompeur dans cette version : `hle_nvn.c` transmet `vi.phys_footprint` à `mtl_mem_stat`.** La télémétrie ajoutée distingue RSS et footprint. Il n'y a aucune justification à additionner footprint, Metal alloué et ensemble résident. L'écart Metal alloué / ensemble résident oriente vers les allocateurs de commandes, pipelines et autres allocations hors ensemble, sans attribuer à ce stade tout l'écart à une seule classe.
+
+Le journal contient aussi `task / mesh pipeline` en échec après 10 545,8 ms : `XPC_ERROR_CONNECTION_INTERRUPTED` (plusieurs tentatives), mesh `4c7d6be5a7717c8d`, fragment `4b825abdc0916973`. Piste réelle d'éléments de végétation mal rendus, sans capture prouvant le lien avec l'anomalie utilisateur. Les quatre refus AV1 « 12 pictures waiting » ne prouvent pas un défaut de décodage : le code réessaie quand la file est pleine.
+
+### Diff amont précis et décisions
+
+Point d'audit `seedds/nxnative@bd979ced3ae6bad60bf86429a71d172297d93471` : **82 commits** après le pin, 234 fichiers modifiés, 132 606 ajouts / 6 678 suppressions. `game.tsv` OOT2 est inchangé. Chaîne shaders : `23a1ea1db092` → `3ee52af3ca18`. **Le pin de production reste `c229bd7d52e30f072362e31c7b1e3206d107d4cd`** ; passer globalement à main changerait la chaîne et pourrait reconstruire les 42 854 shaders et leurs variantes. Les grands nombres de lignes incluent des tables ; ce n'est pas 132 606 lignes de moteur.
+
+Comparaison reproductible : [pin…point d'audit](https://github.com/seedds/nxnative/compare/c229bd7d52e30f072362e31c7b1e3206d107d4cd...bd979ced3ae6bad60bf86429a71d172297d93471).
+
+| Correction vérifiée dans le code / la discussion | Présence au pin ; décision |
+|---|---|
+| [863bc6b789733f8cfb4d9d1488a1e921e17d1417 / #1557](https://github.com/seedds/nxnative/commit/863bc6b789733f8cfb4d9d1488a1e921e17d1417) : familles de résolution pour `COMPRESSIBLE` sans `IMAGE` | Absente. **Rétroportage ciblé** de `image_shape`, sans le recensement détaillé ajouté par le commit. Les tailles successives de profondeur peuvent partager le heap existant au même pool/offset/format. Exclusions display, vidéo, linéaire, sparse ; protections 2D/1 mip/1 échantillon conservées. Amont : 15–16 textures de 14,5 Mo au même offset ; gain GPU observé ~190 Mo dans l'ancienne pile Mac, non prédit pour l'iPad. Risque : alias de profondeur, synchronisation et tailles à valider sur GPU. |
+| [5b84d37edbd60e92695eeb0a0015b793a90f5020 / #1556](https://github.com/seedds/nxnative/commit/5b84d37edbd60e92695eeb0a0015b793a90f5020) : fin d'encodeur au point de cohérence device | Absente. **Rétroportage du changement de visibilité uniquement**, sans remplacer les allocateurs pour les profiler. Les barrières d'entrée gardent l'alias flush ; les copies aliasées gardent aussi celui de sortie ; la voie de passes relâchées reste intacte. Amont : 600 passes, 88,5 → 27,7 Mo de commandes ; 8 allocateurs conservaient chacun 36–80 Mo sur le parcours. Piste particulièrement pertinente pour notre écart allocation/résidence, mais gain iPad non mesuré. `DM_NVN_END_ALIAS=1` rétablit les barrières de fin si les diagnostics de la version l'autorisent ; baseline est le retour arrière fiable. |
+| [f25fa9562ee96d06f1e6412dbb91aab2b7035ec1 / #1484](https://github.com/seedds/nxnative/commit/f25fa9562ee96d06f1e6412dbb91aab2b7035ec1) : lookup shader sans résidence | Absente ; non sélectionnée en premier. La PR est fermée **sans merge GitHub**, mais la correction remaniée est intégrée dans ce commit. Le mainteneur mesure **aucun gain OOT2 isolé** (table raw gmem remettant les pools en résidence). Les « 334 Mo » venaient d'une pile de changements : ne plus promettre ce gain. |
+| [#1453](https://github.com/seedds/nxnative/pull/1453), head `28cfdafa9ad3cf1bda9749400d7c6c397c130902` : heap par pool GPU-only | PR ouverte, absente de main observé ; gain récent ~1 % en scène fixe, pas les anciens 2–3 Go. Laisse les pools virtuels hors de ce chemin ; notre depth buffer bénéficie donc plutôt de #1557. Écart de layout NVN/Metal et alias imposent des tests GPU ; différée. |
+| [#1588](https://github.com/seedds/nxnative/pull/1588), head `4b231acf1bfee4f8929bc2f494e9bb75c3f70253` : cibles mortes par écrasement | PR ouverte, opt-in. Mac : RT 3,5 → 1,1–1,2 Go dans une pile donnée ; aucun test unitaire de reclaim dans la PR et exclusions nombreuses. Pas intégrée à l'aveugle. |
+| [#1492](https://github.com/seedds/nxnative/pull/1492), head `f6fc93eb0feb1d12dfda9d96ff24270c1e3cf174` : trous dans les fichiers guest et contrôle disque | PR ouverte. Traite surtout blocs disque / pages dirty des fichiers guest. Notre log est en mémoire anonyme ; ce n'est pas le premier correctif de notre arrêt. Forcer `DM_GUEST_FILE=1` déplace une partie de la pression vers APFS sans corriger les duplications GPU, demande un essai indépendant et un budget disque. Aucune activation ici. |
+| [#1486](https://github.com/seedds/nxnative/pull/1486) : arrêt à la première erreur GPU OOM iOS | PR ouverte. Réduit les suites d'erreurs/paniques après OOM GPU, pas l'empreinte et pas un correctif Jetsam ; non assimilée à une réussite. |
+| [#1436](https://github.com/seedds/nxnative/pull/1436) : poolstat/texstat | PR ouverte ; diagnostic utile mais pas correctif. Le rapport externe de 8 259/8 192 Mo concerne un autre iPad et une autre pile ; notre événement est une pénurie système, pas une erreur Metal explicite. |
+| [e2b76d4e / #1604](https://github.com/seedds/nxnative/commit/e2b76d4e), [b547f1e2 / #1558](https://github.com/seedds/nxnative/commit/b547f1e2), [d4c11e2b](https://github.com/seedds/nxnative/commit/d4c11e2b) : écritures CPU de terrain | Absentes. Le profil active déjà dirty/flush upload, mais la règle au niveau pool et le test d'usage du host peuvent écarter des réécritures valides. #1558 dépend du suivi d'intervalles de #1604 ; des écritures voisines partageant une page ont ensuite exigé d4c11e2b. À rétroporter comme ensemble cohérent après identification visuelle, pas en copiant isolément une ligne. |
+| [0e4480d2 / #1607](https://github.com/seedds/nxnative/commit/0e4480d2), [fa9cfb84 / #1644](https://github.com/seedds/nxnative/commit/fa9cfb84) | Absentes ; vues de texture périmées et durée de résidence des textures encore détenues. Correctifs de page faults / durée de vie, pas preuve de fuite ; importants avant intégration de la série CPU terrain. |
+| [d365496d / #1575](https://github.com/seedds/nxnative/commit/d365496d), [16776913 / #1376](https://github.com/seedds/nxnative/commit/16776913), [e5f1adee / #1673](https://github.com/seedds/nxnative/commit/e5f1adee), [30fb2136 / #1307](https://github.com/seedds/nxnative/commit/30fb2136) | Absentes. Respectivement débordement mesh, barrières LDSM upscaler, invariance de position végétation, archives compute. Changent les outils/chaîne ou les artefacts de compilation. À isoler après mesures ; conserver les anciens caches. Le pin contient déjà les corrections plus anciennes float atomics, gather et HMMA mentionnées dans son README ; ne pas les annoncer comme nouvelles. |
+
+Source Apple : [recommendedMaxWorkingSetSize](https://developer.apple.com/documentation/metal/mtldevice/recommendedmaxworkingsetsize) est une **approximation de budget performant**, pas une preuve universelle de plafond dur à 8 Go. [currentAllocatedSize](https://developer.apple.com/documentation/metal/mtldevice/currentallocatedsize) décrit les ressources allouées du device, pas du RSS additionnable à la RAM guest.
+
+Le [message X S2ARM](https://x.com/happyjoejiang/status/2118623895305777222) renvoie 403 via la consultation disponible. Aucun contenu primaire vérifiable ni code de ce moteur obtenu ; aucun chiffre de gain repris comme mesure comparable, aucun moteur tiers intégré. Cette piste reste non auditée.
+
+### Modifications préparées et contraintes de validation
+
+`security/oot2_patch_runtime.py` vérifie le SHA Git exact **et** le SHA-256 intégral de `nvn_mtl.m` avant application atomique de patchs versionnés. Une source différente ou déjà patchée est refusée. Trois variantes proposées à `workflow_dispatch` :
+
+- `baseline` (défaut) : télémétrie seule, règles de résidence et barrières originales ;
+- `depth` : télémétrie + famille de profondeur #1557 ;
+- `memory-v1` : télémétrie + famille de profondeur + barrières #1556.
+
+Toutes conservent le profil et la chaîne shaders. Les correctifs sont appliqués dans le checkout éphémère **avant tout transfert privé**. Le patch NUP/disque existant reste indépendant. Aucun workflow coûteux n'est déclenché par push/PR : seul un smoke test de compilation des sources iOS est ajouté, limité à 15 minutes, sans jeu ni shaders traduits du jeu, sans IPA, sans signature. Le compilateur compile les petits shaders propres au host requis par ses en-têtes ; ce n'est pas la reconstruction des 42 854 shaders.
+
+Télémétrie `[oot2-mem]` : à chaque appel de mesure existant (300 frames), 240 échantillons maximum, RSS, footprint, Metal alloué, budget recommandé, marge processus, internal/compressed, temps monotone. Aucun parcours de ressources ni attente GPU ajouté. Le temps est celui de l'horloge monotone et doit être ramené au premier échantillon ; ce n'est pas une date. Ne couvre pas les pics entre échantillons, ni la phase avant les premières frames, ni les MTLCompilerService d'autres processus. Le diagnostic antérieur reste présent. Le parseur convertit correctement le champ « resident » historique en footprint ; il ne rebaptise pas un ancien log en RSS.
+
+Validation locale initiale : 42 tests synthétiques pipeline existants réussis ; smoke `oot2_runtime_smoke.py` réussi pour les 3 variantes sur le code réellement épinglé. Il compile/exécute la fonction `image_shape` extraite, avec les constantes NVN réelles, cas depth, display/vidéo/linéaire/sparse, layout, mip, profondeur, samples et stride ; vérifie application unique et maintien des barrières d'entrée. **Ce n'est pas un test d'aliasing Metal sur GPU.** Les tests du parseur et la compilation iOS sont ajoutés à la CI ; résultats définitifs à consigner après exécution. La variante baseline demeure la valeur par défaut tant que les tests GPU et la comparaison iPad manquent.
+
+### Protocole iPad et retour arrière
+
+1. Conserver IPA installée, cache et sauvegardes. Archiver le `log.txt` avant chaque relancement (l'app fait tourner ses logs). Ne pas effacer les caches système ou les données du jeu pour « nettoyer » les chiffres.
+2. Après compilation iOS du candidat réussie et inspection de la PR, préparer **une seule IPA expérimentale** `memory-v1` avec le cache existant ; pas de build effectué ici. Vérifier l'IPA ZIP et son hash avant remplacement. Signer/installer manuellement ; aucune installation automatique pendant l'audit.
+3. Même sauvegarde et parcours : titre 30 s, chargement, maison, forêt ; rester immobile 30 s puis marche + caméra 60 s ; si stable, 5 min puis 15 min, changements de zone, retour et sauvegarde/chargement. Relever les temps réels ; ne pas appeler « stable » une minute sans crash.
+4. Collecter `Documents/log.txt` du **conteneur OOT2**, et JetsamEvent si arrêt. Photographier/capturer le même endroit à mêmes réglages : terrain/trous bleus, végétation blanche, lignes horizontales, luminosité/upscaler, UI. Séparer défaut permanent, défaut au chargement et défaut après mouvement. Le message de pipeline interrompu doit être corrélé à la scène.
+5. Mesurer pic RSS et footprint échantillonnés, changement après chargement, pente sur scène fixe/marche, Metal alloué et ensemble résident séparément, nombre d'erreurs de compilation, durée avant arrêt. Un second passage à cache chaud sans supprimer l'ancien cache distingue les compilations à froid d'une croissance persistante.
+6. En cas de régression, revenir à l'IPA originale conservée. Pour attribution, comparer `baseline`, puis `depth`, puis `memory-v1` seulement si le gain justifie le coût des builds. Revenir au commit `d1b919f` restaure intégralement le pipeline antérieur ; pas de réduction arbitraire de `app_pool`, `mem_reserve` ou alias. Ne pas supprimer le dossier entier contenant les caches pour restaurer du code.
+
+Les trois commandes Linux suivantes gardent le brut local. La première reste active pendant le parcours et s'arrête avec Ctrl-C ; les deux autres s'exécutent ensuite. Les stderr nxnative sont parfois exclusivement dans `log.txt` : l'absence de lignes dans syslog n'est donc **pas** une absence de consommation. Dans ce cas, utiliser le `log.txt` récupéré comme entrée du parseur.
+
+```bash
+umask 077; mkdir -p "$HOME/portage-ipados/oot-switch2/resultats/ipad-test-memory-v1"; idevicesyslog > "$HOME/portage-ipados/oot-switch2/resultats/ipad-test-memory-v1/syslog-private.txt" 2>&1
+```
+```bash
+rg -i '\[oot2-mem\]|memory up to frame|residency set up to frame|GPU out of memory|vm-pageshortage|MTLCompilerService|XPC_ERROR_CONNECTION_INTERRUPTED' "$HOME/portage-ipados/oot-switch2/resultats/ipad-test-memory-v1/syslog-private.txt" > "$HOME/portage-ipados/oot-switch2/resultats/ipad-test-memory-v1/diagnostic.txt"
+```
+```bash
+python3 "$HOME/portage-ipados/oot-switch2/audit-pipeline/security/oot2_memory_report.py" "$HOME/portage-ipados/oot-switch2/resultats/ipad-test-memory-v1/diagnostic.txt"
+```
+
+Critères non atteints à cette étape : baisse mesurée sur iPad, disparition du Jetsam, correction visuelle démontrée, session prolongée, sauvegarde/rechargement validés sur candidat. Les tests de code ne remplacent pas ces mesures.
