@@ -1,0 +1,5 @@
+One-time user-authorized OOT2 build recovery, 2026-11-07.
+Pinned nxnative: c229bd7d52e30f072362e31c7b1e3206d107d4cd.
+SQLite shader checkpoints restored privately from CachyOS.
+The runner-only NUP is closed and removed after full extraction.
+Never add game data or keys to this repository.
