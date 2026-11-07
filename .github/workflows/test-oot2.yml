@@ -9,6 +9,7 @@ on:
       - '.github/workflows/test-oot2.yml'
       - 'security/oot2_*.py'
       - 'security/oot2_*.patch'
+      - 'security/oot2_graphics_manifest.json'
       - 'security/test_oot2_*.py'
       - 'security/run_oot2.py'
       - 'security/setup_oot2.sh'
@@ -21,6 +22,7 @@ on:
       - '.github/workflows/test-oot2.yml'
       - 'security/oot2_*.py'
       - 'security/oot2_*.patch'
+      - 'security/oot2_graphics_manifest.json'
       - 'security/test_oot2_*.py'
       - 'security/run_oot2.py'
       - 'security/setup_oot2.sh'
@@ -60,6 +62,10 @@ jobs:
           git -C "$SMOKE" checkout -q --detach FETCH_HEAD
           test "$(git -C "$SMOKE" rev-parse HEAD)" = "$UPSTREAM_SHA"
           python3 security/oot2_runtime_smoke.py "$SMOKE"
+          git -C "$SMOKE" fetch -q --depth 1 origin 167769131235226c739517a0a3e53fce48025b1f
+          python3 security/oot2_patch_graphics.py "$SMOKE"
+          python3 "$SMOKE/dm/gfx/tests/test_dmsh_meshstage.py"
+          python3 "$SMOKE/dm/gfx/tests/test_dmsh_hmma.py" HmmaRewrite
           python3 security/oot2_patch_nup_release.py "$SMOKE/scripts/build_ipa_from_nsp.py"
           python3 -m py_compile "$SMOKE/scripts/build_ipa_from_nsp.py"
           python3 - "$SMOKE/scripts/build_ipa_from_nsp.py" <<'PY'
@@ -101,6 +107,10 @@ jobs:
           git -C "$SMOKE" checkout -q --detach FETCH_HEAD
           test "$(git -C "$SMOKE" rev-parse HEAD)" = "$UPSTREAM_SHA"
           python3 security/oot2_runtime_smoke.py "$SMOKE"
+          git -C "$SMOKE" fetch -q --depth 1 origin 167769131235226c739517a0a3e53fce48025b1f
+          python3 security/oot2_patch_graphics.py "$SMOKE"
+          python3 "$SMOKE/dm/gfx/tests/test_dmsh_meshstage.py"
+          python3 "$SMOKE/dm/gfx/tests/test_dmsh_hmma.py" HmmaRewrite
           python3 security/oot2_patch_nup_release.py "$SMOKE/scripts/build_ipa_from_nsp.py"
           python3 -m py_compile "$SMOKE/scripts/build_ipa_from_nsp.py"
           python3 - "$SMOKE/scripts/build_ipa_from_nsp.py" <<'PY'
@@ -133,6 +143,8 @@ jobs:
           git -C "$RUNNER_TEMP/oot2-compile" remote add origin https://github.com/seedds/nxnative.git
           git -C "$RUNNER_TEMP/oot2-compile" fetch -q --depth 1 origin c229bd7d52e30f072362e31c7b1e3206d107d4cd
           git -C "$RUNNER_TEMP/oot2-compile" checkout -q --detach FETCH_HEAD
+          git -C "$RUNNER_TEMP/oot2-compile" fetch -q --depth 1 origin 167769131235226c739517a0a3e53fce48025b1f
+          python3 security/oot2_patch_graphics.py "$RUNNER_TEMP/oot2-compile"
           python3 security/oot2_patch_runtime.py "$RUNNER_TEMP/oot2-compile" --variant memory-v1
       - name: Compile iOS sources only (no game shaders, no IPA, no signing)
         run: |
@@ -140,4 +152,6 @@ jobs:
           xcodebuild -version
           xcodebuild -downloadComponent MetalToolchain
           python3 "$RUNNER_TEMP/oot2-compile/dm/gfx/tools/own_compilers.py" --check-metal
+          python3 "$RUNNER_TEMP/oot2-compile/dm/gfx/tests/test_dmsh_meshstage.py"
+          python3 "$RUNNER_TEMP/oot2-compile/dm/gfx/tests/test_dmsh_hmma.py"
           python3 "$RUNNER_TEMP/oot2-compile/dm/ios/tools/compile_check.py"
