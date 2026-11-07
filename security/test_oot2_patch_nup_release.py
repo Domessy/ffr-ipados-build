@@ -38,6 +38,8 @@ def main(args=None):
     reader = Nup()
     fam = {"base": None, "updates": [("v131072", True)],
            "dlc": [], "nup": reader}
+    # Simulate the upstream scan_nup path holding a mapped Nup instance.
+    mapped_container = fam['nup']
     dirs = {pkg_ver: work / "oot2-work/extract/v131072"}
     def say(s): pass
     aoc = extract_aoc(nx, keys, repo, work, app, fam, logs)
