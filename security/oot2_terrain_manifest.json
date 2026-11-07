@@ -1,0 +1,19 @@
+{
+  "requires_runtime_variant": "memory-v1",
+  "shader_chain_unchanged": "07ebbab64578",
+  "originals": {
+    "dm/gfx/nvn/hle_nvn.c": "4f81ee7d6cfafd64db40eca8cb5ddf350fe2660a1a1ef459a49c077739cd83e9",
+    "dm/gfx/nvn/nvn_mtl.h": "51385ce2d3f2f89c76805e60c0623247c70d9e42267319f5806e844f47043d53",
+    "dm/gfx/nvn/nvn_mtl.m": "2b1c1ae84d178b4ff50b35e2110e58bfc6991f7ad54ed6e51e1778583f11eb99",
+    "dm/gfx/nvn/nvn_obj.h": "74c343564a87c5d2bac0a5e72481fd4ae095fb121bc36a632df471f8b436e544",
+    "dm/gfx/tests/t_cpu_storage.m": "5e9bc180610e119acf70891ae85a6bea56cd25c6cb0d2f38bf99f44553d00b3f",
+    "dm/gfx/tests/t_cpu_tex.m": "773abf386e0e563d35b93e2626f493205d8f9f8f9167a0e95aa5d87492b5d957"
+  },
+  "upstream_commits": [
+    "e2b76d4e",
+    "b547f1e2",
+    "d4c11e2b",
+    "fa9cfb84",
+    "0e4480d2"
+  ]
+}

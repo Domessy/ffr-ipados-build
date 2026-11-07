@@ -251,3 +251,39 @@ Mesures extraites (`guest-file-summary.json`, privé) :
 **Correction de l'estimation de stockage précédente :** le chiffre `com.apple.disk_usage TotalDataAvailable` de ~207,6 Gio n'est pas la capacité immédiatement disponible observée par `statfs` dans l'app. La mesure du volume vue par le processus (38,5 → 31,5 Gio ici) prime pour le budget de ce test ; ne pas présenter les ~208 Gio comme marge réellement disponible aux fichiers guest. L'écart de méthodes est constaté, son origine exacte (espace récupérable/réservations/comptabilité) n'est pas établie.
 
 Conclusion vérifiable : le choix de mémoire guest anonyme contribuait fortement à l'empreinte comptabilisée ; l'adossement à des fichiers réduit nettement cette empreinte et l'essai dépasse la durée du premier journal. Il ne démontre pas une disparition définitive du Jetsam. Les framerates et glitchs persistants restent distincts : les captures appellent toujours les corrections de shaders de `graphics-v2`, et les deux correctifs Metal restent pertinents. Aucun nouveau build IPA lancé lors de ce point de mesure. Configuration d'essai laissée active, retrait selon la procédure précédente ; aucun autre changement sur l'iPad.
+
+### Terrain absent et session prolongée — 07/11/2026
+
+Nouveau retour utilisateur : pas de crash, jeu plutôt fluide entre des chutes drastiques intermittentes ; lignes à l'écran et sol manquant. Capture privée `E97F4A77-FBAF-4ED6-9372-69760E3E6118.png` inspectée : grands trous bleus à la place du terrain, végétation et objets conservés au-dessus, bandes verticales périodiques ; FPS affiché 59 sur cette seule image. Ce n'est pas une mesure du framerate sur toute la session.
+
+Lecture USB en mode lecture seule, diagnostic privé `resultats/ipad-audit-20261107/terrain-live-log.txt` : 1 432 973 octets au prélèvement, dernier timing frame 36 227 à **783,62 s (~13 min depuis démarrage host)**. Dernière ligne guest-file : **4,14 Gio de footprint, pic de cette comptabilité 5,47 Gio**, **7,17 Gio de fichiers alloués sur APFS**, **31,4 Gio libres**. Le dernier échantillon NVN est 4 183 Mio de footprint / 15 365 Mio Metal alloué. Zéro ligne OOM GPU et zéro interruption du compilateur. Les deux méthodes de comptabilité ne doivent toujours pas être confondues avec du RSS ; pas de preuve de stabilité illimitée.
+
+**Gels de framerate : preuves et limite.** Le journal `longframe` montre notamment :
+
+| Frame / temps host | Temps frame | Pipelines nouveaux / temps compilation | GPU |
+|---|---:|---:|---:|
+| 26 258 / 567,48 s | 7 464,9 ms | 6 / 7 450,1 ms | 27,7 ms |
+| 28 105 / 610,94 s | 6 857,6 ms | 6 / 6 772,0 ms | 29,9 ms |
+| 6 485 / 147,04 s | 4 850,7 ms | 3 / 4 840,2 ms | 21,6 ms |
+| 34 365 / 750,56 s | 4 773,8 ms | 3 / 4 744,8 ms | 25,9 ms |
+| 33 148 / 724,15 s | 22 478,9 ms | 0 / 0 ms | 23,7 ms |
+
+Plusieurs gels sont donc directement corrélés aux compilations PSO synchrones, alors que le GPU met quelques dizaines de ms. Le gel de 22,48 s ne l'est pas (submit+present 278,8 ms, zéro upload enregistré) : blocage CPU/hors compteurs non attribué. Ne pas l'expliquer arbitrairement par le paging APFS, le GPU ou la compilation. Ne pas promettre que les corrections de terrain résoudront tous les gels. Conserver les caches et comparer un deuxième passage sur le même parcours ; toute nouvelle chaîne shader rend une partie des caches PSO de nouveau froide. Les shaders metallib compilés offline et les PSO spécialisés à l'exécution sont des artefacts distincts.
+
+**Candidat `terrain-v3`, ajouté après cette capture.** Il inclut `graphics-v2` et `memory-v1`, conserve le pin du moteur et la chaîne graphique candidate `07ebbab64578`, et rétroporte les corrections host suivantes ensemble :
+
+- `e2b76d4e` / #1604 : propriété GPU suivie par **intervalles de stockage de textures**, plutôt qu'un bit pour tout le pool ; une normal map rendue dans le pool ne rend plus les height/blend/hole maps voisines inéligibles à leur premier upload CPU ;
+- `b547f1e2` / #1558 : les cartes CPU réécrites après première utilisation sont réévaluées suivant la même règle de stockage, plutôt que rejetées parce que Metal leur avait donné l'usage renderTarget ; les réécritures futures restent observées lorsque le GPU possède temporairement les octets ;
+- `d4c11e2b` : hash des portions de texture dans les pages de bord partagées, pour qu'une écriture CPU à côté ne déclenche pas à tort un upload qui écraserait le rendu GPU ;
+- `fa9cfb84` / #1644 : une texture rendue encore référencée par un serial live/finalisé reste résidente après retirement, jusqu'à disparition de sa dernière référence ; le correctif terrain de propriété ne doit pas introduire de page faults GPU ;
+- `0e4480d2` / #1607 : un ID sans texture invalide sa vue mise en cache au lieu de conserver une vue libérée lorsque `nil == nil`.
+
+Patch local `security/oot2_terrain.patch`, six fichiers (quatre sources/headers NVN, deux tests GPU synthétiques), **631 ajouts / 95 suppressions** sur le pin. Deux adaptations de backport sont explicites : conservation de `REC_SNAP` dans CopyBufferToTexture et remplacement du seul appel de propriété (le refactoring `rec_copy` de l'amont n'est pas requis) ; commentaire de lifetime adapté au cache de tables du pin, sans importer l'optimisation de table #1489. Pas de shader traduit ni de profil de jeu modifié par ce lot terrain.
+
+`security/oot2_patch_terrain.py` exige le SHA exact du pin et les SHA-256 des six fichiers **après `memory-v1`** ; application unique et atomique par git apply, avant toute donnée privée. Le manifeste conserve la provenance ; la CI doit vérifier l'empilement complet dans un checkout propre, compiler les sources iOS puis exécuter **`check_t_cpu_storage` et `check_t_cpu_tex --metal`** avec validation Metal. Linux local : 46 tests pipeline toujours réussis, application terrain réussie sur la pile préparée. Les tests GPU et la compilation de ce nouveau lot ne sont pas encore déclarés réussis à ce point.
+
+Protocole du prochain candidat : garder le réglage guest-file qui a permis la session prolongée ; comparer ce même point de vue et le sol après déplacement/changement de zone, les cartes devant se réuploader sans remettre les normal maps à zéro. Tester aussi la réutilisation des textures et un passage prolongé pour les durées de vie GPU. Les bandes restent traitées par le lot shaders déjà préparé. Aucune nouvelle IPA construite pendant ce diagnostic ; aucun réglage supplémentaire modifié sur l'iPad.
+
+Première CI terrain : [run 42401996087](https://github.com/Domessy/ffr-ipados-build/actions/runs/42401996087), head `38f0615118b92e5e10e9538e1b4476e83ed613cc` : Linux/macOS synthétiques et compilation des **261 sources iOS** réussis ; compilation des deux tests de textures réussie, puis exécution refusée par `mtl_init` : **Apple Paravirtual device sans famille GPU Metal 4**. L'échec ne démontre pas une réussite des tests GPU ni une régression du correctif.
+
+Adaptation de validation : le test storage ajoute un mode CPU `--ownership-only`, qui exerce directement les fonctions de production d'intervalles et le vrai suivi de pages protégées : propriété limitée à la texture, voisin dans le même pool non contaminé, faute de page sur réécriture CPU, écrasement GPU partiel préservant l'état des intervalles extérieurs, reprise de propriété GPU, destruction du pool, exclusion des pools virtuels. Le test CPU de classification de `t_cpu_tex` est aussi exécuté. Une sonde de capacité Metal 4 décide si les tests GPU complets peuvent ensuite s'exécuter ; son absence est annoncée explicitement, jamais comptée comme un succès GPU. Aucune voie de production n'est assouplie pour le runner.
