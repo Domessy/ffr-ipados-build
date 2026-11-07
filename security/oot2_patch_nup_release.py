@@ -26,11 +26,11 @@ INJECTION = '''    # OOT2_RUNNER_NUP_RELEASE_V1
         candidate = Path(release)
         valid = (
             runner.is_dir()
-            and candidate == expected
+            and candidate.resolve() == expected
             and not candidate.is_symlink()
             and candidate.is_file()
             and nup is not None
-            and Path(nup) == candidate
+            and Path(nup).resolve() == expected
             and platform == "ios"
             and app == 0x0400486024DEC000
             and pkg_ver == "v131072"
