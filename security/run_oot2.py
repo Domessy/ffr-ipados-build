@@ -159,6 +159,15 @@ def handler(_signum, _frame):
 
 def compile_ipa():
     global active
+    layout = os.environ.get("OOT2_IPA_LAYOUT", "bundle")
+    if layout not in ("bundle", "separate"):
+        print("OOT2: invalid IPA layout; refusing build.", flush=True)
+        return 1
+    # Upstream's separate mode needs the extracted RomFS to stay available
+    # after packaging for its one-time device transfer. This is runner-local;
+    # it does not make an ephemeral runner persistent or skip shader builds.
+    layout_args = (["--romfs", "separate", "--keep-extracted"]
+                   if layout == "separate" else ["--no-keep-extracted"])
     CACHE.mkdir(parents=True, exist_ok=True, mode=0o700)
     LOG.parent.mkdir(parents=True, exist_ok=True)
     if not CAS_DB.is_file():
@@ -176,7 +185,10 @@ def compile_ipa():
     cmd = [str(PYTHON), str(NATIVE / "scripts" / "build_ipa_from_nsp.py"),
            str(NUP), "-o", str(OUTPUT), "-p", "v131072",
            "--platform", "ios", "--work-dir", str(TEMP / "oot2-work"),
-           "--no-keep-extracted", "--show-fps", "--gpu", "none"]
+           "--show-fps", "--gpu", "none", *layout_args]
+    print(f"OOT2 IPA layout: {layout}.", flush=True)
+    if layout == "separate":
+        print("Slim IPA requires the matching RomFS in the existing OOT2 device container; no device transfer is performed by this build.", flush=True)
     print("nxnative started; full diagnostic remains private.", flush=True)
     planned_stop = False
     rc = 1
