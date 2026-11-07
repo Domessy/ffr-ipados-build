@@ -41,6 +41,19 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertEqual(workflow.count('"$BASE" =~ ^[01]$'), 2)
         self.assertNotIn('"$BASE" == 1', workflow)
 
+    def test_ephemeral_mmap_release_is_before_transfer_and_opt_in(self):
+        workflow = BUILD.read_text()
+        patch_call = workflow.index("python3 security/oot2_patch_nup_release.py")
+        transfer = workflow.index("Transferer uniquement le NUP")
+        self.assertLess(patch_call, transfer)
+        self.assertIn("security/test_oot2_patch_nup_release.py", workflow)
+        script = (ROOT/"security/run_oot2.py").read_text()
+        self.assertIn("OOT2_RELEASE_EPHEMERAL_NUP=str(NUP)", script)
+        patch_script = (ROOT/"security/oot2_patch_nup_release.py").read_text()
+        self.assertIn('fam["nup"].close()', patch_script)
+        self.assertIn("candidate.unlink()", patch_script)
+        self.assertIn("25020741061", patch_script)
+
     def test_one_nup_without_keys(self):
         workflow=BUILD.read_text()
         self.assertIn("security/oot2_transfer.py nup",workflow)

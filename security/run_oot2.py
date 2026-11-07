@@ -164,7 +164,8 @@ def compile_ipa():
     if not CAS_DB.is_file():
         print("OOT2: SQLite shader cache not initialized; refusing build.", flush=True)
         return 1
-    env = dict(os.environ, DMSH_CAS=str(CAS_DB))
+    env = dict(os.environ, DMSH_CAS=str(CAS_DB),
+               OOT2_RELEASE_EPHEMERAL_NUP=str(NUP))
     # Preserve the restore's older mtimes; do not re-upload already stored files.
     since_ns = time.time_ns()
     last_sync = time.monotonic()
