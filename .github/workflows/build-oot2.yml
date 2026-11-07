@@ -22,6 +22,7 @@ on:
           - depth
           - memory-v1
           - graphics-v2
+          - terrain-v3
 
 permissions:
   contents: read
@@ -207,10 +208,13 @@ jobs:
           # the Mac-runner copy after extracting the RomFS; never touch the
           # local CachyOS NUP or any other game.
           python3 security/oot2_patch_nup_release.py "$RUNNER_TEMP/nxnative/scripts/build_ipa_from_nsp.py"
-          if [ "$OOT2_RUNTIME_VARIANT" = graphics-v2 ]; then
+          if [ "$OOT2_RUNTIME_VARIANT" = graphics-v2 ] || [ "$OOT2_RUNTIME_VARIANT" = terrain-v3 ]; then
             git -C "$RUNNER_TEMP/nxnative" fetch -q --depth 1 origin 167769131235226c739517a0a3e53fce48025b1f
             python3 security/oot2_patch_graphics.py "$RUNNER_TEMP/nxnative"
             python3 security/oot2_patch_runtime.py "$RUNNER_TEMP/nxnative" --variant memory-v1
+            if [ "$OOT2_RUNTIME_VARIANT" = terrain-v3 ]; then
+              python3 security/oot2_patch_terrain.py "$RUNNER_TEMP/nxnative"
+            fi
           else
             python3 security/oot2_patch_runtime.py "$RUNNER_TEMP/nxnative" --variant "$OOT2_RUNTIME_VARIANT"
           fi
