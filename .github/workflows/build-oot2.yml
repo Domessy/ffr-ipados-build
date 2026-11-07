@@ -1,6 +1,13 @@
 name: The Legend of Zelda Ocarina Switch 2 - experimental iPadOS
 
+# Branch-scoped, one-shot trigger for the user-authorized OOT2 recovery.
+# The ONLY matching path is created once and never touched again.
 on:
+  push:
+    branches:
+      - ops/oot2-one-shot-20261107
+    paths:
+      - 'security/oot2_one_shot_20261107.txt'
   workflow_dispatch:
     inputs:
       mode:
@@ -294,7 +301,7 @@ jobs:
           echo 'OOT2 remote metadata and runner disk preflight passed.'
 
       - name: Restaurer le cache de shaders OOT2
-        if: ${{ inputs.mode == 'build' }}
+        if: ${{ inputs.mode == 'build' || (github.event_name == 'push' && github.ref == 'refs/heads/ops/oot2-one-shot-20261107') }}
         run: |
           set -euo pipefail
           # nxnative Store opens DMSH_CAS with sqlite3.connect(): FILE path.
@@ -327,7 +334,7 @@ jobs:
           PY
 
       - name: Transferer uniquement le NUP, sans cles
-        if: ${{ inputs.mode == 'build' }}
+        if: ${{ inputs.mode == 'build' || (github.event_name == 'push' && github.ref == 'refs/heads/ops/oot2-one-shot-20261107') }}
         run: |
           set -euo pipefail
           umask 077
@@ -339,13 +346,13 @@ jobs:
           echo 'OOT2 transfer complete; originals and keys stay on CachyOS.'
 
       - name: Compiler IPA experimentale Ocarina Switch 2
-        if: ${{ inputs.mode == 'build' }}
+        if: ${{ inputs.mode == 'build' || (github.event_name == 'push' && github.ref == 'refs/heads/ops/oot2-one-shot-20261107') }}
         run: |
           set -euo pipefail
           python3 security/run_oot2.py
 
       - name: Rapatrier IPA OOT2 sans lancement sur iPad
-        if: ${{ inputs.mode == 'build' }}
+        if: ${{ inputs.mode == 'build' || (github.event_name == 'push' && github.ref == 'refs/heads/ops/oot2-one-shot-20261107') }}
         run: |
           set -euo pipefail
           test -s "$RUNNER_TEMP/ZeldaOcarinaOfTime.ipa"
