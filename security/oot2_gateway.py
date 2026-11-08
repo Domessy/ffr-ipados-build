@@ -21,6 +21,8 @@ ROUTES = frozenset({
     "oot2-diagnose-v1", "oot2-probe-v1", "oot2-manifest-v1", "oot2-space-v1",
     "oot2-read-nup", "oot2-read-cache", "oot2-write-cache",
     "oot2-write-ipa", "oot2-write-log",
+    "oot2-read-metal-snapshot-v1",
+    "oot2-write-host-kit-v1",
 })
 
 
@@ -83,6 +85,14 @@ def dispatch(command, parent):
     if command == "oot2-read-nup":
         parent.send_file(nup_file())
         return 0
+    if command == "oot2-read-metal-snapshot-v1":
+        try:
+            from .oot2_cache_snapshot import snapshot
+        except ImportError:
+            from oot2_cache_snapshot import snapshot
+        archive, _ = snapshot(CACHE, ROOT / "cache-transfer")
+        parent.send_file(archive)
+        return 0
     previous = parent.CACHE, parent.CONFLICTS, parent.OUTPUT
     try:
         parent.CACHE, parent.CONFLICTS, parent.OUTPUT = CACHE, CONFLICTS, OUTPUT
@@ -94,6 +104,8 @@ def dispatch(command, parent):
             parent.receive_file("ZeldaOcarinaOfTime.ipa", 50 * 1024**3)
         elif command == "oot2-write-log":
             parent.receive_file("oot2-build.log", 32 * 1024**2)
+        elif command == "oot2-write-host-kit-v1":
+            parent.receive_file("OOT2HostKit-v4.tar.zst", 1 * 1024**3)
         return 0
     finally:
         parent.CACHE, parent.CONFLICTS, parent.OUTPUT = previous
