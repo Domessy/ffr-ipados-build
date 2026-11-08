@@ -17,7 +17,9 @@ class SnapshotTests(unittest.TestCase):
     def setUp(self):
         t = tempfile.TemporaryDirectory()
         self.addCleanup(t.cleanup)
-        self.root = Path(t.name)
+        # macOS tempfile may spell /private/var as /var. Resolve this trusted
+        # fixture root; the exporter must still reject cache-owned symlinks.
+        self.root = Path(t.name).resolve()
         self.cache = self.root / 'cache'
         self.out = self.root / 'transfer'
         for n, data in {'metallib/ios/a.metallib': b'compiled bytes',
