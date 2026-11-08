@@ -12,6 +12,8 @@ on:
       - 'security/oot2_graphics_manifest.json'
       - 'security/oot2_terrain_manifest.json'
       - 'security/oot2_ipados_defaults.env'
+      - 'security/oot2_ipad_v5_defaults.env'
+      - 'security/oot2_ipad_v5_manifest.json'
       - 'security/test_oot2_*.py'
       - 'security/run_oot2.py'
       - 'security/setup_oot2.sh'
@@ -27,6 +29,8 @@ on:
       - 'security/oot2_graphics_manifest.json'
       - 'security/oot2_terrain_manifest.json'
       - 'security/oot2_ipados_defaults.env'
+      - 'security/oot2_ipad_v5_defaults.env'
+      - 'security/oot2_ipad_v5_manifest.json'
       - 'security/test_oot2_*.py'
       - 'security/run_oot2.py'
       - 'security/setup_oot2.sh'
@@ -52,7 +56,7 @@ jobs:
       - name: Python, Bash and NUP fixtures (no retail material)
         run: |
           set -euo pipefail
-          python3 -m py_compile security/oot2_nup_info.py security/oot2_gateway.py security/oot2_transfer.py security/oot2_sqlite_cas.py security/oot2_patch_nup_release.py security/run_oot2.py security/test_oot2_nup_info.py security/test_oot2_gateway.py security/test_oot2_transfer.py security/test_oot2_sqlite_cas.py security/test_oot2_patch_nup_release.py security/test_oot2_setup.py security/test_oot2_workflow.py security/test_oot2_memory_report.py security/test_oot2_ipa_layout.py security/test_oot2_cache_snapshot.py security/test_oot2_export_buildkit.py
+          python3 -m py_compile security/oot2_nup_info.py security/oot2_gateway.py security/oot2_transfer.py security/oot2_sqlite_cas.py security/oot2_patch_nup_release.py security/oot2_prepare_ipad_v5.py security/oot2_ipad_v5_smoke.py security/run_oot2.py security/test_oot2_nup_info.py security/test_oot2_gateway.py security/test_oot2_transfer.py security/test_oot2_sqlite_cas.py security/test_oot2_patch_nup_release.py security/test_oot2_setup.py security/test_oot2_workflow.py security/test_oot2_memory_report.py security/test_oot2_ipa_layout.py security/test_oot2_cache_snapshot.py security/test_oot2_export_buildkit.py
           bash -n security/setup_oot2.sh
           python3 -m unittest -v security/test_oot2_nup_info.py security/test_oot2_gateway.py security/test_oot2_transfer.py security/test_oot2_sqlite_cas.py security/test_oot2_patch_nup_release.py security/test_oot2_setup.py security/test_oot2_workflow.py security/test_oot2_memory_report.py security/test_oot2_ipa_layout.py security/test_oot2_cache_snapshot.py security/test_oot2_export_buildkit.py
       - name: Verify NUP release and runtime patches against EXACT pinned nxnative source

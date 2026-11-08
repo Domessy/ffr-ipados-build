@@ -23,11 +23,23 @@ CHAIN = '579d06bf3932'
 LIMIT = 1 << 30
 
 
+def build_identity():
+    variant = os.environ.get('OOT2_RUNTIME_VARIANT', 'upstream-v4')
+    if variant == 'upstream-v4':
+        return PIN, CHAIN, None
+    if variant == 'ipad-v5':
+        data = Path(__file__).with_name('oot2_ipad_v5_manifest.json').read_bytes()
+        manifest = json.loads(data)
+        return manifest['base_revision'], manifest['shader_chain'], hashlib.sha256(data).hexdigest()
+    raise ValueError('unsupported buildkit variant')
+
+
 def collect(temp):
     temp = Path(temp).resolve()
     source, work = temp / 'nxnative', temp / 'oot2-work'
     head = subprocess.check_output(['git', '-C', str(source), 'rev-parse', 'HEAD'], text=True).strip()
-    if head != PIN or f'"{CHAIN}"' not in (source / 'dm/gfx/nvn/dmsh_chain.h').read_text():
+    pin, chain, _ = build_identity()
+    if head != pin or f'"{chain}"' not in (source / 'dm/gfx/nvn/dmsh_chain.h').read_text():
         raise ValueError('buildkit revision/chain')
     patched = work / 'patched_v131072'
     gen = source / 'dm/ios/Gen'
@@ -73,8 +85,10 @@ def export(temp, output):
     if output.is_symlink() or output.exists() or output.parent.is_symlink():
         raise ValueError('buildkit output exists or symlink')
     files = collect(temp)
-    manifest = {'format': 1, 'title': TITLE, 'package': 'v131072', 'source_revision': PIN,
-                'shader_chain': CHAIN, 'host_only_rebuild_validated': False, 'files': {}}
+    pin, chain, recipe = build_identity()
+    manifest = {'format': 1, 'title': TITLE, 'package': 'v131072', 'source_revision': pin,
+                'shader_chain': chain, 'optimization_recipe_sha256': recipe,
+                'host_only_rebuild_validated': False, 'files': {}}
     for label, p in files.items():
         manifest['files'][label] = {'bytes': p.stat().st_size, 'sha256': hashlib.sha256(p.read_bytes()).hexdigest()}
     output.parent.mkdir(parents=True, exist_ok=True)

@@ -81,3 +81,17 @@ class IpaLayoutTests(unittest.TestCase):
     def test_old_variants_keep_existing_memory_default(self):
         _, call, _ = self.exercise('bundle', 'terrain-v3')
         self.assertNotIn('--env-file', call.args[0])
+
+    def test_ipad_v5_uses_explicit_optimization_defaults(self):
+        rc, call, _ = self.exercise('bundle', 'ipad-v5')
+        self.assertEqual(rc, 0)
+        argv = call.args[0]
+        defaults = Path(argv[argv.index('--env-file') + 1])
+        values = dict(line.split('=', 1) for line in defaults.read_text().splitlines()
+                      if line and not line.startswith('#'))
+        self.assertEqual(values['DM_GUEST_FILE'], '1')
+        self.assertEqual(values['DM_NVN_RT_RECYCLE'], '1')
+        self.assertEqual(values['DM_NVN_SEG_POST'], '1')
+        self.assertEqual(values['DM_NVN_SEG_RB'], '1')
+        self.assertEqual(values['DM_NVN_MESH_CPRE'], '0')
+        self.assertEqual(values['DM_NVN_MESH_CPRE_DEQ'], '8')

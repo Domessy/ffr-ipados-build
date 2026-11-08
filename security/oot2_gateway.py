@@ -27,6 +27,7 @@ ROUTES = frozenset({
     "oot2-metal-snapshot-info-v1",
     "oot2-release-preflight-v1",
     "oot2-write-host-kit-v1",
+    "oot2-write-host-kit-v5",
 })
 
 
@@ -142,8 +143,9 @@ def dispatch(command, parent):
             parent.receive_file("ZeldaOcarinaOfTime.ipa", 50 * 1024**3)
         elif command == "oot2-write-log":
             parent.receive_file("oot2-build.log", 32 * 1024**2)
-        elif command == "oot2-write-host-kit-v1":
-            parent.receive_file("OOT2HostKit-v4.tar.zst", 1 * 1024**3)
+        elif command in ("oot2-write-host-kit-v1", "oot2-write-host-kit-v5"):
+            filename = "OOT2HostKit-v5.tar.zst" if command.endswith("-v5") else "OOT2HostKit-v4.tar.zst"
+            parent.receive_file(filename, 1 * 1024**3)
         return 0
     finally:
         parent.CACHE, parent.CONFLICTS, parent.OUTPUT = previous

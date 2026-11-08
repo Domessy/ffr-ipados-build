@@ -1,5 +1,6 @@
 """Only synthetic rewritten modules and metadata, never a real game kit."""
 from pathlib import Path
+import os
 import hashlib
 import json
 import shutil
@@ -70,7 +71,21 @@ class BuildkitTests(unittest.TestCase):
             self.assertEqual(gw.dispatch('oot2-write-host-kit-v1', gate), 0)
             receive.assert_called_once_with('OOT2HostKit-v4.tar.zst', 1 << 30)
             self.assertEqual(gw.dispatch('oot2-write-host-kit-v1 /tmp/x', gate), 126)
+            receive.reset_mock()
+            self.assertEqual(gw.dispatch('oot2-write-host-kit-v5', gate), 0)
+            receive.assert_called_once_with('OOT2HostKit-v5.tar.zst', 1 << 30)
         self.assertEqual(gate.OUTPUT, old)
+
+    def test_ipad_v5_kit_is_bound_to_its_shader_chain_and_recipe(self):
+        with patch.dict(os.environ, {'OOT2_RUNTIME_VARIANT': 'ipad-v5'}):
+            pin, chain, recipe = kit.build_identity()
+            self.assertEqual(len(recipe), 64)
+            header = self.source / 'dm/gfx/nvn/dmsh_chain.h'
+            with patch.object(kit.subprocess, 'check_output', return_value=pin):
+                with self.assertRaisesRegex(ValueError, 'revision/chain'):
+                    kit.collect(self.root)
+                header.write_text(f'#define DMSH_CHAIN "{chain}"')
+                self.assertIn('patched/main.fixups.tsv', kit.collect(self.root))
 
     @unittest.skipUnless(shutil.which('zstd'), 'zstd unavailable; input filtering tests still run')
     def test_real_archive_contains_checked_manifest_and_exact_bytes(self):
