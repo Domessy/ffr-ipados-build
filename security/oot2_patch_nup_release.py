@@ -35,11 +35,12 @@ INJECTION = '''    # OOT2_RUNNER_NUP_RELEASE_V1
             and app == 0x0400486024DEC000
             and pkg_ver == "v131072"
             and versions == [pkg_ver]
-            and fam["base"] is None
             and len(fam["updates"]) == 1
             and not fam["dlc"]
             and not g.get("programs", "")
-            and candidate.stat().st_size == 25020741061
+            and os.environ.get("OOT2_RELEASE_EPHEMERAL_NUP_ID") == (
+                f"{candidate.stat().st_size}:{fam['nup'].toc_sha.hex()}"
+            )
             and (dirs[pkg_ver] / "RomFS.img").is_file()
             and not (dirs[pkg_ver] / "RomFS.img").is_symlink()
             and (dirs[pkg_ver] / "RomFS.img").stat().st_size > 0

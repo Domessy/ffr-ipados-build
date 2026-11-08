@@ -11,6 +11,17 @@ from security.test_oot2_nup_info import fake_nup, SIZE
 
 
 class Oot2GatewayTests(unittest.TestCase):
+    def test_release_preflight_is_a_fixed_numeric_identity_route(self):
+        with tempfile.TemporaryDirectory() as d:
+            home = Path(d)
+            nup, project = self.fixture(home)
+            fake_nup(nup, base=True, base_version=65536, standalone=True, romfs_file_bytes=8)
+            with patch.object(gw, 'HOME', home), patch.object(gw, 'SOURCE_LINK', project/'source'):
+                with patch('builtins.print') as emit:
+                    self.assertEqual(gw.dispatch('oot2-release-preflight-v1', parent), 0)
+                    emit.assert_called_once_with('OOT2_RELEASE_READY_V1', gw.release_identity(nup))
+                self.assertEqual(gw.dispatch('oot2-release-preflight-v1 /arbitrary', parent), 126)
+
     @staticmethod
     def fixture(home):
         docs = home / "Documents"

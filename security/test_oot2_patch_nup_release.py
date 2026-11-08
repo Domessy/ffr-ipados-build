@@ -33,6 +33,7 @@ def main(args=None):
     nx = keys = repo = logs = None
     g = {"programs": ""}
     class Nup:
+        toc_sha = bytes.fromhex("ab" * 32)
         def __init__(self): self.closed = False
         def close(self): self.closed = True
     reader = Nup()
@@ -81,6 +82,7 @@ class RunnerNupReleaseTests(unittest.TestCase):
             namespace = {"__name__": "oot2_fixture"}
             with mock_patch.dict(os.environ, {
                  "RUNNER_TEMP": str(temp),
+                 "OOT2_RELEASE_EPHEMERAL_NUP_ID": f"25020741061:{'ab'*32}",
                  "OOT2_RELEASE_EPHEMERAL_NUP": str(nup)}):
                 exec(compile(path.read_text(), str(path), "exec"), namespace)
                 self.assertTrue(namespace["main"]())
@@ -99,6 +101,7 @@ class RunnerNupReleaseTests(unittest.TestCase):
             namespace = {"__name__": "oot2_fixture"}
             with mock_patch.dict(os.environ, {
                  "RUNNER_TEMP": str(temp),
+                 "OOT2_RELEASE_EPHEMERAL_NUP_ID": f"25020741061:{'ab'*32}",
                  "OOT2_RELEASE_EPHEMERAL_NUP": str(nup)}):
                 exec(compile(path.read_text(), str(path), "exec"), namespace)
                 with self.assertRaisesRegex(ValueError, "safety conditions"):
@@ -124,6 +127,52 @@ class RunnerNupReleaseTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "safety conditions"):
                     namespace["main"]()
             self.assertTrue(nup.exists())
+
+    def test_base_plus_update_releases_only_bound_runner_copy(self):
+        with tempfile.TemporaryDirectory() as d:
+            temp = Path(d)
+            nup = temp / 'oot2-nup/OcarinaOfTime.nup'
+            nup.parent.mkdir()
+            with nup.open('wb') as f:
+                f.truncate(25622267860)
+            original = temp / 'original.nup'
+            original.write_bytes(b'original must stay')
+            romfs = temp / 'oot2-work/extract/v131072/RomFS.img'
+            romfs.parent.mkdir(parents=True)
+            romfs.write_bytes(b'fully extracted fixture')
+            path = src(d)
+            path.write_text(path.read_text().replace('"base": None', '"base": object()'))
+            patcher.patch(path)
+            namespace = {'__name__': 'oot2_fixture'}
+            with mock_patch.dict(os.environ, {'RUNNER_TEMP': str(temp),
+                    'OOT2_RELEASE_EPHEMERAL_NUP': str(nup),
+                    'OOT2_RELEASE_EPHEMERAL_NUP_ID': f"25622267860:{'ab'*32}"}):
+                exec(compile(path.read_text(), str(path), 'exec'), namespace)
+                self.assertTrue(namespace['main']())
+            self.assertFalse(nup.exists())
+            self.assertTrue(romfs.exists())
+            self.assertEqual(original.read_bytes(), b'original must stay')
+
+    def test_wrong_or_missing_bound_identity_keeps_runner_copy(self):
+        with tempfile.TemporaryDirectory() as d:
+            temp = Path(d)
+            nup = temp / 'oot2-nup/OcarinaOfTime.nup'
+            nup.parent.mkdir()
+            with nup.open('wb') as f: f.truncate(25622267860)
+            romfs = temp / 'oot2-work/extract/v131072/RomFS.img'
+            romfs.parent.mkdir(parents=True)
+            romfs.write_bytes(b'extracted')
+            path = src(d)
+            patcher.patch(path)
+            namespace = {'__name__': 'oot2_fixture'}
+            for identity in ('', f"25020741061:{'ab'*32}", f"25622267860:{'cd'*32}"):
+                with mock_patch.dict(os.environ, {'RUNNER_TEMP': str(temp),
+                        'OOT2_RELEASE_EPHEMERAL_NUP': str(nup),
+                        'OOT2_RELEASE_EPHEMERAL_NUP_ID': identity}):
+                    exec(compile(path.read_text(), str(path), 'exec'), namespace)
+                    with self.assertRaisesRegex(ValueError, 'safety conditions'):
+                        namespace['main']()
+                self.assertTrue(nup.exists())
 
 
 if __name__ == "__main__":

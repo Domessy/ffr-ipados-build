@@ -344,6 +344,10 @@ jobs:
             exit 1
           fi
           echo 'OOT2 remote metadata and runner disk preflight passed.'
+          read -r RELEASE_MARK RELEASE_ID <<< "$(ssh -o ConnectTimeout=25 ffr-cachyos oot2-release-preflight-v1)"
+          [[ "$RELEASE_MARK" == OOT2_RELEASE_READY_V1 && "$RELEASE_ID" =~ ^[1-9][0-9]*:[0-9a-f]{64}$ ]]
+          echo "OOT2_NUP_ID=$RELEASE_ID" >> "$GITHUB_ENV"
+          echo 'OOT2 runner-copy release eligibility checked before cache and NUP transfer.'
 
       - name: Restaurer le cache de shaders OOT2
         if: ${{ inputs.mode == 'build' }}
