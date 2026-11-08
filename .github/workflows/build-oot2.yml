@@ -34,6 +34,15 @@ on:
           - bundle
           - separate
 
+      cache_restore:
+        description: Full cache for same-chain resume, or compiled Metal snapshot for a new chain
+        type: choice
+        required: true
+        default: full
+        options:
+          - full
+          - metal-snapshot
+
 permissions:
   contents: read
 
@@ -62,9 +71,9 @@ jobs:
       - name: Verifier les scripts et tests NUP avant tout transfert prive
         run: |
           set -euo pipefail
-          python3 -m py_compile security/ffr_ssh_gate.py security/oot2_nup_info.py security/oot2_gateway.py security/oot2_transfer.py security/oot2_sqlite_cas.py security/oot2_patch_nup_release.py security/run_oot2.py security/test_oot2_sqlite_cas.py security/test_oot2_patch_nup_release.py security/test_oot2_nup_info.py security/test_oot2_gateway.py security/test_oot2_transfer.py security/test_oot2_setup.py security/test_oot2_workflow.py security/test_oot2_memory_report.py security/test_oot2_ipa_layout.py
+          python3 -m py_compile security/ffr_ssh_gate.py security/oot2_nup_info.py security/oot2_gateway.py security/oot2_transfer.py security/oot2_sqlite_cas.py security/oot2_patch_nup_release.py security/run_oot2.py security/test_oot2_sqlite_cas.py security/test_oot2_patch_nup_release.py security/test_oot2_nup_info.py security/test_oot2_gateway.py security/test_oot2_transfer.py security/test_oot2_setup.py security/test_oot2_workflow.py security/test_oot2_memory_report.py security/test_oot2_ipa_layout.py security/test_oot2_cache_snapshot.py security/test_oot2_export_buildkit.py
           bash -n security/setup_oot2.sh
-          python3 -m unittest -v security/test_oot2_nup_info.py security/test_oot2_gateway.py security/test_oot2_transfer.py security/test_oot2_sqlite_cas.py security/test_oot2_patch_nup_release.py security/test_oot2_setup.py security/test_oot2_workflow.py security/test_oot2_memory_report.py security/test_oot2_ipa_layout.py
+          python3 -m unittest -v security/test_oot2_nup_info.py security/test_oot2_gateway.py security/test_oot2_transfer.py security/test_oot2_sqlite_cas.py security/test_oot2_patch_nup_release.py security/test_oot2_setup.py security/test_oot2_workflow.py security/test_oot2_memory_report.py security/test_oot2_ipa_layout.py security/test_oot2_cache_snapshot.py security/test_oot2_export_buildkit.py
 
       - name: Verifier les secrets reseau avant toute installation couteuse
         env:
@@ -338,6 +347,8 @@ jobs:
 
       - name: Restaurer le cache de shaders OOT2
         if: ${{ inputs.mode == 'build' }}
+        env:
+          OOT2_CACHE_RESTORE: ${{ inputs.cache_restore }}
         run: |
           set -euo pipefail
           # nxnative Store opens DMSH_CAS with sqlite3.connect(): FILE path.
@@ -346,8 +357,19 @@ jobs:
           export DMSH_CAS="$RUNNER_TEMP/oot2-shader-cas/cas.db"
           umask 077
           mkdir -p "$(dirname "$DMSH_CAS")"
-          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 ffr-cachyos oot2-read-cache | tar -xz -C "$(dirname "$DMSH_CAS")"
-          python3 security/oot2_sqlite_cas.py prepare "$(dirname "$DMSH_CAS")"
+          if [ "$OOT2_CACHE_RESTORE" = metal-snapshot ]; then
+            # Direct SQLite avoids the flat tar extraction/import round trip.
+            # Compile keys include MSL, flags and compiler; no chain relabel.
+            ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 ffr-cachyos oot2-read-metal-snapshot-v1 \
+              | zstd -q -d -c > "$DMSH_CAS.partial"
+            python3 security/oot2_cache_snapshot.py accept "$(dirname "$DMSH_CAS")"
+          elif [ "$OOT2_CACHE_RESTORE" = full ]; then
+            ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 ffr-cachyos oot2-read-cache | tar -xz -C "$(dirname "$DMSH_CAS")"
+            python3 security/oot2_sqlite_cas.py prepare "$(dirname "$DMSH_CAS")"
+          else
+            echo 'OOT2: invalid cache restore mode.' >&2
+            exit 1
+          fi
           # Exercise the actual pinned nxnative schema BEFORE transferring 25GB.
           "$RUNNER_TEMP/oot2-venv/bin/python" "$RUNNER_TEMP/nxnative/dm/tools/shader_cache.py" "$DMSH_CAS"
           read -r TITLE VERSION NUP_BYTES BASE PATCHES PKGS <<< "$(ssh ffr-cachyos oot2-manifest-v1)"
@@ -389,6 +411,16 @@ jobs:
         run: |
           set -euo pipefail
           python3 security/run_oot2.py
+
+      - name: Conserver les entrees privees pour une future reconstruction du moteur
+        if: ${{ inputs.mode == 'build' && inputs.runtime_variant == 'upstream-v4' }}
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          python3 security/oot2_export_buildkit.py "$RUNNER_TEMP" "$RUNNER_TEMP/OOT2HostKit-v4.tar.zst"
+          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 \
+            ffr-cachyos oot2-write-host-kit-v1 < "$RUNNER_TEMP/OOT2HostKit-v4.tar.zst"
+          echo 'Private rebuild inputs saved; host-only rebuild still requires validation.'
 
       - name: Rapatrier IPA OOT2 sans lancement sur iPad
         if: ${{ inputs.mode == 'build' }}
