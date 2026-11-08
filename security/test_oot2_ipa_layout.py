@@ -10,9 +10,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class IpaLayoutTests(unittest.TestCase):
-    def exercise(self, layout):
+    def exercise(self, layout, variant='baseline'):
         with tempfile.TemporaryDirectory() as temp:
-            values = {'RUNNER_TEMP': temp, 'GITHUB_WORKSPACE': str(ROOT)}
+            values = {'RUNNER_TEMP': temp, 'GITHUB_WORKSPACE': str(ROOT),
+                      'OOT2_RUNTIME_VARIANT': variant}
             if layout is not None:
                 values['OOT2_IPA_LAYOUT'] = layout
             with patch.dict(os.environ, values):
@@ -59,3 +60,16 @@ class IpaLayoutTests(unittest.TestCase):
         s = (ROOT/'.github/workflows/build-oot2.yml').read_text()
         self.assertIn('default: bundle', s)
         self.assertIn('OOT2_IPA_LAYOUT: ${{ inputs.ipa_layout }}', s)
+
+    def test_upstream_build_bakes_in_reinstall_safe_memory_default(self):
+        rc, call, _ = self.exercise('bundle', 'upstream-v4')
+        self.assertEqual(rc, 0)
+        argv = call.args[0]
+        defaults = Path(argv[argv.index('--env-file') + 1])
+        self.assertEqual(defaults, ROOT/'security/oot2_ipados_defaults.env')
+        self.assertEqual([l for l in defaults.read_text().splitlines()
+                          if l and not l.startswith('#')], ['DM_GUEST_FILE=1'])
+
+    def test_old_variants_keep_existing_memory_default(self):
+        _, call, _ = self.exercise('bundle', 'terrain-v3')
+        self.assertNotIn('--env-file', call.args[0])

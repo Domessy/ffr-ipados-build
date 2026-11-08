@@ -186,6 +186,15 @@ def compile_ipa():
            str(NUP), "-o", str(OUTPUT), "-p", "v131072",
            "--platform", "ios", "--work-dir", str(TEMP / "oot2-work"),
            "--show-fps", "--gpu", "none", *layout_args]
+    if os.environ.get("OOT2_RUNTIME_VARIANT") == "upstream-v4":
+        # Bake the proven setting into this diagnostic IPA so deleting a data
+        # container cannot silently restore anonymous guest memory. The host
+        # reads Documents/env.txt first, so an explicit device override wins.
+        defaults = WORKSPACE / "security" / "oot2_ipados_defaults.env"
+        if not defaults.is_file() or defaults.is_symlink():
+            print("OOT2: iPadOS defaults missing; refusing build.", flush=True)
+            return 1
+        cmd += ["--env-file", str(defaults)]
     print(f"OOT2 IPA layout: {layout}.", flush=True)
     if layout == "separate":
         print("Slim IPA requires the matching RomFS in the existing OOT2 device container; no device transfer is performed by this build.", flush=True)
