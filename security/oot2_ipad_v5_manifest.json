@@ -1,0 +1,149 @@
+{
+  "base_revision": "7f50222003e4270e3655d4f798e85744d390edf0",
+  "excluded": [
+    "RomFS substitution for damaged textures",
+    "RomFS resolution overlays",
+    "unrelated launcher presets",
+    "unpublished translate-ahead scheduler port"
+  ],
+  "features": {
+    "compute_binding_order": "included upstream",
+    "depth_snap": "included upstream",
+    "dynamic_resolution_controller": "included upstream",
+    "expanded_pso_manifest": "included",
+    "float_atomic_reduction": "enabled by game profile",
+    "grass_compute_prepass": "host compiled; disabled until missing mkcpre2.py kernels can be generated",
+    "hmma_reuse_and_gather_merge": "enabled by shader rewrite",
+    "pool_mark_plain_load": "enabled by shader rewrite",
+    "real_speed_and_hold_policy": "enabled by game profile",
+    "render_target_recycling": "included upstream",
+    "segment_completion_and_readbacks": "enabled by variant env defaults",
+    "vector_loads_and_extended_multiply": "included upstream"
+  },
+  "files": {
+    "dm/games/0400486024DEC000/game.tsv": {
+      "after_sha256": "d5bb0913683ae631ecd4d91376230a8e2ebf28ef636b5f29e5cdafa4514fa713",
+      "before_sha256": "1cbfe60e31db3367ac678d28602c1e585ddcebaeda66d89815d29cbb7e43b2a8"
+    },
+    "dm/games/0400486024DEC000/patches.py": {
+      "after_sha256": "3a488141b749e4e9fcca6eb6ff8d62292b29f20126560ea4d92cd9883ac7186c",
+      "before_sha256": "1ceee68c2812b95770b79711ab004ce6f809564cf42a080bf081ff97102f39ea"
+    },
+    "dm/games/0400486024DEC000/pso_manifest.tsv": {
+      "after_sha256": "ae9688387fbaeaaf357d0f8d93c6d0f9856dfb9b0a1d821bea40f20dfe83586d",
+      "before_sha256": "4040249c8e60b9cdfc850c1bffdf32c404e78eee550a9d6b57a836d4d9804451"
+    },
+    "dm/games/game.py": {
+      "after_sha256": "865bf0b1598e1592391dcbfe4c912db980675b3e79b81efa40e998f77eccfd2f",
+      "before_sha256": "5fc5b7b55be74371f281648b143802c197583b61521f03b68d00572fa343ca42"
+    },
+    "dm/games/settings.tsv": {
+      "after_sha256": "3c080b0e5d132a1dec5c5f87ed0280d9447d4830a08b6563d1a6be4e1e18cfe7",
+      "before_sha256": "e6df9f438137d81c63b17634301c7cee0da5d00092004c9206e1e15debacdf81"
+    },
+    "dm/gfx/nvn/dmsh_chain.h": {
+      "after_sha256": "161a818b32c10091381cf8732600a6857db029bace928643b3a6f565d6bfe36d",
+      "before_sha256": "f2619d9995abd6e73c85a690114b90c42715c662cb2220ef9cba017c7f866141"
+    },
+    "dm/gfx/nvn/hle_nvn.c": {
+      "after_sha256": "82e801dba887047ed79fcc17b794105da353a6a3ac4d10c216d10b66ed6c26df",
+      "before_sha256": "795b326b8a0bc4c543ebbd6402ba33db6e7e26d97e4eed7ee171540c545f2906"
+    },
+    "dm/gfx/nvn/nvn_fstep.h": {
+      "after_sha256": "dadc1a0a4b0f411ec1c39b8657bac3bcd6475d75c1652d366015a01074eb69fc",
+      "before_sha256": "86c7a24a4668932c25188b266660567ed9c61fe65c1ca654e9d611fe1e4345cd"
+    },
+    "dm/gfx/nvn/nvn_geometry.inc": {
+      "after_sha256": "33d99a0ac860f09c1801d1ce36ecc10a2f322e0781ae2e43812990d41b2585b3",
+      "before_sha256": "c20d270fbd3fb88b021f49da08e013a73e6f8c3d8adcaf191499624ceaa2adb8"
+    },
+    "dm/gfx/nvn/nvn_mtl.m": {
+      "after_sha256": "3ee91ccd17c784d845397f0cbad08894a10ec94b99d624ba8aa413a6a06b6bc1",
+      "before_sha256": "4f6a9d6aa6f56153aa6016040ffbd6dad7651e7b70798e2b2fec230f250543ed"
+    },
+    "dm/gfx/tests/t_fstep.c": {
+      "after_sha256": "00606cd34fc3fbe98f67f58f5403e13a2408515263fedc4dfd7da9f33d0aaa00",
+      "before_sha256": "fc17fd12d85bc8a8bf215db63e44a78be4ef9a5f84c3be9fbe89ab56a02ebced"
+    },
+    "dm/gfx/tests/test_dmsh_gather_offsets.py": {
+      "after_sha256": "f8b9f1a417df8cd6bea22ea32a2245272cb2f02a64e28b2796da7efb7ee034c6",
+      "before_sha256": "8725733b4e7a69d6a6b34f25843aedcf14951ad97f9bc1b512ad5a00adf4cc24"
+    },
+    "dm/gfx/tests/test_dmsh_hmma.py": {
+      "after_sha256": "8612ebdaea13da51f9ad4e32b8b0b9846010162627fdc252cf3305f9d6e36e77",
+      "before_sha256": "9e16c497111976fefc017f32222e39a04199589776c19a60f7ea0042bbf0d90f"
+    },
+    "dm/gfx/tests/test_dmsh_redsum.py": {
+      "after_sha256": "d270e01f49621da78b4c1cf30b120ad6673a236dc19b12ece013b1b5e7cba3d0",
+      "before_sha256": null
+    },
+    "dm/gfx/tools/dmsh_build.py": {
+      "after_sha256": "70c62251bc2cbb98912216aeabeb92b4e6d849108ca177d84f1809256885bcd1",
+      "before_sha256": "a48a70e6b55b1e51529c08ac0cc95a091e2146d6e6e68225c79827851a14dd54"
+    },
+    "dm/gfx/tools/dmsh_chain.py": {
+      "after_sha256": "3950243a4720f43547de2981ece2a1b3786bb21957335d4be40abf9003777723",
+      "before_sha256": "6b85f54eb50de79d3e7ca91cdb282422aa9adc06e56ed27d6441fb72fdad651a"
+    },
+    "dm/gfx/tools/dmsh_redsum.py": {
+      "after_sha256": "6c7930d9458284c7bdb2b1ea95a6e2cb5270043ae62673dcfbcb5464e156208e",
+      "before_sha256": null
+    },
+    "dm/host/hle.h": {
+      "after_sha256": "f305a817e9f03c1b8f10b5c361d41af689e144f905d4832461ab1a566abc8c9a",
+      "before_sha256": "8bebe86f9b00df9557e96953de71a88d2450fcbc6c210760a6515e4843ce1aab"
+    },
+    "dm/tools/gpuprof.py": {
+      "after_sha256": "1a966c8999b565fea783c85f290318202fe010893e4e223df1362333cda23848",
+      "before_sha256": "5e84c17189b10a20b32942059c115e7f17d6984bbf8ab1ba84d2dc996eba1e94"
+    },
+    "dm/tools/impact_map.tsv": {
+      "after_sha256": "2668718dd5d314ddcaba55f5e8e26c891c4ca311d4ad5cc5bb4e37a761c39380",
+      "before_sha256": "014f866ea40632101d693c3c14ec7334d6c1ffb78fffd7effc8c632e4211a53a"
+    },
+    "dm/tools/nso_asm.py": {
+      "after_sha256": "1728e757c36596997552aeb209117ec48a80787960804903e107f1c425f785b3",
+      "before_sha256": "ae1b3d83bec3720fd6c806b2c8caa559a5652ac333ad44c5e3e6ef091deb7d20"
+    },
+    "dm/tools/patch_nso.py": {
+      "after_sha256": "601964368087e6bdc03af88dc4e7530e7deffd80ec352d042a7c8860027e20c0",
+      "before_sha256": "377324a12b19cce90deff54fba605d9e4b08d1ab7dfd79dc04500e757e7bc5ec"
+    },
+    "dm/tools/tests/test_oot_frame_step.py": {
+      "after_sha256": "671faa674a69900b7d50f22bcc0e07db54320394b60d4733b9e86658eab7f175",
+      "before_sha256": null
+    },
+    "dm/tools/tests/test_shader_toolchain_cache.py": {
+      "after_sha256": "2fa652f47f15a410cc53fa0750374c877d8f08f609cdcc38d16219daefe2cbcf",
+      "before_sha256": "91f0b01076475279b7d5abb592270821f3a5bad6bd252cbb8dc16755bb5e63df"
+    },
+    "scripts/build_ipa_from_nsp.py": {
+      "after_sha256": "e955f9362d833763be73f85671af7785255f7fdda82970ff6a32b3f5a84bd0a9",
+      "before_sha256": "eab31bf56019fa2d7e1d210cd9f1e8947ee6b09d8dee16f757bd84b31d1a3e27"
+    }
+  },
+  "fork_commits": [
+    "519f082c169302aea01733d8b3d6c2d7121610a6",
+    "caba36561d5b9a844dd56357102f0906b90d412b",
+    "e701a0237cf9d1bdddef37e127e20e74f658a6ce",
+    "238e608fd3ae9c830689d2da5ba4320a63753e09",
+    "3a483d0d5183a57af8e2c4339bd407a560a7bcfe",
+    "bc5dc98bae55e90192363b58b5eeceb475adb327",
+    "35190fd06336b1bd34cdd24a4edce1d5f2ffc332",
+    "d668fc1f875310e22e92bae6415ba7b96da78d34",
+    "d00defbb3353965fcfb07250cd1e480c3e1ed133",
+    "a0340d81ddfe85cf5bead4c4c306649ce1e6b014",
+    "ddd9909a7e19def4ae527f9ff5f71d0b197b0105",
+    "e6c2e02ad80782022a8674e6a9cb80d0acc9c446"
+  ],
+  "fork_head": "e6c2e02ad80782022a8674e6a9cb80d0acc9c446",
+  "fork_repository": "https://github.com/aksmith-git/nxnative",
+  "format": 1,
+  "hardware_validation": "not yet tested on user iPad",
+  "local_adjustments": [
+    "HMMA parity fixture: initialize skipped output and keep collective calls uniform per SIMD group; retain exact bit equality"
+  ],
+  "official_repository": "https://github.com/seedds/nxnative",
+  "patch_sha256": "ef85d4fa153aadfa358d221e521cade6a0f37f0a84e3c8686b7ea611fc12eb31",
+  "shader_chain": "fb6cc361728e"
+}

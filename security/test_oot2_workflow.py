@@ -13,6 +13,17 @@ EXPECTED = {"FFR_TS_AUTHKEY","FFR_SSH_KEY","FFR_SSH_KNOWN_HOSTS",
 
 
 class WorkflowContractTests(unittest.TestCase):
+    def test_ipad_v5_default_and_preparation_are_explicit(self):
+        workflow = BUILD.read_text()
+        self.assertIn('default: ipad-v5', workflow)
+        self.assertIn('python3 security/oot2_prepare_ipad_v5.py', workflow)
+        self.assertLess(workflow.index('python3 security/oot2_prepare_ipad_v5.py'),
+                        workflow.index('Restaurer le cache de shaders OOT2'))
+        self.assertIn('KIT_ROUTE=oot2-write-host-kit-v1', workflow)
+        self.assertIn('KIT_ROUTE=oot2-write-host-kit-v5', workflow)
+        manifest = (ROOT/'security/oot2_ipad_v5_manifest.json').read_text()
+        self.assertIn('disabled until missing mkcpre2.py', manifest)
+
     def test_runner_cleanup_preflight_precedes_all_large_transfers(self):
         workflow = BUILD.read_text()
         preflight = workflow.index('oot2-release-preflight-v1')

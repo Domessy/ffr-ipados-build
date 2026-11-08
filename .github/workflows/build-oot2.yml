@@ -13,10 +13,10 @@ on:
           - build
 
       runtime_variant:
-        description: Pinned experiments or upstream-v4 (new revision and shader chain)
+        description: iPad optimization candidate or preserved earlier experiments
         type: choice
         required: true
-        default: baseline
+        default: ipad-v5
         options:
           - baseline
           - depth
@@ -24,6 +24,7 @@ on:
           - graphics-v2
           - terrain-v3
           - upstream-v4
+          - ipad-v5
 
       ipa_layout:
         description: Bundle all data, or slim IPA requiring matching Documents/romfs.img already on iPad
@@ -71,7 +72,7 @@ jobs:
       - name: Verifier les scripts et tests NUP avant tout transfert prive
         run: |
           set -euo pipefail
-          python3 -m py_compile security/ffr_ssh_gate.py security/oot2_nup_info.py security/oot2_gateway.py security/oot2_transfer.py security/oot2_sqlite_cas.py security/oot2_patch_nup_release.py security/run_oot2.py security/test_oot2_sqlite_cas.py security/test_oot2_patch_nup_release.py security/test_oot2_nup_info.py security/test_oot2_gateway.py security/test_oot2_transfer.py security/test_oot2_setup.py security/test_oot2_workflow.py security/test_oot2_memory_report.py security/test_oot2_ipa_layout.py security/test_oot2_cache_snapshot.py security/test_oot2_export_buildkit.py
+          python3 -m py_compile security/ffr_ssh_gate.py security/oot2_nup_info.py security/oot2_gateway.py security/oot2_transfer.py security/oot2_sqlite_cas.py security/oot2_patch_nup_release.py security/oot2_prepare_ipad_v5.py security/oot2_ipad_v5_smoke.py security/run_oot2.py security/test_oot2_sqlite_cas.py security/test_oot2_patch_nup_release.py security/test_oot2_nup_info.py security/test_oot2_gateway.py security/test_oot2_transfer.py security/test_oot2_setup.py security/test_oot2_workflow.py security/test_oot2_memory_report.py security/test_oot2_ipa_layout.py security/test_oot2_cache_snapshot.py security/test_oot2_export_buildkit.py
           bash -n security/setup_oot2.sh
           python3 -m unittest -v security/test_oot2_nup_info.py security/test_oot2_gateway.py security/test_oot2_transfer.py security/test_oot2_sqlite_cas.py security/test_oot2_patch_nup_release.py security/test_oot2_setup.py security/test_oot2_workflow.py security/test_oot2_memory_report.py security/test_oot2_ipa_layout.py security/test_oot2_cache_snapshot.py security/test_oot2_export_buildkit.py
 
@@ -210,6 +211,8 @@ jobs:
           NXNATIVE_SHA="c229bd7d52e30f072362e31c7b1e3206d107d4cd"
           if [ "$OOT2_RUNTIME_VARIANT" = upstream-v4 ]; then
             NXNATIVE_SHA="1794a35a1a2462a75cb1730eee29d32fac81248c"
+          elif [ "$OOT2_RUNTIME_VARIANT" = ipad-v5 ]; then
+            NXNATIVE_SHA="7f50222003e4270e3655d4f798e85744d390edf0"
           fi
           # Use a complete, immutable Git object ID (not a 39-digit prefix).
           [[ "$NXNATIVE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
@@ -229,12 +232,16 @@ jobs:
           # Patch only this ephemeral checkout to close the mmap and unlink
           # the Mac-runner copy after extracting the RomFS; never touch the
           # local CachyOS NUP or any other game.
-          if [ "$OOT2_RUNTIME_VARIANT" = upstream-v4 ]; then
+          if [ "$OOT2_RUNTIME_VARIANT" = ipad-v5 ]; then
+            python3 security/oot2_prepare_ipad_v5.py "$RUNNER_TEMP/nxnative"
+          elif [ "$OOT2_RUNTIME_VARIANT" = upstream-v4 ]; then
             python3 security/oot2_prepare_upstream.py "$RUNNER_TEMP/nxnative"
           else
             python3 security/oot2_patch_nup_release.py "$RUNNER_TEMP/nxnative/scripts/build_ipa_from_nsp.py"
           fi
-          if [ "$OOT2_RUNTIME_VARIANT" = upstream-v4 ]; then
+          if [ "$OOT2_RUNTIME_VARIANT" = ipad-v5 ]; then
+            echo 'iPad-v5: reviewed optimization recipe applied; old pin backports excluded.'
+          elif [ "$OOT2_RUNTIME_VARIANT" = upstream-v4 ]; then
             echo 'Official upstream-v4: old pin backports deliberately not applied.'
           elif [ "$OOT2_RUNTIME_VARIANT" = graphics-v2 ] || [ "$OOT2_RUNTIME_VARIANT" = terrain-v3 ]; then
             git -C "$RUNNER_TEMP/nxnative" fetch -q --depth 1 origin 167769131235226c739517a0a3e53fce48025b1f
@@ -426,13 +433,18 @@ jobs:
           python3 security/run_oot2.py
 
       - name: Conserver les entrees privees pour une future reconstruction du moteur
-        if: ${{ inputs.mode == 'build' && inputs.runtime_variant == 'upstream-v4' }}
+        if: ${{ inputs.mode == 'build' && (inputs.runtime_variant == 'upstream-v4' || inputs.runtime_variant == 'ipad-v5') }}
         continue-on-error: true
+        env:
+          OOT2_RUNTIME_VARIANT: ${{ inputs.runtime_variant }}
         run: |
           set -euo pipefail
-          python3 security/oot2_export_buildkit.py "$RUNNER_TEMP" "$RUNNER_TEMP/OOT2HostKit-v4.tar.zst"
+          KIT_VERSION=v4
+          KIT_ROUTE=oot2-write-host-kit-v1
+          if [ "$OOT2_RUNTIME_VARIANT" = ipad-v5 ]; then KIT_VERSION=v5; KIT_ROUTE=oot2-write-host-kit-v5; fi
+          python3 security/oot2_export_buildkit.py "$RUNNER_TEMP" "$RUNNER_TEMP/OOT2HostKit-$KIT_VERSION.tar.zst"
           ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 \
-            ffr-cachyos oot2-write-host-kit-v1 < "$RUNNER_TEMP/OOT2HostKit-v4.tar.zst"
+            ffr-cachyos "$KIT_ROUTE" < "$RUNNER_TEMP/OOT2HostKit-$KIT_VERSION.tar.zst"
           echo 'Private rebuild inputs saved; host-only rebuild still requires validation.'
 
       - name: Rapatrier IPA OOT2 sans lancement sur iPad
