@@ -13,7 +13,7 @@ on:
           - build
 
       runtime_variant:
-        description: Instrumented baseline or host-only memory experiment (same shader chain)
+        description: Pinned experiments or upstream-v4 (new revision and shader chain)
         type: choice
         required: true
         default: baseline
@@ -23,6 +23,7 @@ on:
           - memory-v1
           - graphics-v2
           - terrain-v3
+          - upstream-v4
 
       ipa_layout:
         description: Bundle all data, or slim IPA requiring matching Documents/romfs.img already on iPad
@@ -198,6 +199,9 @@ jobs:
           "$RUNNER_TEMP/oot2-venv/bin/python" -m pip install -q lz4 "capstone>=5,<6" fonttools nsz zbic "backports.zstd; python_version < '3.14'"
           # Pin the upstream code that processes the NUP; no keys are transferred.
           NXNATIVE_SHA="c229bd7d52e30f072362e31c7b1e3206d107d4cd"
+          if [ "$OOT2_RUNTIME_VARIANT" = upstream-v4 ]; then
+            NXNATIVE_SHA="1794a35a1a2462a75cb1730eee29d32fac81248c"
+          fi
           # Use a complete, immutable Git object ID (not a 39-digit prefix).
           [[ "$NXNATIVE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
             echo 'OOT2: invalid pinned upstream commit ID (expected full 40-hex SHA).' >&2
@@ -216,8 +220,14 @@ jobs:
           # Patch only this ephemeral checkout to close the mmap and unlink
           # the Mac-runner copy after extracting the RomFS; never touch the
           # local CachyOS NUP or any other game.
-          python3 security/oot2_patch_nup_release.py "$RUNNER_TEMP/nxnative/scripts/build_ipa_from_nsp.py"
-          if [ "$OOT2_RUNTIME_VARIANT" = graphics-v2 ] || [ "$OOT2_RUNTIME_VARIANT" = terrain-v3 ]; then
+          if [ "$OOT2_RUNTIME_VARIANT" = upstream-v4 ]; then
+            python3 security/oot2_prepare_upstream.py "$RUNNER_TEMP/nxnative"
+          else
+            python3 security/oot2_patch_nup_release.py "$RUNNER_TEMP/nxnative/scripts/build_ipa_from_nsp.py"
+          fi
+          if [ "$OOT2_RUNTIME_VARIANT" = upstream-v4 ]; then
+            echo 'Official upstream-v4: old pin backports deliberately not applied.'
+          elif [ "$OOT2_RUNTIME_VARIANT" = graphics-v2 ] || [ "$OOT2_RUNTIME_VARIANT" = terrain-v3 ]; then
             git -C "$RUNNER_TEMP/nxnative" fetch -q --depth 1 origin 167769131235226c739517a0a3e53fce48025b1f
             python3 security/oot2_patch_graphics.py "$RUNNER_TEMP/nxnative"
             python3 security/oot2_patch_runtime.py "$RUNNER_TEMP/nxnative" --variant memory-v1
@@ -375,6 +385,7 @@ jobs:
         if: ${{ inputs.mode == 'build' }}
         env:
           OOT2_IPA_LAYOUT: ${{ inputs.ipa_layout }}
+          OOT2_RUNTIME_VARIANT: ${{ inputs.runtime_variant }}
         run: |
           set -euo pipefail
           python3 security/run_oot2.py

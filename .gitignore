@@ -20,6 +20,8 @@
 *.p8
 *.mobileprovision
 *.env
+# Public, reviewed OOT2 runtime default; contains no credentials.
+!security/oot2_ipados_defaults.env
 .env.*
 private/
 resultats/
