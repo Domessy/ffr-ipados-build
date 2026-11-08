@@ -107,7 +107,7 @@ class Oot2GatewayTests(unittest.TestCase):
             selector = project / "selected-nup.json"
             selector.write_text(json.dumps(selected))
             with patch.object(gw, "HOME", home), patch.object(gw, "SOURCE_LINK", project/"source"):
-                self.assertEqual(gw.nup_file(), other)
+                self.assertTrue(gw.nup_file().samefile(other))
                 self.assertTrue(nup.exists())
                 selected["toc_sha256"] = "0" * 64
                 selector.write_text(json.dumps(selected))
