@@ -30,7 +30,6 @@ jobs:
           SRC="$RUNNER_TEMP/upstream-v4"
           git init -q "$SRC"
           git -C "$SRC" remote add origin https://github.com/seedds/nxnative.git
-          git -C "$SRC" fetch -q --depth 1 origin c229bd7d52e30f072362e31c7b1e3206d107d4cd
           git -C "$SRC" fetch -q --depth 1 origin 1794a35a1a2462a75cb1730eee29d32fac81248c
           git -C "$SRC" checkout -q --detach FETCH_HEAD
           python3 security/oot2_upstream_smoke.py "$SRC"

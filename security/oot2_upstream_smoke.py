@@ -58,7 +58,15 @@ def run(source):
             pass
         else:
             raise AssertionError('duplicate preparation must fail')
-        subprocess.run(['git', '-C', temp, 'update-ref', 'HEAD', 'c229bd7d52e30f072362e31c7b1e3206d107d4cd'], check=True)
+        # A shallow CI clone need not contain the old pin. Make an unrelated
+        # public synthetic revision locally so this rejection test is complete
+        # without depending on dangling objects surviving a clone.
+        tree = subprocess.check_output(['git', '-C', temp, 'mktree'], input='', text=True).strip()
+        other = subprocess.check_output(
+            ['git', '-C', temp, '-c', 'user.name=OOT2 Test', '-c',
+             'user.email=oot2-test@example.invalid', 'commit-tree', tree],
+            input='synthetic revision rejection fixture\n', text=True).strip()
+        subprocess.run(['git', '-C', temp, 'update-ref', 'HEAD', other], check=True)
         try:
             candidate.prepare(root)
         except ValueError:
