@@ -70,7 +70,7 @@
       "before_sha256": "8725733b4e7a69d6a6b34f25843aedcf14951ad97f9bc1b512ad5a00adf4cc24"
     },
     "dm/gfx/tests/test_dmsh_hmma.py": {
-      "after_sha256": "f7af9727a6973c4be8d7ba7688d5e2c3dbe67c262b8fa0bcf2f4650f71d49e7a",
+      "after_sha256": "8612ebdaea13da51f9ad4e32b8b0b9846010162627fdc252cf3305f9d6e36e77",
       "before_sha256": "9e16c497111976fefc017f32222e39a04199589776c19a60f7ea0042bbf0d90f"
     },
     "dm/gfx/tests/test_dmsh_redsum.py": {
@@ -137,8 +137,13 @@
     "e6c2e02ad80782022a8674e6a9cb80d0acc9c446"
   ],
   "fork_head": "e6c2e02ad80782022a8674e6a9cb80d0acc9c446",
+  "fork_repository": "https://github.com/aksmith-git/nxnative",
   "format": 1,
   "hardware_validation": "not yet tested on user iPad",
-  "patch_sha256": "45562d77aeda38f295a2636f030ec3c145c3d8a6becbbffc85029ee7067ccccb",
+  "local_adjustments": [
+    "HMMA parity fixture: initialize skipped output and keep collective calls uniform per SIMD group; retain exact bit equality"
+  ],
+  "official_repository": "https://github.com/seedds/nxnative",
+  "patch_sha256": "ef85d4fa153aadfa358d221e521cade6a0f37f0a84e3c8686b7ea611fc12eb31",
   "shader_chain": "fb6cc361728e"
 }

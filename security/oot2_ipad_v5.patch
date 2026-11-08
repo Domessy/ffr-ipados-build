@@ -1460,7 +1460,7 @@ index d7fc708f..ca0ca803 100644
  if __name__ == '__main__':
      unittest.main()
 diff --git a/dm/gfx/tests/test_dmsh_hmma.py b/dm/gfx/tests/test_dmsh_hmma.py
-index f2da6c86..86079e57 100644
+index f2da6c86..08a2fc7d 100644
 --- a/dm/gfx/tests/test_dmsh_hmma.py
 +++ b/dm/gfx/tests/test_dmsh_hmma.py
 @@ -17,7 +17,7 @@ import tempfile
@@ -1472,12 +1472,15 @@ index f2da6c86..86079e57 100644
  tree = ast.parse((TOOLS / 'dmsh_build.py').read_text())
  selected = [n for n in tree.body if (isinstance(n, ast.FunctionDef) and n.name in NAMES)
              or (isinstance(n, ast.Assign) and any(getattr(t, 'id', None) in NAMES for t in n.targets))]
-@@ -150,6 +150,51 @@ kernel void check_seq(device const ushort *in [[buffer(0)]], device uint *out [[
+@@ -150,6 +150,54 @@ kernel void check_seq(device const ushort *in [[buffer(0)]], device uint *out [[
      out[gid * 4] = uint(d4); out[gid * 4 + 1] = uint(e4); out[gid * 4 + 2] = uint(d3); out[gid * 4 + 3] = uint(e3);
  }
  '''
 +# B shared by calls (hmma_bslots): calls 1 and 2 use B0 (2 through copies of its words), 3 and 4 B2 with the first use in a branch, 5 B3 whose word is assigned twice,
 +# 6 B1 used once. Outputs every call's D; the GPU check compares it with the same kernel with every call's B through the scratch (dm_bf 0)
++# Keep collective matrix operations uniform within each SIMD-group. The skipped
++# group must also write a defined e3; comparing uninitialized words is not a
++# bitwise-equivalence test (Metal warned about e3 in the public runner).
 +BSHARE_KERNEL = '''
 +static uint pk(device const ushort* p, int i, int j) { return uint(p[i]) | uint(p[j]) << 16; }
 +kernel void check_seq(device const ushort *in [[buffer(0)]], device uint *out [[buffer(1)]], uint lane [[thread_index_in_simdgroup]], uint sg [[simdgroup_index_in_threadgroup]],
@@ -1500,14 +1503,14 @@ index f2da6c86..86079e57 100644
 +    int _131 = int(pk(B3, (2 * t + 8) * 8 + g, (2 * t + 9) * 8 + g));
 +    int c0 = int(pk(C, g * 8 + 2 * t, g * 8 + 2 * t + 1)), c1 = int(pk(C, (g + 8) * 8 + 2 * t, (g + 8) * 8 + 2 * t + 1));
 +    int f0 = 0, z = 0;
-+    int e1, e2, e3, e4, e5, e6, e7, d3 = 0;
++    int e1, e2, e3 = 0, e4, e5, e6, e7, d3 = 0;
 +    int _200 = as_type<int>(_100);
 +    int _201 = as_type<int>(_101);
 +    int d1 = dmsh_hmma16816_f16(l, blk, a00, a01, a02, a03, _200, _201, c0, c1, f0, z, z, z, z, z, z, e1, scr);
 +    int _210 = as_type<int>(_100);
 +    int _211 = _201;
 +    int d2 = dmsh_hmma16816_f16(l, blk, a10, a11, a12, a13, _210, _211, c0, c1, f0, z, z, z, z, z, z, e2, scr);
-+    if (g < 4)
++    if ((sg & 1u) == 0u)
 +    {
 +        d3 = dmsh_hmma16816_f16(l, blk, a00, a01, a02, a03, _120, _121, c0, c1, f0, z, z, z, z, z, z, e3, scr);
 +    }
@@ -1524,7 +1527,7 @@ index f2da6c86..86079e57 100644
  HALF = r'''#import <Foundation/Foundation.h>
  #import <Metal/Metal.h>
  static float h2f(uint16_t h) { __fp16 v; memcpy(&v, &h, 2); return (float)v; }
-@@ -206,6 +251,23 @@ int main(int argc, char **argv) {
+@@ -206,6 +254,23 @@ int main(int argc, char **argv) {
      }
  }
  '''
@@ -1548,7 +1551,7 @@ index f2da6c86..86079e57 100644
  # The run of calls: E0 = A0 (B0 + B1) + C and E1 = A1 (B2 + B3), each two HMMAs with an f16 accumulator in between: the tolerance is twice the single call's
  SEQ_RUNNER = HALF + r'''
  int main(int argc, char **argv) {
-@@ -272,9 +334,9 @@ class HmmaRewrite(unittest.TestCase):
+@@ -272,9 +337,9 @@ class HmmaRewrite(unittest.TestCase):
      def test_callers_get_their_matrices_and_shared_memory(self):
          out = hmma_msl(HEAD + HELPER + SEQ_KERNEL)
          kernel = out[out.index('kernel void check_seq'):]
@@ -1561,7 +1564,7 @@ index f2da6c86..86079e57 100644
          self.assertIn('adirect = (f & 16) != 0', out)
  
      def test_two_other_arrays_load_a_through_the_scratch(self):
-@@ -282,11 +344,18 @@ class HmmaRewrite(unittest.TestCase):
+@@ -282,11 +347,18 @@ class HmmaRewrite(unittest.TestCase):
          out = hmma_msl(HEAD + HELPER + src)
          self.assertNotIn('dm_shm', out)
          self.assertIn('adirect = false', out)
@@ -1582,7 +1585,7 @@ index f2da6c86..86079e57 100644
  
      def test_other_shaders_unchanged(self):
          src = HEAD + KERNEL.replace('dmsh_hmma16816_f16(l, blk, a0, a1, a2, a3, b0, b1, c0, c1, z, z, z, z, z, z, z, d1, scr)', 'a0')
-@@ -322,6 +391,25 @@ class HmmaRewrite(unittest.TestCase):
+@@ -322,6 +394,25 @@ class HmmaRewrite(unittest.TestCase):
  
  @unittest.skipUnless(shutil.which('xcrun') and shutil.which('clang'), 'needs Xcode')
  class HmmaOnGpu(unittest.TestCase):
