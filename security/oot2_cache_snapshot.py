@@ -15,6 +15,7 @@ import sqlite3
 import stat
 import subprocess
 import tempfile
+import time
 
 PART = re.compile(r'[A-Za-z0-9_.-]{1,180}\Z')
 MAX_FILE = 1 << 30
@@ -136,14 +137,23 @@ def accept(root):
         raise ValueError('snapshot size')
     db = sqlite3.connect(src.as_uri() + '?mode=ro', uri=True)
     try:
+        print('OOT2 cache validation: SQLite integrity check started.', flush=True)
         if db.execute('PRAGMA quick_check').fetchone()[0] != 'ok':
             raise ValueError('snapshot integrity')
         schema = db.execute("SELECT name,type FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY name").fetchall()
         if schema != [('blob', 'table'), ('entry', 'table')]:
             raise ValueError('snapshot schema')
+        expected = db.execute('SELECT coalesce(sum(length(data)),0) FROM blob').fetchone()[0]
+        checked, reported = 0, time.monotonic()
+        print(f'OOT2 cache validation: hashing {expected / 1024**3:.2f} GiB of compiled blobs.', flush=True)
         for digest, data in db.execute('SELECT hash,data FROM blob'):
             if len(data) > MAX_FILE or hashlib.blake2b(data, digest_size=16).digest() != digest:
                 raise ValueError('snapshot blob checksum')
+            checked += len(data)
+            if time.monotonic() - reported >= 10:
+                print(f'OOT2 cache validation: {checked / 1024**3:.2f}/{expected / 1024**3:.2f} GiB ({100 * checked / max(1, expected):.1f}%)', flush=True)
+                reported = time.monotonic()
+        print(f'OOT2 cache blob validation complete: {checked / 1024**3:.2f} GiB (100%); checking entries.', flush=True)
         count, total = 0, 0
         for name, size, digest_size in db.execute('SELECT e.name,length(b.data),length(b.hash) FROM entry e JOIN blob b ON e.blob=b.id'):
             count += 1

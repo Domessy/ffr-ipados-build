@@ -67,6 +67,39 @@ class OOT2TransferTests(unittest.TestCase):
                 transfer.transfer("nup", 3, dest)
             self.assertEqual(dest.read_bytes(), b"nup")
 
+    def test_cache_snapshot_progress_and_route_are_independent(self):
+        with tempfile.TemporaryDirectory() as temp:
+            folder = Path(temp) / 'oot2-shader-cas'
+            folder.mkdir()
+            dest = folder / 'metal-snapshot.zst'
+            output = io.StringIO()
+            with patch.dict(os.environ, {'RUNNER_TEMP': temp}), \
+                 patch.object(transfer.subprocess, 'Popen', return_value=DummySSH(b'zstd')) as ssh, \
+                 contextlib.redirect_stdout(output):
+                transfer.transfer('metal-snapshot', 4, dest)
+            self.assertEqual(dest.read_bytes(), b'zstd')
+            self.assertEqual(ssh.call_args.args[0][-1], 'oot2-read-metal-snapshot-v1')
+            self.assertIn('100.0%', output.getvalue())
+            self.assertIn('GiB', output.getvalue())
+            self.assertNotIn(str(dest), output.getvalue())
+            with patch.dict(os.environ, {'RUNNER_TEMP': temp}):
+                with self.assertRaises(ValueError):
+                    transfer.transfer('metal-snapshot', 4, folder / 'OcarinaOfTime.nup')
+
+    def test_cache_truncation_and_ssh_failure_never_publish(self):
+        with tempfile.TemporaryDirectory() as temp:
+            folder = Path(temp) / 'oot2-shader-cas'
+            folder.mkdir()
+            dest = folder / 'metal-snapshot.zst'
+            for size, code, error in ((9, 0, ValueError), (4, 255, RuntimeError), (3, 0, ValueError)):
+                with patch.dict(os.environ, {'RUNNER_TEMP': temp}), \
+                     patch.object(transfer.subprocess, 'Popen', return_value=DummySSH(b'zstd', code)), \
+                     contextlib.redirect_stdout(io.StringIO()):
+                    with self.assertRaises(error):
+                        transfer.transfer('metal-snapshot', size, dest)
+                self.assertFalse(dest.exists())
+                self.assertEqual(list(folder.glob('*.partial')), [])
+
     def test_mismatch_never_publishes_partial_file(self):
         with tempfile.TemporaryDirectory() as temp:
             folder = self.setup_folder(temp)

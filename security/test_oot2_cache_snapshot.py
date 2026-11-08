@@ -133,6 +133,17 @@ class SnapshotTests(unittest.TestCase):
             send.assert_called_once_with(archive)
             self.assertEqual(gw.dispatch('oot2-read-metal-snapshot-v1 /etc/passwd', gate), 126)
 
+    def test_snapshot_info_reports_only_aggregate_numeric_metadata(self):
+        archive = self.root / 'fixture.zst'
+        archive.write_bytes(b'compressed')
+        with patch.object(gw, 'CACHE', self.cache), patch.object(gw, 'ROOT', self.root), \
+             patch.object(snap, 'snapshot', return_value=(archive, {'sqlite_bytes': 100, 'entries': 2})), \
+             patch('builtins.print') as emit, patch.object(gate, 'send_file') as send:
+            self.assertEqual(gw.dispatch('oot2-metal-snapshot-info-v1', gate), 0)
+            emit.assert_called_once_with('OOT2_METAL_SNAPSHOT_V1', 10, 100, 2)
+            send.assert_not_called()
+            self.assertEqual(gw.dispatch('oot2-metal-snapshot-info-v1 /private', gate), 126)
+
     @unittest.skipUnless(shutil.which('zstd'), 'zstd unavailable; synthetic database tests still run')
     def test_real_zstd_roundtrip(self):
         archive, _ = snap.snapshot(self.cache, self.out)

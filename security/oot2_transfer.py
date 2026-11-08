@@ -12,7 +12,9 @@ import subprocess
 import tempfile
 import time
 
-ROUTES = {"nup": "oot2-read-nup"}
+ROUTES = {"nup": "oot2-read-nup", "metal-snapshot": "oot2-read-metal-snapshot-v1"}
+DESTINATIONS = {"nup": ("oot2-nup", "OcarinaOfTime.nup"),
+                "metal-snapshot": ("oot2-shader-cas", "metal-snapshot.zst")}
 MiB = 1024 ** 2
 GiB = 1024 ** 3
 MAX_SIZE = 80 * GiB
@@ -40,10 +42,11 @@ def transfer(role, expected, output):
     if role not in ROUTES or not 0 < expected <= MAX_SIZE:
         raise ValueError("invalid OOT2 transfer role or declared size")
     runner_temp = Path(os.environ["RUNNER_TEMP"]).resolve(strict=True)
-    folder = runner_temp / "oot2-nup"
+    folder_name, filename = DESTINATIONS[role]
+    folder = runner_temp / folder_name
     if output.parent.resolve(strict=True) != folder.resolve(strict=True):
-        raise ValueError("output must be in the dedicated OOT2 NUP directory")
-    if output.name != "OcarinaOfTime.nup" or output.is_symlink():
+        raise ValueError("output must be in the dedicated OOT2 transfer directory")
+    if output.name != filename or output.is_symlink():
         raise ValueError("invalid output filename")
 
     # Progress comes from how many bytes the receiving Mac has written, not
