@@ -5,6 +5,7 @@ import struct
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 from security import oot2_nup_info as n
 
 SIZE = 200 * 1024**2
@@ -53,6 +54,23 @@ def fake_nup(path, *, version=n.VERSION, base=True, title=TITLE,
 
 
 class NupInfoTests(unittest.TestCase):
+    def test_release_identity_supports_verified_base_and_standalone_layouts(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / 'source.nup'
+            for base in (False, True):
+                fake_nup(p, base=base, standalone=True, base_version=65536,
+                         romfs_file_bytes=8)
+                identity = n.release_identity(p)
+                with p.open('rb') as stream:
+                    digest = n.SUPER.unpack(stream.read(n.SUPER.size))[5].hex()
+                self.assertEqual(identity, f'{SIZE}:{digest}')
+            fake_nup(p, base=False, standalone=True)
+            with self.assertRaisesRegex(n.NupInvalid, 'release_layout'):
+                n.release_identity(p)
+            with patch.object(n, 'inspect', return_value=(SIZE, 1, 1, 3)):
+                with self.assertRaisesRegex(n.NupInvalid, 'release_layout'):
+                    n.release_identity(p)
+
     def test_metadata_valid_for_base_plus_registered_patch(self):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "anything.nup"

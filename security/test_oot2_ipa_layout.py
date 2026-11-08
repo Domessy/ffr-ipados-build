@@ -5,12 +5,14 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
+from security.test_oot2_nup_info import fake_nup
+from security.oot2_nup_info import release_identity
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class IpaLayoutTests(unittest.TestCase):
-    def exercise(self, layout, variant='baseline'):
+    def exercise(self, layout, variant='baseline', valid_identity=True):
         with tempfile.TemporaryDirectory() as temp:
             values = {'RUNNER_TEMP': temp, 'GITHUB_WORKSPACE': str(ROOT),
                       'OOT2_RUNTIME_VARIANT': variant}
@@ -25,7 +27,8 @@ class IpaLayoutTests(unittest.TestCase):
                 mod.CACHE.mkdir()
                 mod.CAS_DB.write_bytes(b'synthetic')
                 mod.NUP_FOLDER.mkdir()
-                mod.NUP.write_bytes(b'synthetic')
+                fake_nup(mod.NUP, standalone=True, romfs_file_bytes=8, base_version=65536)
+                os.environ['OOT2_NUP_ID'] = release_identity(mod.NUP) if valid_identity else 'wrong'
                 mod.OUTPUT.write_bytes(b'synthetic')
                 proc = Mock()
                 proc.poll.return_value = 0
@@ -40,6 +43,11 @@ class IpaLayoutTests(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertIn('--no-keep-extracted', call.args[0])
         self.assertNotIn('--romfs', call.args[0])
+
+    def test_changed_source_identity_starts_no_builder(self):
+        rc, _, count = self.exercise('bundle', valid_identity=False)
+        self.assertEqual(rc, 1)
+        self.assertEqual(count, 0)
 
     def test_separate_obeys_upstream_keep_requirement(self):
         rc, call, _ = self.exercise('separate')

@@ -8,9 +8,9 @@ from pathlib import Path
 import json
 import re
 try:
-    from .oot2_nup_info import TITLE, VERSION, SUPER, inspect, selected_romfs_bytes, NupInvalid
+    from .oot2_nup_info import TITLE, VERSION, SUPER, inspect, selected_romfs_bytes, release_identity, NupInvalid
 except ImportError:  # forced-command gateway runs as a standalone script
-    from oot2_nup_info import TITLE, VERSION, SUPER, inspect, selected_romfs_bytes, NupInvalid
+    from oot2_nup_info import TITLE, VERSION, SUPER, inspect, selected_romfs_bytes, release_identity, NupInvalid
 
 HOME = Path.home()
 ROOT = HOME / "portage-ipados" / "oot-switch2"
@@ -25,6 +25,7 @@ ROUTES = frozenset({
     "oot2-write-ipa", "oot2-write-log",
     "oot2-read-metal-snapshot-v1",
     "oot2-metal-snapshot-info-v1",
+    "oot2-release-preflight-v1",
     "oot2-write-host-kit-v1",
 })
 
@@ -102,6 +103,9 @@ def dispatch(command, parent):
     if command == "oot2-probe-v1":
         nup_file()
         print("OOT2_GATEWAY_V1")
+        return 0
+    if command == "oot2-release-preflight-v1":
+        print("OOT2_RELEASE_READY_V1", release_identity(nup_file()))
         return 0
     if command == "oot2-manifest-v1":
         size, base, selected, count = inspect(nup_file())

@@ -103,6 +103,20 @@ def inspect(path):
 
 
 
+def release_identity(path):
+    """Bind runner-copy cleanup to verified metadata, before any transfer.
+
+    Both standalone updates and base+update containers are supported. Extra
+    packages/versions are refused because cleanup only follows one extraction.
+    """
+    size, bases, updates, packages = inspect(path)
+    if updates != 1 or packages != bases + 1 or selected_romfs_bytes(path) <= 0:
+        raise NupInvalid("release_layout")
+    with Path(path).open("rb") as stream:
+        digest = SUPER.unpack(stream.read(SUPER.size))[5].hex()
+    return f"{size}:{digest}"
+
+
 def selected_romfs_bytes(path):
     """Read-only sum of the selected update's RomFS file sizes from the NUP TOC.
 

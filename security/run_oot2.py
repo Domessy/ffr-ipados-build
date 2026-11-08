@@ -12,6 +12,10 @@ import signal
 import subprocess
 import sys
 import time
+try:
+    from security.oot2_nup_info import release_identity
+except ImportError:
+    from oot2_nup_info import release_identity
 
 TEMP = Path(os.environ["RUNNER_TEMP"])
 WORKSPACE = Path(os.environ["GITHUB_WORKSPACE"])
@@ -182,6 +186,14 @@ def compile_ipa():
     if not NUP.is_file() or NUP.is_symlink():
         print("OOT2: private NUP missing; no build started.", flush=True)
         return 1
+    try:
+        identity = release_identity(NUP)
+        if identity != os.environ.get("OOT2_NUP_ID"):
+            raise ValueError("source identity changed")
+    except (OSError, ValueError):
+        print("OOT2: runner NUP does not match the source release preflight; no build started.", flush=True)
+        return 1
+    env["OOT2_RELEASE_EPHEMERAL_NUP_ID"] = identity
     cmd = [str(PYTHON), str(NATIVE / "scripts" / "build_ipa_from_nsp.py"),
            str(NUP), "-o", str(OUTPUT), "-p", "v131072",
            "--platform", "ios", "--work-dir", str(TEMP / "oot2-work"),

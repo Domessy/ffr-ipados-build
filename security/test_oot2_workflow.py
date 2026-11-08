@@ -13,6 +13,13 @@ EXPECTED = {"FFR_TS_AUTHKEY","FFR_SSH_KEY","FFR_SSH_KNOWN_HOSTS",
 
 
 class WorkflowContractTests(unittest.TestCase):
+    def test_runner_cleanup_preflight_precedes_all_large_transfers(self):
+        workflow = BUILD.read_text()
+        preflight = workflow.index('oot2-release-preflight-v1')
+        self.assertLess(preflight, workflow.index('Restaurer le cache de shaders OOT2'))
+        self.assertLess(preflight, workflow.index('Transferer uniquement le NUP'))
+        self.assertIn('echo "OOT2_NUP_ID=$RELEASE_ID" >> "$GITHUB_ENV"', workflow)
+
     def test_network_secret_names_match_working_dread(self):
         workflow=BUILD.read_text()
         known=REFERENCE.read_text()
@@ -52,7 +59,9 @@ class WorkflowContractTests(unittest.TestCase):
         patch_script = (ROOT/"security/oot2_patch_nup_release.py").read_text()
         self.assertIn('fam["nup"].close()', patch_script)
         self.assertIn("candidate.unlink()", patch_script)
-        self.assertIn("25020741061", patch_script)
+        self.assertIn('OOT2_RELEASE_EPHEMERAL_NUP_ID', patch_script)
+        self.assertIn("fam['nup'].toc_sha.hex()", patch_script)
+        self.assertNotIn("25020741061", patch_script)
 
     def test_one_nup_without_keys(self):
         workflow=BUILD.read_text()
