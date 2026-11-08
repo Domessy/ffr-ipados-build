@@ -13,12 +13,12 @@ TITLE = n.TITLE
 
 def fake_nup(path, *, version=n.VERSION, base=True, title=TITLE,
              broken_toc=False, standalone=False, reserved=0,
-             update_romfs=None, romfs_file_bytes=0):
+             update_romfs=None, romfs_file_bytes=0, base_version=0):
     """A synthetic metadata-only NUP, never a valid game image."""
     recs = []
     if base:
         recs.append(n.PKG.pack(title, 0, n.NO_DIR if hasattr(n, "NO_DIR") else 0xFFFFFFFF,
-                               0xFFFFFFFF, 0, 0, 0, 0, 0, 0, 0))
+                               0xFFFFFFFF, base_version, 0, 0, 0, 0, 0, 0))
     ndirs = 3 if standalone else 1
     exefs = 1 if standalone else 0xFFFFFFFF
     romfs = (2 if standalone else 0xFFFFFFFF) if update_romfs is None else update_romfs
@@ -64,6 +64,15 @@ class NupInfoTests(unittest.TestCase):
             p = Path(d) / "standalone.nup"
             fake_nup(p, base=False, standalone=True, reserved=1)
             self.assertEqual(n.inspect(p), (SIZE, 0, 1, 1))
+
+    def test_base_version_label_does_not_override_selected_update(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "replacement.nup"
+            fake_nup(p, base_version=65536)
+            self.assertEqual(n.inspect(p), (SIZE, 1, 1, 2))
+            fake_nup(p, base_version=65536, version=196608)
+            with self.assertRaisesRegex(n.NupInvalid, "version"):
+                n.inspect(p)
 
     def test_space_estimate_from_selected_romfs(self):
         with tempfile.TemporaryDirectory() as d:
