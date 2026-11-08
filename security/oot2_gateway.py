@@ -5,10 +5,12 @@ No Nintendo keys are required for a NUP. No shell command or arbitrary path
 is accepted, and output/caches never share another game's workspace.
 """
 from pathlib import Path
+import json
+import re
 try:
-    from .oot2_nup_info import TITLE, VERSION, inspect, selected_romfs_bytes, NupInvalid
+    from .oot2_nup_info import TITLE, VERSION, SUPER, inspect, selected_romfs_bytes, NupInvalid
 except ImportError:  # forced-command gateway runs as a standalone script
-    from oot2_nup_info import TITLE, VERSION, inspect, selected_romfs_bytes, NupInvalid
+    from oot2_nup_info import TITLE, VERSION, SUPER, inspect, selected_romfs_bytes, NupInvalid
 
 HOME = Path.home()
 ROOT = HOME / "portage-ipados" / "oot-switch2"
@@ -35,6 +37,33 @@ def nup_file():
             or folder.name.casefold() != "the legend of zelda ocarina of time"):
         raise ValueError("source")
     files = sorted(p for p in folder.iterdir() if p.suffix.casefold() == ".nup")
+    # Local selection is never supplied by the SSH client. Bind it to the
+    # validated container's size and TOC, preserving every original NUP.
+    selector = SOURCE_LINK.parent / "selected-nup.json"
+    if selector.exists() or selector.is_symlink():
+        if selector.is_symlink() or not selector.is_file() or selector.stat().st_size > 4096:
+            raise ValueError("selection")
+        try:
+            chosen = json.loads(selector.read_text())
+            if (not isinstance(chosen, dict) or set(chosen) != {"filename", "bytes", "toc_sha256"}
+                    or not isinstance(chosen["filename"], str)
+                    or chosen["filename"] in ("", ".", "..")
+                    or "/" in chosen["filename"] or "\\" in chosen["filename"]
+                    or type(chosen["bytes"]) is not int
+                    or not isinstance(chosen["toc_sha256"], str)
+                    or not re.fullmatch(r"[0-9a-f]{64}", chosen["toc_sha256"])):
+                raise ValueError("selection")
+            file = folder / chosen["filename"]
+            if file not in files:
+                raise ValueError("selection")
+            inspect(file)  # Includes actual TOC digest verification.
+            with file.open("rb") as stream:
+                header = SUPER.unpack(stream.read(SUPER.size))
+            if file.stat().st_size != chosen["bytes"] or header[5].hex() != chosen["toc_sha256"]:
+                raise ValueError("selection")
+        except (OSError, ValueError, TypeError, KeyError):
+            raise ValueError("selection") from None
+        return file
     if len(files) != 1:
         raise ValueError("count")
     file = files[0]
@@ -58,7 +87,7 @@ def diagnose():
     except NupInvalid as exc:
         reason = exc.reason
     except (OSError, ValueError) as exc:
-        reason = str(exc) if str(exc) in ("source", "count") else "source"
+        reason = str(exc) if str(exc) in ("source", "count", "selection") else "source"
     print(f"OOT2_DIAG_V1 source={'ok' if source else 'fail'} "
           f"nup={'ok' if nup else 'fail'} reason={reason}")
     return 0

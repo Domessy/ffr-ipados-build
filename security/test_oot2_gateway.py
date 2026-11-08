@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Fixed SSH gateway unit tests using synthetic sparse NUP only."""
 from pathlib import Path
+import json
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -92,6 +93,47 @@ class Oot2GatewayTests(unittest.TestCase):
             link.symlink_to(outside, target_is_directory=True)
             with patch.object(gw, "HOME", home), patch.object(gw, "SOURCE_LINK", link):
                 with self.assertRaisesRegex(ValueError, "source"):
+                    gw.nup_file()
+
+    def test_explicit_selection_preserves_multiple_originals(self):
+        with tempfile.TemporaryDirectory() as d:
+            home = Path(d)
+            nup, project = self.fixture(home)
+            other = nup.with_name("Validated update.nup")
+            fake_nup(other)
+            with other.open("rb") as stream:
+                digest = gw.SUPER.unpack(stream.read(gw.SUPER.size))[5].hex()
+            selected = {"filename": other.name, "bytes": SIZE, "toc_sha256": digest}
+            selector = project / "selected-nup.json"
+            selector.write_text(json.dumps(selected))
+            with patch.object(gw, "HOME", home), patch.object(gw, "SOURCE_LINK", project/"source"):
+                self.assertTrue(gw.nup_file().samefile(other))
+                self.assertTrue(nup.exists())
+                selected["toc_sha256"] = "0" * 64
+                selector.write_text(json.dumps(selected))
+                with self.assertRaisesRegex(ValueError, "selection"):
+                    gw.nup_file()
+                selected["toc_sha256"] = digest
+                selected["bytes"] -= 1
+                selector.write_text(json.dumps(selected))
+                with self.assertRaisesRegex(ValueError, "selection"):
+                    gw.nup_file()
+
+    def test_invalid_selector_never_falls_back(self):
+        with tempfile.TemporaryDirectory() as d:
+            home = Path(d)
+            nup, project = self.fixture(home)
+            selector = project / "selected-nup.json"
+            with patch.object(gw, "HOME", home), patch.object(gw, "SOURCE_LINK", project/"source"):
+                for value in ("{", "[]", "x" * 4097,
+                              json.dumps({"filename": "../escape.nup", "bytes": SIZE, "toc_sha256": "0"*64}),
+                              json.dumps({"filename": "missing.nup", "bytes": SIZE, "toc_sha256": "0"*64})):
+                    selector.write_text(value)
+                    with self.assertRaisesRegex(ValueError, "selection"):
+                        gw.nup_file()
+                selector.unlink()
+                selector.symlink_to(nup)
+                with self.assertRaisesRegex(ValueError, "selection"):
                     gw.nup_file()
 
     def test_private_cache_and_ipa_outputs_isolated(self):

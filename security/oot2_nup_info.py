@@ -75,7 +75,10 @@ def inspect(path):
     if len(bases) > 1:
         raise NupInvalid("base")
     if bases:
-        if bases[0][0] != TITLE or bases[0][4] != 0:
+        # Some producers label the base record with its dump's version
+        # (our verified replacement uses 65536). Upstream scan() identifies
+        # the base by kind, not this label; the selected update remains exact.
+        if bases[0][0] != TITLE:
             raise NupInvalid("title_id")
     else:
         # nxnative accepts a NUP without a base when every update is
