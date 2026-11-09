@@ -112,6 +112,19 @@ class SQLiteCasTests(unittest.TestCase):
                     "WHERE e.name=?", (key,)).fetchone()
                 self.assertEqual(row[0], data)
 
+    def test_inflight_stage_is_not_a_persistent_checkpoint_member(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d).resolve()
+            with contextlib.redirect_stdout(io.StringIO()):cas.prepare(root)
+            add(root/'cas.db','stage/0123456789abcdef/ios/transient.metallib',b'in flight',time.time()-3)
+            add(root/'cas.db','metallib/ios/ready.metallib',b'committed library',time.time()-3)
+            output=archive(root,0,time.time_ns())
+            self.assertEqual(output.returncode,0,output.stderr)
+            with tarfile.open(fileobj=io.BytesIO(output.stdout),mode='r:gz') as tar:
+                self.assertEqual(tar.getnames(),['metallib/ios/ready.metallib'])
+            with sqlite3.connect(root/'cas.db') as db:
+                self.assertEqual(db.execute("SELECT count(*) FROM entry WHERE name LIKE 'stage/%'").fetchone()[0],1)
+
     def test_invalid_cache_path_is_not_exported(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)

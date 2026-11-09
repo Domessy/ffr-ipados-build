@@ -133,7 +133,7 @@ def export(root, since_ns, before_ns):
         cursor = db.execute(
             "SELECT e.name, b.data, e.mtime "
             "FROM entry e JOIN blob b ON b.id=e.blob "
-            "WHERE e.mtime>? AND e.mtime<=? ORDER BY e.name",
+            "WHERE e.mtime>? AND e.mtime<=? AND substr(e.name,1,6) != 'stage/' ORDER BY e.name",
             (since, before))
         with tarfile.open(fileobj=sys.stdout.buffer, mode="w|gz",
                           compresslevel=1) as tar:

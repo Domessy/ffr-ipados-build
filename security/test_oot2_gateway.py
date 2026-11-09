@@ -38,6 +38,16 @@ class Oot2GatewayTests(unittest.TestCase):
                     send.assert_called_once_with(archive)
                 self.assertEqual(gw.dispatch('oot2-read-resume-v5 /arbitrary', parent), 126)
 
+    def test_v6_slim_route_bundles_only_fixed_private_paths(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d).resolve()
+            with patch.object(gw, 'ROOT', root), patch.object(gw, 'OUTPUT', root/'out'), patch.object(parent,'receive_file') as receive, patch('security.oot2_local_bundle.bundle',return_value={'ipa_bytes':123}) as bundle:
+                (root/'out').mkdir()
+                self.assertEqual(gw.dispatch('oot2-write-slim-v6',parent),0)
+                receive.assert_called_once_with('ZeldaOcarinaOfTime-v6-slim.ipa',8<<30)
+                self.assertEqual(bundle.call_args.args,(root/'out/ZeldaOcarinaOfTime-v6-slim.ipa',root/'local-bundle-v6/extract/v131072/RomFS.img',root/'local-bundle-v6/romfs-manifest.json',root/'out/ZeldaOcarinaOfTime.ipa'))
+                self.assertEqual(gw.dispatch('oot2-write-slim-v6 /arbitrary',parent),126)
+
     @staticmethod
     def fixture(home):
         docs = home / "Documents"

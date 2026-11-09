@@ -59,6 +59,14 @@ class IpaLayoutTests(unittest.TestCase):
         self.assertEqual(call.kwargs['env']['DMSH_CAS'], str(Path(call.kwargs['cwd']).parent/'oot2-shader-cas/cas.db'))
         self.assertIn('OOT2_RELEASE_EPHEMERAL_NUP', call.kwargs['env'])
 
+    def test_local_bundle_v6_uses_slim_native_pack_and_v6_defaults(self):
+        rc, call, _ = self.exercise('local-bundle', 'ipad-v6')
+        self.assertEqual(rc, 0)
+        argv = call.args[0]
+        self.assertEqual(argv[argv.index('--romfs') + 1], 'separate')
+        self.assertIn('--keep-extracted', argv)
+        self.assertTrue(argv[argv.index('--env-file') + 1].endswith('oot2_ipad_v6_defaults.env'))
+
     def test_bad_layout_starts_no_builder(self):
         rc, _, count = self.exercise('unknown')
         self.assertEqual(rc, 1)

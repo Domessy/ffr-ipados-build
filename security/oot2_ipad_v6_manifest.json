@@ -1,0 +1,29 @@
+{
+  "base_revision": "8d5d4f1b04610fef5a96521c72a4263d68794959",
+  "shader_chain": "0c434f1b68df",
+  "native_changes": "official sources plus bounded existing memory telemetry and runner-only NUP cleanup",
+  "v5_preserved": true,
+  "experimental_fork_overlay_applied": false,
+  "reason": "Use the complete official dependency set, avoid overlaying superseded queue/shader/texture implementations. v5 remains available for comparison.",
+  "grass_prepass_enabled": false,
+  "defaults": [
+    "DM_GUEST_FILE=1",
+    "DM_NVN_RT_RECYCLE=1"
+  ],
+  "included_fixes": [
+    "bf420fda",
+    "70b9a68a",
+    "4c3a03af",
+    "4a815619",
+    "c06d1e79",
+    "caa4a8a0",
+    "e4e5ff64",
+    "8d5d4f1b",
+    "a2cfd407",
+    "1d377206",
+    "b001c49b",
+    "356a7132",
+    "9983d659"
+  ],
+  "m5_hardware_validated": false
+}

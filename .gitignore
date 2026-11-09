@@ -33,3 +33,5 @@ resultats/
 __pycache__/
 *.pyc
 .DS_Store
+
+!security/oot2_ipad_v6_defaults.env
