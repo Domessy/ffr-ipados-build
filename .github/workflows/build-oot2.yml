@@ -43,6 +43,7 @@ on:
         options:
           - full
           - metal-snapshot
+          - resume-v5
 
 permissions:
   contents: read
@@ -360,6 +361,7 @@ jobs:
         if: ${{ inputs.mode == 'build' }}
         env:
           OOT2_CACHE_RESTORE: ${{ inputs.cache_restore }}
+          OOT2_RUNTIME_VARIANT: ${{ inputs.runtime_variant }}
         run: |
           set -euo pipefail
           # nxnative Store opens DMSH_CAS with sqlite3.connect(): FILE path.
@@ -368,21 +370,30 @@ jobs:
           export DMSH_CAS="$RUNNER_TEMP/oot2-shader-cas/cas.db"
           umask 077
           mkdir -p "$(dirname "$DMSH_CAS")"
-          if [ "$OOT2_CACHE_RESTORE" = metal-snapshot ]; then
+          if [ "$OOT2_CACHE_RESTORE" = metal-snapshot ] || [ "$OOT2_CACHE_RESTORE" = resume-v5 ]; then
+            SNAPSHOT_ROUTE=oot2-metal-snapshot-info-v1
+            SNAPSHOT_ROLE=metal-snapshot
+            ACCEPT_ARGS=()
+            if [ "$OOT2_CACHE_RESTORE" = resume-v5 ]; then
+              [[ "$OOT2_RUNTIME_VARIANT" = ipad-v5 ]] || { echo "Resume cache is specific to ipad-v5." >&2; exit 1; }
+              SNAPSHOT_ROUTE=oot2-resume-v5-info
+              SNAPSHOT_ROLE=resume-v5
+              ACCEPT_ARGS=(--translations)
+            fi
             # Direct SQLite avoids the flat tar extraction/import round trip.
             # Compile keys include MSL, flags and compiler; no chain relabel.
             echo 'OOT2 cache: preparing snapshot metadata on CachyOS.'
-            read -r MARK COMPRESSED_BYTES SQLITE_BYTES SNAPSHOT_ENTRIES <<< "$(ssh -o ConnectTimeout=20 -o ServerAliveInterval=30 -o ServerAliveCountMax=6 ffr-cachyos oot2-metal-snapshot-info-v1)"
+            read -r MARK COMPRESSED_BYTES SQLITE_BYTES SNAPSHOT_ENTRIES <<< "$(ssh -o ConnectTimeout=20 -o ServerAliveInterval=30 -o ServerAliveCountMax=6 ffr-cachyos "$SNAPSHOT_ROUTE")"
             [[ "$MARK" == OOT2_METAL_SNAPSHOT_V1 && "$COMPRESSED_BYTES" =~ ^[1-9][0-9]*$ && "$SQLITE_BYTES" =~ ^[1-9][0-9]*$ && "$SNAPSHOT_ENTRIES" =~ ^[1-9][0-9]*$ ]]
             free=$(( $(df -Pk "$RUNNER_TEMP" | awk 'NR==2 {print $4}') * 1024 ))
             # The compressed file temporarily coexists with its database.
             (( free >= COMPRESSED_BYTES + SQLITE_BYTES + 7 * 1024**3 )) || { echo 'OOT2: insufficient cache restoration disk.' >&2; exit 1; }
-            python3 security/oot2_transfer.py metal-snapshot "$COMPRESSED_BYTES" "$(dirname "$DMSH_CAS")/metal-snapshot.zst"
+            python3 security/oot2_transfer.py "$SNAPSHOT_ROLE" "$COMPRESSED_BYTES" "$(dirname "$DMSH_CAS")/metal-snapshot.zst"
             echo 'OOT2 cache transfer complete (100%); decompressing SQLite snapshot.'
             zstd -q -d -c "$(dirname "$DMSH_CAS")/metal-snapshot.zst" > "$DMSH_CAS.partial"
             rm "$(dirname "$DMSH_CAS")/metal-snapshot.zst"
             echo 'OOT2 cache decompressed; validating database and compiled blobs.'
-            python3 security/oot2_cache_snapshot.py accept "$(dirname "$DMSH_CAS")"
+            python3 security/oot2_cache_snapshot.py accept "$(dirname "$DMSH_CAS")" "${ACCEPT_ARGS[@]}"
           elif [ "$OOT2_CACHE_RESTORE" = full ]; then
             ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 ffr-cachyos oot2-read-cache | tar -xz -C "$(dirname "$DMSH_CAS")"
             python3 security/oot2_sqlite_cas.py prepare "$(dirname "$DMSH_CAS")"

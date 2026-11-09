@@ -33,6 +33,14 @@ def metal_name(name):
             and all(p not in ('.', '..') and PART.fullmatch(p) for p in parts))
 
 
+def cache_name(name, translations=False):
+    if not translations:
+        return metal_name(name)
+    parts = name.split('/')
+    return (2 <= len(parts) <= 7 and parts[0] in ('metallib', 'shader', 'index', 'variant')
+            and all(p not in ('.', '..') and PART.fullmatch(p) for p in parts))
+
+
 def safe_dir(path):
     path = Path(path)
     # Walk parents too: a root redirect must not broaden a fixed-route export.
@@ -41,9 +49,9 @@ def safe_dir(path):
     return path
 
 
-def inventory(cache):
+def inventory(cache, translations=False):
     cache = safe_dir(cache)
-    base = safe_dir(cache / 'metallib')
+    base = safe_dir(cache if translations else cache / 'metallib')
     rows, total = [], 0
     if not base.is_dir():
         raise ValueError('compiled Metal cache missing')
@@ -53,7 +61,7 @@ def inventory(cache):
             p = Path(folder) / name
             label = p.relative_to(cache).as_posix()
             st = p.lstat()
-            if not stat.S_ISREG(st.st_mode) or not metal_name(label):
+            if not stat.S_ISREG(st.st_mode) or not cache_name(label, translations):
                 continue
             total += st.st_size
             if st.st_size > MAX_FILE or total > MAX_BYTES or len(rows) >= MAX_FILES:
@@ -65,14 +73,14 @@ def inventory(cache):
     return rows, total, fingerprint
 
 
-def snapshot(cache, output):
+def snapshot(cache, output, translations=False):
     cache, output = safe_dir(cache), safe_dir(output)
     output.mkdir(mode=0o700, parents=True, exist_ok=True)
     os.chmod(output, 0o700)
     lock = output / 'metal-v1.lock'
     with os.fdopen(os.open(lock, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600), 'rb') as guard:
         fcntl.flock(guard, fcntl.LOCK_EX)
-        rows, source_bytes, fingerprint = inventory(cache)
+        rows, source_bytes, fingerprint = inventory(cache, translations)
         archive = output / 'metal-v1.sqlite.zst'
         manifest = output / 'metal-v1.json'
         if archive.is_symlink() or manifest.is_symlink():
@@ -127,7 +135,7 @@ def snapshot(cache, output):
             return archive, stats
 
 
-def accept(root):
+def accept(root, translations=False):
     """Publish a complete runner-local snapshot only after validation."""
     root = safe_dir(root)
     src, dst = root / 'cas.db.partial', root / 'cas.db'
@@ -158,7 +166,7 @@ def accept(root):
         for name, size, digest_size in db.execute('SELECT e.name,length(b.data),length(b.hash) FROM entry e JOIN blob b ON e.blob=b.id'):
             count += 1
             total += size
-            if not metal_name(name) or size > MAX_FILE or digest_size != 16 or count > MAX_FILES or total > MAX_BYTES:
+            if not cache_name(name, translations) or size > MAX_FILE or digest_size != 16 or count > MAX_FILES or total > MAX_BYTES:
                 raise ValueError('snapshot entry')
         if not count or count != db.execute('SELECT count(*) FROM entry').fetchone()[0]:
             raise ValueError('snapshot missing entries')
@@ -179,9 +187,10 @@ if __name__ == '__main__':
     create.add_argument('output', type=Path)
     validate = sub.add_parser('accept')
     validate.add_argument('root', type=Path)
+    validate.add_argument('--translations', action='store_true')
     args = parser.parse_args()
     if args.cmd == 'create':
         _, stats = snapshot(args.cache, args.output)
         print(json.dumps(stats, sort_keys=True))
     else:
-        accept(args.root)
+        accept(args.root, translations=args.translations)

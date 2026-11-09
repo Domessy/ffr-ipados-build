@@ -26,6 +26,7 @@ ROUTES = frozenset({
     "oot2-read-metal-snapshot-v1",
     "oot2-metal-snapshot-info-v1",
     "oot2-release-preflight-v1",
+    "oot2-read-resume-v5", "oot2-resume-v5-info",
     "oot2-write-host-kit-v1",
     "oot2-write-host-kit-v5",
 })
@@ -120,13 +121,15 @@ def dispatch(command, parent):
     if command == "oot2-read-nup":
         parent.send_file(nup_file())
         return 0
-    if command in ("oot2-read-metal-snapshot-v1", "oot2-metal-snapshot-info-v1"):
+    if command in ("oot2-read-metal-snapshot-v1", "oot2-metal-snapshot-info-v1", "oot2-read-resume-v5", "oot2-resume-v5-info"):
         try:
             from .oot2_cache_snapshot import snapshot
         except ImportError:
             from oot2_cache_snapshot import snapshot
-        archive, stats = snapshot(CACHE, ROOT / "cache-transfer")
-        if command == "oot2-metal-snapshot-info-v1":
+        resume = command in ("oot2-read-resume-v5", "oot2-resume-v5-info")
+        archive, stats = (snapshot(ROOT / "cache-resume-v5", ROOT / "cache-transfer-resume-v5", translations=True)
+                          if resume else snapshot(CACHE, ROOT / "cache-transfer"))
+        if command in ("oot2-metal-snapshot-info-v1", "oot2-resume-v5-info"):
             print("OOT2_METAL_SNAPSHOT_V1", archive.stat().st_size,
                   stats["sqlite_bytes"], stats["entries"])
         else:

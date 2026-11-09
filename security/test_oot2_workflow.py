@@ -13,6 +13,14 @@ EXPECTED = {"FFR_TS_AUTHKEY","FFR_SSH_KEY","FFR_SSH_KNOWN_HOSTS",
 
 
 class WorkflowContractTests(unittest.TestCase):
+    def test_resume_snapshot_is_explicit_and_keeps_default_metal_validation(self):
+        workflow = BUILD.read_text()
+        self.assertIn('          - resume-v5', workflow)
+        self.assertIn('[[ "$OOT2_RUNTIME_VARIANT" = ipad-v5 ]]', workflow)
+        self.assertIn('SNAPSHOT_ROUTE=oot2-resume-v5-info', workflow)
+        self.assertIn('ACCEPT_ARGS=(--translations)', workflow)
+        self.assertIn('"${ACCEPT_ARGS[@]}"', workflow)
+
     def test_ipad_v5_default_and_preparation_are_explicit(self):
         workflow = BUILD.read_text()
         self.assertIn('default: ipad-v5', workflow)
