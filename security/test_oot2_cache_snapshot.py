@@ -153,3 +153,56 @@ class SnapshotTests(unittest.TestCase):
             subprocess.run(['zstd', '-q', '-d', '-c', str(archive)], stdout=f, check=True)
         snap.accept(runner)
         self.assertTrue((runner / 'cas.db').is_file())
+
+class ResumeViewTests(unittest.TestCase):
+    def fixture(self, root):
+        from security import oot2_resume_cache as resume
+        import hashlib, json
+        cache, conflicts, view = root/'cache', root/'conflicts', root/'view'
+        old = {'digest': 'b'*64, 'code_fp': 'c'*64, 'rule_fp': 'd'*64}
+        new = dict(old, digest='e'*64, code_fp='f'*64)
+        (cache/'index').mkdir(parents=True); (conflicts/'index').mkdir(parents=True)
+        (cache/'index/123.json').write_text(json.dumps(old))
+        data = json.dumps(new).encode()
+        p = conflicts/('index/123.json.'+hashlib.sha256(data).hexdigest()+'.conflict'); p.write_bytes(data)
+        for n in ('mac/123_b.json', 'mac/123_b.metal', 'ios/123_b.json', 'ios/123_b.metallib'):
+            p = cache/'shader'/new['digest']/n; p.parent.mkdir(parents=True, exist_ok=True); p.write_bytes(b'exact original bytes')
+        p=cache/'metallib/ios/key.metallib'; p.parent.mkdir(parents=True); p.write_bytes(b'compiled')
+        return resume, cache, conflicts, view, old, new
+
+    def test_current_indices_recovered_without_replacing_originals(self):
+        import json
+        with tempfile.TemporaryDirectory() as t:
+            resume, cache, conflicts, view, old, new = self.fixture(Path(t))
+            stats=resume.stage(cache, conflicts, view, new['code_fp'])
+            self.assertEqual(stats['indices'], 1)
+            self.assertEqual(json.loads((cache/'index/123.json').read_text()), old)
+            self.assertEqual(json.loads((view/'index/123.json').read_text()), new)
+            def compression(argv, **_): shutil.copyfile(argv[4], argv[6])
+            with patch.object(snap.subprocess, 'run', side_effect=compression):
+                archive,_=snap.snapshot(view, Path(t)/'out', translations=True)
+            runner=Path(t)/'runner'; runner.mkdir(); shutil.copyfile(archive,runner/'cas.db.partial')
+            with self.assertRaisesRegex(ValueError, 'snapshot entry'): snap.accept(runner)
+            snap.accept(runner, translations=True)
+            with closing(sqlite3.connect(runner/'cas.db')) as db:
+                rows=dict(db.execute('SELECT e.name,b.data FROM entry e JOIN blob b ON e.blob=b.id'))
+            self.assertEqual(rows['index/123.json'], (view/'index/123.json').read_bytes())
+            self.assertEqual(len(rows), 6)
+
+    def test_incomplete_translation_aborts_without_publishing(self):
+        with tempfile.TemporaryDirectory() as t:
+            resume, cache, conflicts, view, _, new = self.fixture(Path(t))
+            (cache/'shader'/new['digest']/'ios/123_b.metallib').unlink()
+            with self.assertRaisesRegex(ValueError, 'incomplete'): resume.stage(cache, conflicts, view, new['code_fp'])
+            self.assertFalse(view.exists())
+
+    def test_conflict_checksum_and_ambiguity_are_rejected(self):
+        import json, hashlib
+        with tempfile.TemporaryDirectory() as t:
+            resume, cache, conflicts, view, _, new = self.fixture(Path(t))
+            p=next((conflicts/'index').iterdir()); data=p.read_bytes(); p.write_bytes(b'changed')
+            with self.assertRaisesRegex(ValueError, 'conflict digest'): resume.stage(cache, conflicts, view, new['code_fp'])
+            p.write_bytes(data)
+            other=dict(new,digest='1'*64); data=json.dumps(other).encode()
+            (conflicts/('index/123.json.'+hashlib.sha256(data).hexdigest()+'.conflict')).write_bytes(data)
+            with self.assertRaisesRegex(ValueError, 'ambiguous'): resume.stage(cache, conflicts, view, new['code_fp'])

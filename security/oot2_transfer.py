@@ -12,8 +12,8 @@ import subprocess
 import tempfile
 import time
 
-ROUTES = {"nup": "oot2-read-nup", "metal-snapshot": "oot2-read-metal-snapshot-v1"}
-DESTINATIONS = {"nup": ("oot2-nup", "OcarinaOfTime.nup"),
+ROUTES = {"resume-v5": "oot2-read-resume-v5", "nup": "oot2-read-nup", "metal-snapshot": "oot2-read-metal-snapshot-v1"}
+DESTINATIONS = {"resume-v5": ("oot2-shader-cas", "metal-snapshot.zst"), "nup": ("oot2-nup", "OcarinaOfTime.nup"),
                 "metal-snapshot": ("oot2-shader-cas", "metal-snapshot.zst")}
 MiB = 1024 ** 2
 GiB = 1024 ** 3
