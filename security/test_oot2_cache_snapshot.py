@@ -173,7 +173,7 @@ class ResumeViewTests(unittest.TestCase):
     def test_current_indices_recovered_without_replacing_originals(self):
         import json
         with tempfile.TemporaryDirectory() as t:
-            resume, cache, conflicts, view, old, new = self.fixture(Path(t))
+            resume, cache, conflicts, view, old, new = self.fixture(Path(t).resolve())
             stats=resume.stage(cache, conflicts, view, new['code_fp'])
             self.assertEqual(stats['indices'], 1)
             self.assertEqual(json.loads((cache/'index/123.json').read_text()), old)
@@ -191,7 +191,7 @@ class ResumeViewTests(unittest.TestCase):
 
     def test_incomplete_translation_aborts_without_publishing(self):
         with tempfile.TemporaryDirectory() as t:
-            resume, cache, conflicts, view, _, new = self.fixture(Path(t))
+            resume, cache, conflicts, view, _, new = self.fixture(Path(t).resolve())
             (cache/'shader'/new['digest']/'ios/123_b.metallib').unlink()
             with self.assertRaisesRegex(ValueError, 'incomplete'): resume.stage(cache, conflicts, view, new['code_fp'])
             self.assertFalse(view.exists())
@@ -199,7 +199,7 @@ class ResumeViewTests(unittest.TestCase):
     def test_conflict_checksum_and_ambiguity_are_rejected(self):
         import json, hashlib
         with tempfile.TemporaryDirectory() as t:
-            resume, cache, conflicts, view, _, new = self.fixture(Path(t))
+            resume, cache, conflicts, view, _, new = self.fixture(Path(t).resolve())
             p=next((conflicts/'index').iterdir()); data=p.read_bytes(); p.write_bytes(b'changed')
             with self.assertRaisesRegex(ValueError, 'conflict digest'): resume.stage(cache, conflicts, view, new['code_fp'])
             p.write_bytes(data)
