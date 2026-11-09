@@ -1,4 +1,4 @@
-name: OOT2 iPad-v5 optimization validation
+name: OOT2 official iPad-v6 validation
 
 on:
   workflow_dispatch:
@@ -12,6 +12,7 @@ on:
       - 'security/oot2_telemetry.patch'
       - 'security/oot2_ipad_v6_defaults.env'
       - 'security/oot2_ipad_v6_manifest.json'
+      - 'security/oot2_ipad_v6_tests.patch'
       - 'security/run_oot2.py'
 
 permissions:

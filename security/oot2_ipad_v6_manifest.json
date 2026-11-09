@@ -25,5 +25,7 @@
     "356a7132",
     "9983d659"
   ],
-  "m5_hardware_validated": false
+  "m5_hardware_validated": false,
+  "test_fixture_patch_sha256": "99010d73716bc21ea63399b484b1e93d20fc16afc9431e9b78461d849e249651",
+  "test_fixture_fix": "test_dmsh_meshstage IntegerPassThrough scope imports real dmsh_fetch. No runtime shader changes."
 }

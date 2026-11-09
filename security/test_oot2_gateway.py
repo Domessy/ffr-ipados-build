@@ -48,6 +48,16 @@ class Oot2GatewayTests(unittest.TestCase):
                 self.assertEqual(bundle.call_args.args,(root/'out/ZeldaOcarinaOfTime-v6-slim.ipa',root/'local-bundle-v6/extract/v131072/RomFS.img',root/'local-bundle-v6/romfs-manifest.json',root/'out/ZeldaOcarinaOfTime.ipa'))
                 self.assertEqual(gw.dispatch('oot2-write-slim-v6 /arbitrary',parent),126)
 
+    def test_local_bundle_preflight_rejects_a_different_source(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d).resolve(); folder=root/'local-bundle-v6/extract/v131072';folder.mkdir(parents=True)
+            (folder/'RomFS.img').write_bytes(b'bounded image')
+            (root/'local-bundle-v6/romfs-manifest.json').write_text(json.dumps({'source_identity':'123:original','identity':[13,'hash']}))
+            with patch.object(gw,'ROOT',root), patch.object(gw,'nup_file',return_value=root/'original.nup'), patch.object(gw,'release_identity',return_value='123:original'), patch('security.oot2_local_bundle.identity',return_value=(13,'hash')):
+                self.assertEqual(gw.dispatch('oot2-local-bundle-v6-ready',parent),0)
+                with patch.object(gw,'release_identity',return_value='456:different'):
+                    with self.assertRaisesRegex(ValueError,'input identity'):gw.dispatch('oot2-local-bundle-v6-ready',parent)
+
     @staticmethod
     def fixture(home):
         docs = home / "Documents"

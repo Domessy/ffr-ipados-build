@@ -14,6 +14,7 @@ from oot2_patch_nup_release import patch as release_nup
 PIN = '8d5d4f1b04610fef5a96521c72a4263d68794959'
 CHAIN = '0c434f1b68df'
 ORIGINALS = {
+    'dm/gfx/tests/test_dmsh_meshstage.py': '5bf60614c2df1ea5c465afcf22ed6741554fc2e7f34ee2e10f23ede83a52ece0',
     'dm/gfx/nvn/nvn_mtl.m': '1fce2702a55e8dc311b9e12bf1b354ec5874592dea10096607b1f411e75ef9b5',
     'dm/gfx/nvn/dmsh_chain.h': '3821c5387e36fbac9e4eb4f75724d14fa8c16d1fb36aac69e6ec63cdca4c3ca0',
     'scripts/build_ipa_from_nsp.py': '356e255fc710b8b9f0b06b015ef56599cd346f7908030b17e0e00f3d352d8e29',
@@ -30,6 +31,10 @@ def prepare(root):
         if p.is_symlink() or hashlib.sha256(p.read_bytes()).hexdigest() != expected:
             raise ValueError('ipad-v6 source differs or was already prepared: ' + name)
     telemetry = Path(__file__).with_name('oot2_telemetry.patch')
+    fixture = Path(__file__).with_name('oot2_ipad_v6_tests.patch')
+    if hashlib.sha256(fixture.read_bytes()).hexdigest() != '99010d73716bc21ea63399b484b1e93d20fc16afc9431e9b78461d849e249651':
+        raise ValueError('v6 test fixture patch digest')
+    subprocess.run(['git', '-C', str(root), 'apply', '--check', str(fixture)], check=True)
     subprocess.run(['git', '-C', str(root), 'apply', '--check', str(telemetry)], check=True)
     # The script hash above proves the release helper's source contract. Restore
     # both inputs if an unexpected helper/IO failure interrupts preparation.
@@ -37,12 +42,13 @@ def prepare(root):
     try:
         release_nup(root / 'scripts/build_ipa_from_nsp.py')
         subprocess.run(['git', '-C', str(root), 'apply', str(telemetry)], check=True)
+        subprocess.run(['git', '-C', str(root), 'apply', str(fixture)], check=True)
     except Exception:
         for n, data in originals.items():
             (root / n).write_bytes(data)
         raise
     assert f'"{CHAIN}"' in (root / 'dm/gfx/nvn/dmsh_chain.h').read_text()
-    print(f'OOT2 ipad-v6 prepared: {PIN}, original shader chain {CHAIN}; telemetry and runner NUP release only')
+    print(f'OOT2 ipad-v6 prepared: {PIN}, original shader chain {CHAIN}; runtime changes limited to telemetry and runner NUP release; test fixture import repaired')
 
 
 if __name__ == '__main__':

@@ -14,6 +14,7 @@ import shutil
 import stat
 import struct
 import tempfile
+import time
 import zipfile
 
 TITLE = '0400486024DEC000'
@@ -87,6 +88,7 @@ def bundle(slim, romfs, manifest, output):
         os.close(fd)
         digest=hashlib.sha256()
         try:
+            print('OOT2 local assembly: copying compiled app resources.', flush=True)
             with zipfile.ZipFile(temp,'w',allowZip64=True) as dst:
                 for z in src.infolist():
                     with src.open(z) as inp, dst.open(z,'w',force_zip64=True) as out:
@@ -94,14 +96,20 @@ def bundle(slim, romfs, manifest, output):
                 z=zipfile.ZipInfo(prefix+'romfs.img'); z.compress_type=zipfile.ZIP_STORED
                 z.external_attr=(stat.S_IFREG|0o644)<<16
                 with romfs.open('rb') as inp, dst.open(z,'w',force_zip64=True) as out:
-                    while block:=inp.read(8<<20): out.write(block); digest.update(block)
+                    done=0; report=time.monotonic()+10
+                    while block:=inp.read(8<<20):
+                        out.write(block); digest.update(block); done+=len(block)
+                        if time.monotonic()>=report:
+                            print(f'OOT2 local assembly: {done/1024**3:.2f}/{actual[0]/1024**3:.2f} GiB ({100*done/actual[0]:.1f}%)',flush=True)
+                            report=time.monotonic()+10
             if digest.hexdigest()!=meta['sha256']: raise ValueError('RomFS bytes changed')
             with zipfile.ZipFile(temp) as check:
-                assert check.getinfo(prefix+'romfs.img').file_size==actual[0]
-                assert len(check.infolist())==len(names)+1
+                if check.getinfo(prefix+'romfs.img').file_size!=actual[0] or len(check.infolist())!=len(names)+1:
+                    raise ValueError('completed IPA directory differs')
             os.chmod(temp,0o600)
             with open(temp,'rb') as f: os.fsync(f.fileno())
             os.replace(temp,output)
+            print('OOT2 local assembly: 100%; complete archive published.',flush=True)
         finally:
             if os.path.exists(temp): os.unlink(temp)
     return {'ipa_bytes':output.stat().st_size,'romfs_bytes':actual[0],
