@@ -46,6 +46,17 @@ class BuildkitTests(unittest.TestCase):
         self.assertIn('Gen/dm/env.txt', files)
         self.assertFalse(any('prod.keys' in n or 'RomFS' in n for n in files))
 
+    def test_ipad_v6_identity_and_separate_kit_route(self):
+        import os, json, hashlib
+        with patch.dict(os.environ, {'OOT2_RUNTIME_VARIANT':'ipad-v6'}):
+            pin,chain,recipe=kit.build_identity()
+        self.assertEqual(pin,'8d5d4f1b04610fef5a96521c72a4263d68794959')
+        self.assertEqual(chain,'0c434f1b68df')
+        self.assertEqual(len(recipe),64)
+        with patch.object(gate,'receive_file') as receive:
+            self.assertEqual(gw.dispatch('oot2-write-host-kit-v6',gate),0)
+            receive.assert_called_once_with('OOT2HostKit-v6.tar.zst',1<<30)
+
     def test_wrong_revision_and_incomplete_profile_fail_before_export(self):
         with patch.object(kit.subprocess, 'check_output', return_value='0' * 40):
             with self.assertRaises(ValueError):

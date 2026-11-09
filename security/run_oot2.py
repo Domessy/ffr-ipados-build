@@ -164,14 +164,14 @@ def handler(_signum, _frame):
 def compile_ipa():
     global active
     layout = os.environ.get("OOT2_IPA_LAYOUT", "bundle")
-    if layout not in ("bundle", "separate"):
+    if layout not in ("bundle", "separate", "local-bundle"):
         print("OOT2: invalid IPA layout; refusing build.", flush=True)
         return 1
     # Upstream's separate mode needs the extracted RomFS to stay available
     # after packaging for its one-time device transfer. This is runner-local;
     # it does not make an ephemeral runner persistent or skip shader builds.
     layout_args = (["--romfs", "separate", "--keep-extracted"]
-                   if layout == "separate" else ["--no-keep-extracted"])
+                   if layout in ("separate", "local-bundle") else ["--no-keep-extracted"])
     CACHE.mkdir(parents=True, exist_ok=True, mode=0o700)
     LOG.parent.mkdir(parents=True, exist_ok=True)
     if not CAS_DB.is_file():
@@ -198,11 +198,11 @@ def compile_ipa():
            str(NUP), "-o", str(OUTPUT), "-p", "v131072",
            "--platform", "ios", "--work-dir", str(TEMP / "oot2-work"),
            "--show-fps", "--gpu", "none", *layout_args]
-    if os.environ.get("OOT2_RUNTIME_VARIANT") in ("upstream-v4", "ipad-v5"):
+    if os.environ.get("OOT2_RUNTIME_VARIANT") in ("upstream-v4", "ipad-v5", "ipad-v6"):
         # Bake the proven setting into this diagnostic IPA so deleting a data
         # container cannot silently restore anonymous guest memory. The host
         # reads Documents/env.txt first, so an explicit device override wins.
-        filename = ("oot2_ipad_v5_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v5"
+        filename = ("oot2_ipad_v6_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v6" else "oot2_ipad_v5_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v5"
                     else "oot2_ipados_defaults.env")
         defaults = WORKSPACE / "security" / filename
         if not defaults.is_file() or defaults.is_symlink():
