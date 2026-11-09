@@ -74,7 +74,8 @@ class IpaLayoutTests(unittest.TestCase):
 
     def test_workflow_requires_explicit_separate_choice(self):
         s = (ROOT/'.github/workflows/build-oot2.yml').read_text()
-        self.assertIn('default: bundle', s)
+        self.assertIn('default: local-bundle', s)
+        self.assertIn('IPA_ROUTE=oot2-write-slim-v6', s)
         self.assertIn('OOT2_IPA_LAYOUT: ${{ inputs.ipa_layout }}', s)
 
     def test_upstream_build_bakes_in_reinstall_safe_memory_default(self):
