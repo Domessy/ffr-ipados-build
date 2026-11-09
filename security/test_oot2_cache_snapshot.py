@@ -180,8 +180,8 @@ class ResumeViewTests(unittest.TestCase):
             self.assertEqual(json.loads((view/'index/123.json').read_text()), new)
             def compression(argv, **_): shutil.copyfile(argv[4], argv[6])
             with patch.object(snap.subprocess, 'run', side_effect=compression):
-                archive,_=snap.snapshot(view, Path(t)/'out', translations=True)
-            runner=Path(t)/'runner'; runner.mkdir(); shutil.copyfile(archive,runner/'cas.db.partial')
+                archive,_=snap.snapshot(view, Path(t).resolve()/'out', translations=True)
+            runner=Path(t).resolve()/'runner'; runner.mkdir(); shutil.copyfile(archive,runner/'cas.db.partial')
             with self.assertRaisesRegex(ValueError, 'snapshot entry'): snap.accept(runner)
             snap.accept(runner, translations=True)
             with closing(sqlite3.connect(runner/'cas.db')) as db:
