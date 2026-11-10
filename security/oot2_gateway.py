@@ -27,6 +27,7 @@ ROUTES = frozenset({
     "oot2-metal-snapshot-info-v1",
     "oot2-release-preflight-v1",
     "oot2-read-resume-v5", "oot2-resume-v5-info",
+    "oot2-read-resume-v6", "oot2-resume-v6-info",
     "oot2-write-host-kit-v1",
     "oot2-write-host-kit-v5", "oot2-write-host-kit-v6", "oot2-write-slim-v6", "oot2-local-bundle-v6-ready",
 })
@@ -121,15 +122,16 @@ def dispatch(command, parent):
     if command == "oot2-read-nup":
         parent.send_file(nup_file())
         return 0
-    if command in ("oot2-read-metal-snapshot-v1", "oot2-metal-snapshot-info-v1", "oot2-read-resume-v5", "oot2-resume-v5-info"):
+    if command in ("oot2-read-metal-snapshot-v1", "oot2-metal-snapshot-info-v1", "oot2-read-resume-v5", "oot2-resume-v5-info", "oot2-read-resume-v6", "oot2-resume-v6-info"):
         try:
             from .oot2_cache_snapshot import snapshot
         except ImportError:
             from oot2_cache_snapshot import snapshot
-        resume = command in ("oot2-read-resume-v5", "oot2-resume-v5-info")
-        archive, stats = (snapshot(ROOT / "cache-resume-v5", ROOT / "cache-transfer-resume-v5", translations=True)
+        resume = ("v6" if command in ("oot2-read-resume-v6", "oot2-resume-v6-info") else
+                  "v5" if command in ("oot2-read-resume-v5", "oot2-resume-v5-info") else None)
+        archive, stats = (snapshot(ROOT / ("cache-resume-" + resume), ROOT / ("cache-transfer-resume-" + resume), translations=True)
                           if resume else snapshot(CACHE, ROOT / "cache-transfer"))
-        if command in ("oot2-metal-snapshot-info-v1", "oot2-resume-v5-info"):
+        if command in ("oot2-metal-snapshot-info-v1", "oot2-resume-v5-info", "oot2-resume-v6-info"):
             print("OOT2_METAL_SNAPSHOT_V1", archive.stat().st_size,
                   stats["sqlite_bytes"], stats["entries"])
         else:

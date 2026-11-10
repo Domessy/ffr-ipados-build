@@ -16,6 +16,9 @@ class WorkflowContractTests(unittest.TestCase):
     def test_resume_snapshot_is_explicit_and_keeps_default_metal_validation(self):
         workflow = BUILD.read_text()
         self.assertIn('          - resume-v5', workflow)
+        self.assertIn('          - resume-v6', workflow)
+        self.assertIn('[[ "$OOT2_RUNTIME_VARIANT" = ipad-v6 ]]', workflow)
+        self.assertIn('SNAPSHOT_ROUTE=oot2-resume-v6-info', workflow)
         self.assertIn('[[ "$OOT2_RUNTIME_VARIANT" = ipad-v5 ]]', workflow)
         self.assertIn('SNAPSHOT_ROUTE=oot2-resume-v5-info', workflow)
         self.assertIn('ACCEPT_ARGS=(--translations)', workflow)
