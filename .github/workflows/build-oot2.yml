@@ -46,6 +46,7 @@ on:
           - full
           - metal-snapshot
           - resume-v5
+          - resume-v6
           - empty
 
 permissions:
@@ -385,7 +386,7 @@ jobs:
           export DMSH_CAS="$RUNNER_TEMP/oot2-shader-cas/cas.db"
           umask 077
           mkdir -p "$(dirname "$DMSH_CAS")"
-          if [ "$OOT2_CACHE_RESTORE" = metal-snapshot ] || [ "$OOT2_CACHE_RESTORE" = resume-v5 ]; then
+          if [ "$OOT2_CACHE_RESTORE" = metal-snapshot ] || [ "$OOT2_CACHE_RESTORE" = resume-v5 ] || [ "$OOT2_CACHE_RESTORE" = resume-v6 ]; then
             SNAPSHOT_ROUTE=oot2-metal-snapshot-info-v1
             SNAPSHOT_ROLE=metal-snapshot
             ACCEPT_ARGS=()
@@ -393,6 +394,11 @@ jobs:
               [[ "$OOT2_RUNTIME_VARIANT" = ipad-v5 ]] || { echo "Resume cache is specific to ipad-v5." >&2; exit 1; }
               SNAPSHOT_ROUTE=oot2-resume-v5-info
               SNAPSHOT_ROLE=resume-v5
+              ACCEPT_ARGS=(--translations)
+            elif [ "$OOT2_CACHE_RESTORE" = resume-v6 ]; then
+              [[ "$OOT2_RUNTIME_VARIANT" = ipad-v6 ]] || { echo "Resume cache is specific to ipad-v6." >&2; exit 1; }
+              SNAPSHOT_ROUTE=oot2-resume-v6-info
+              SNAPSHOT_ROLE=resume-v6
               ACCEPT_ARGS=(--translations)
             fi
             # Direct SQLite avoids the flat tar extraction/import round trip.

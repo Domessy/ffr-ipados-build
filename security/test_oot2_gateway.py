@@ -23,20 +23,21 @@ class Oot2GatewayTests(unittest.TestCase):
                 self.assertEqual(gw.dispatch('oot2-release-preflight-v1 /arbitrary', parent), 126)
 
     def test_resume_snapshot_routes_are_fixed_and_separate(self):
-        with tempfile.TemporaryDirectory() as d:
-            root = Path(d)
-            archive = root / 'snapshot'
-            archive.write_bytes(b'compiled fixture')
-            meta = {'sqlite_bytes': 100, 'entries': 6}
-            with patch.object(gw, 'ROOT', root), patch('security.oot2_cache_snapshot.snapshot', return_value=(archive, meta)) as snapshot:
-                with patch('builtins.print') as emit:
-                    self.assertEqual(gw.dispatch('oot2-resume-v5-info', parent), 0)
-                    snapshot.assert_called_once_with(root/'cache-resume-v5', root/'cache-transfer-resume-v5', translations=True)
-                    emit.assert_called_once_with('OOT2_METAL_SNAPSHOT_V1', 16, 100, 6)
-                with patch.object(parent, 'send_file') as send:
-                    self.assertEqual(gw.dispatch('oot2-read-resume-v5', parent), 0)
-                    send.assert_called_once_with(archive)
-                self.assertEqual(gw.dispatch('oot2-read-resume-v5 /arbitrary', parent), 126)
+        for version in ("v5", "v6"):
+            with tempfile.TemporaryDirectory() as d:
+                root = Path(d)
+                archive = root / 'snapshot'
+                archive.write_bytes(b'compiled fixture')
+                meta = {'sqlite_bytes': 100, 'entries': 6}
+                with patch.object(gw, 'ROOT', root), patch('security.oot2_cache_snapshot.snapshot', return_value=(archive, meta)) as snapshot:
+                    with patch('builtins.print') as emit:
+                        self.assertEqual(gw.dispatch(f'oot2-resume-{version}-info', parent), 0)
+                        snapshot.assert_called_once_with(root/f'cache-resume-{version}', root/f'cache-transfer-resume-{version}', translations=True)
+                        emit.assert_called_once_with('OOT2_METAL_SNAPSHOT_V1', 16, 100, 6)
+                    with patch.object(parent, 'send_file') as send:
+                        self.assertEqual(gw.dispatch(f'oot2-read-resume-{version}', parent), 0)
+                        send.assert_called_once_with(archive)
+                    self.assertEqual(gw.dispatch(f'oot2-read-resume-{version} /arbitrary', parent), 126)
 
     def test_v6_slim_route_bundles_only_fixed_private_paths(self):
         with tempfile.TemporaryDirectory() as d:
