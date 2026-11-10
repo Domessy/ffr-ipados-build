@@ -1,0 +1,109 @@
+name: OOT2 official iPad-v7 validation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/test-oot2-ipad-v7.yml'
+      - '.github/workflows/build-oot2.yml'
+      - 'security/oot2_prepare_ipad_v7.py'
+      - 'security/oot2_ipad_v7_smoke.py'
+      - 'security/oot2_telemetry.patch'
+      - 'security/oot2_ipad_v7_defaults.env'
+      - 'security/oot2_ipad_v7_manifest.json'
+      - 'security/oot2_ipad_v7_host.patch'
+      - 'security/run_oot2.py'
+
+permissions:
+  contents: read
+
+jobs:
+  v7-public-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Fetch immutable public revision and verify preparation
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/ipad-v7"
+          git init -q "$SRC"
+          git -C "$SRC" remote add origin https://github.com/seedds/nxnative.git
+          git -C "$SRC" fetch -q --depth 1 origin 2f131edc1b4586f89dd20b0d3de8e4f92ac3f74b
+          git -C "$SRC" checkout -q --detach FETCH_HEAD
+          python3 security/oot2_ipad_v7_smoke.py "$SRC"
+          python3 security/oot2_prepare_ipad_v7.py "$SRC"
+          python3 -m venv "$RUNNER_TEMP/public-test-venv"
+          "$RUNNER_TEMP/public-test-venv/bin/python" -m pip install -q lz4 'capstone>=5,<6'
+          for test in test_nsp_nup test_pso_offline test_shader_rewrites test_romfs_identity test_shader_cache test_shader_toolchain_cache test_shader_pch test_patches test_nsp_chain test_dmsh_code_fp test_dmsh_layer_out test_dmsh_abi test_fps_target test_game_profile test_native_tools; do
+            "$RUNNER_TEMP/public-test-venv/bin/python" "$SRC/dm/tools/tests/$test.py"
+          done
+          cc -O1 -Wall "$SRC/dm/gfx/tests/t_fstep.c" -o "$RUNNER_TEMP/v7-fstep" -lm
+          "$RUNNER_TEMP/v7-fstep"
+          python3 "$SRC/dm/gfx/tests/test_dmsh_meshstage.py"
+          for test in test_dmsh_hmma test_dmsh_wrapv test_dmsh_gather_offsets test_dmsh_zsnap test_dmsh_extended_multiply; do
+            python3 "$SRC/dm/gfx/tests/$test.py"
+          done
+
+  v7-ios-compile:
+    runs-on: xcode-27
+    timeout-minutes: 25
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
+      GAME: '0400486024DEC000'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Prepare exact candidate without private inputs
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/ipad-v7"
+          git init -q "$SRC"
+          git -C "$SRC" remote add origin https://github.com/seedds/nxnative.git
+          git -C "$SRC" fetch -q --depth 1 origin 2f131edc1b4586f89dd20b0d3de8e4f92ac3f74b
+          git -C "$SRC" checkout -q --detach FETCH_HEAD
+          python3 security/oot2_prepare_ipad_v7.py "$SRC"
+      - name: Compile iOS and focused regression binaries (no IPA)
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/ipad-v7"
+          xcodebuild -downloadComponent MetalToolchain
+          python3 "$SRC/dm/gfx/tools/own_compilers.py" --check-metal
+          "$SRC/dm/gfx/tools/dmsh_xlate_bin/dmsh_xlate" --source-sha
+          "$SRC/dm/tools/nx_extract_bin/nx_extract" --source-sha
+          python3 "$SRC/dm/tools/tests/test_own_compilers.py"
+          python3 "$SRC/dm/ios/tools/compile_check.py"
+          python3 "$SRC/dm/gfx/tests/test_dmsh_meshstage.py"
+          for test in test_dmsh_hmma test_dmsh_wrapv test_dmsh_gather_offsets test_dmsh_zsnap test_dmsh_extended_multiply; do
+            python3 "$SRC/dm/gfx/tests/$test.py"
+          done
+          make -C "$SRC/dm/gfx/tests" -j2 t_wait_event t_queue_lifetime t_render_enable_queue t_render_counter_overlap t_mesh_first_use t_omap_mask t_cpu_storage t_cpu_tex t_capture t_rt_recycle t_dispatch_own t_zsnap t_fstep t_pso_archive t_pso_warm t_pso_skey t_image_alias t_pool_chunks t_pool_seen_replace t_pool_standin t_pso_stall t_pso_pending
+          make -C "$SRC/dm/gfx/tests" check_t_capture
+          "$SRC/dm/gfx/tests/t_cpu_tex"
+          "$SRC/dm/gfx/tests/t_fstep"
+          "$SRC/dm/gfx/tests/t_pso_skey"
+          cat > "$RUNNER_TEMP/probe-metal4.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <Metal/Metal.h>
+          int main(void) { @autoreleasepool {
+              id<MTLDevice> d = MTLCreateSystemDefaultDevice();
+              printf("Metal GPU: %s\n", d.name.UTF8String ?: "none");
+              return d && [d supportsFamily:MTLGPUFamilyMetal4] ? 0 : 77;
+          } }
+          OBJC
+          xcrun clang -fobjc-arc "$RUNNER_TEMP/probe-metal4.m" -framework Metal -framework Foundation -o "$RUNNER_TEMP/probe-metal4"
+          rc=0
+          "$RUNNER_TEMP/probe-metal4" || rc=$?
+          if [ "$rc" -eq 0 ]; then
+            make -C "$SRC/dm/gfx/tests" check_t_wait_event check_t_queue_lifetime check_t_render_enable_queue check_t_render_counter_overlap check_t_mesh_first_use check_t_omap_mask check_t_cpu_storage check_t_cpu_tex check_t_rt_recycle check_t_dispatch_own check_t_pso_archive check_t_pso_warm check_t_pso_skey check_t_image_alias check_t_pool_chunks check_t_pool_seen_replace check_t_pool_standin check_t_pso_stall check_t_pso_pending
+            make -C "$SRC/dm/gfx/tests" check_t_render_counter_overlap check_t_queue_lifetime
+            make -C "$SRC/dm/gfx/tests" check_t_zsnap
+          elif [ "$rc" -eq 77 ]; then
+            echo '::notice::Metal 4 GPU execution NOT validated on this runner. iOS sources and focused binaries compiled; device validation remains required.'
+          else
+            exit "$rc"
+          fi

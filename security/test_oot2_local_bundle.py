@@ -61,6 +61,17 @@ class LocalBundleTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'ZIP'):
                 b.validate_zip_headers(output)
 
+    def test_expected_shader_chain_is_checked_before_publication(self):
+        with tempfile.TemporaryDirectory() as t:
+            slim,img,meta,output,_=self.fixture(t)
+            with self.assertRaisesRegex(ValueError,'shader chain'):
+                b.bundle(slim,img,meta,output,expected_chain='bc8830d4ba5a')
+            self.assertFalse(output.exists())
+            with zipfile.ZipFile(slim,'a') as z:
+                z.writestr('Payload/DmIOS.app/msl/b-bc8830d4ba5a.img',b'unchanged compiled image')
+            b.bundle(slim,img,meta,output,expected_chain='bc8830d4ba5a')
+            b.validate_zip_headers(output)
+
     def test_wrong_image_and_cut_transfer_preserve_previous_output(self):
         with tempfile.TemporaryDirectory() as t:
             slim,img,meta,output,_=self.fixture(t); output.write_bytes(b'previous IPA')

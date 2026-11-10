@@ -98,7 +98,7 @@ def validate_zip_headers(path):
                 raise ValueError('ZIP local/central sizes or CRC differ')
 
 
-def bundle(slim, romfs, manifest, output):
+def bundle(slim, romfs, manifest, output, expected_chain=None):
     slim,romfs,manifest,output=map(Path,(slim,romfs,manifest,output))
     for p in (slim,romfs,manifest): regular(p)
     if output in (slim,romfs,manifest) or output.is_symlink() or output.parent.is_symlink():
@@ -118,6 +118,8 @@ def bundle(slim, romfs, manifest, output):
                 or '\\' in z.filename or z.flag_bits&1
                 or stat.S_ISLNK(z.external_attr>>16)):
                 raise ValueError('IPA member path')
+        if expected_chain is not None and prefix+'msl/b-'+expected_chain+'.img' not in names:
+            raise ValueError('IPA shader chain')
         if prefix+'romfs.img' in names: raise ValueError('IPA already bundled')
         info=plistlib.loads(src.read(infos[0]))
         if info.get('CFBundleIdentifier') != BUNDLE_ID: raise ValueError('IPA bundle identity')

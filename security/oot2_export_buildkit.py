@@ -27,8 +27,8 @@ def build_identity():
     variant = os.environ.get('OOT2_RUNTIME_VARIANT', 'upstream-v4')
     if variant == 'upstream-v4':
         return PIN, CHAIN, None
-    if variant in ('ipad-v5', 'ipad-v6'):
-        data = Path(__file__).with_name(('oot2_ipad_v6_manifest.json' if variant == 'ipad-v6' else 'oot2_ipad_v5_manifest.json')).read_bytes()
+    if variant in ('ipad-v5', 'ipad-v6', 'ipad-v7'):
+        data = Path(__file__).with_name(f'oot2_{variant.replace("-", "_")}_manifest.json').read_bytes()
         manifest = json.loads(data)
         return manifest['base_revision'], manifest['shader_chain'], hashlib.sha256(data).hexdigest()
     raise ValueError('unsupported buildkit variant')
