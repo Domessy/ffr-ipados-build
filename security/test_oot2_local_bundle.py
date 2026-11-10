@@ -35,6 +35,32 @@ class LocalBundleTests(unittest.TestCase):
                 for n,v in members.items():self.assertEqual(z.read(n),v)
                 self.assertEqual(z.read('Payload/DmIOS.app/romfs.img'),img.read_bytes())
 
+    def test_zip64_recompression_has_matching_local_and_central_sizes(self):
+        # Exercise ZIP64 without multi-GB fixtures. Source compressed bytes and
+        # header offsets change during repacking, so its extra cannot be reused.
+        with tempfile.TemporaryDirectory() as t, patch.object(zipfile, 'ZIP64_LIMIT', 64):
+            slim,img,meta,output,members=self.fixture(t)
+            with zipfile.ZipFile(slim) as z:
+                self.assertTrue(any(i.extra for i in z.infolist()))
+            b.bundle(slim,img,meta,output)
+            b.validate_zip_headers(output)
+            with zipfile.ZipFile(output) as z:
+                self.assertIsNone(z.testzip())
+                for n,v in members.items(): self.assertEqual(z.read(n),v)
+                for i in z.infolist():
+                    self.assertLessEqual(sum(k == 1 for k,_ in b.extra_fields(i.extra)),1)
+
+    def test_validator_rejects_legacy_repacking_of_zip64_metadata(self):
+        with tempfile.TemporaryDirectory() as t, patch.object(zipfile, 'ZIP64_LIMIT', 64):
+            slim,_,_,output,_=self.fixture(t)
+            with zipfile.ZipFile(slim) as src, zipfile.ZipFile(output,'w') as dst:
+                for member in src.infolist():
+                    # Previous buggy implementation retained ZIP64 source sizes/offsets.
+                    with src.open(member) as inp, dst.open(member,'w',force_zip64=True) as out:
+                        out.write(inp.read())
+            with self.assertRaisesRegex(ValueError,'ZIP'):
+                b.validate_zip_headers(output)
+
     def test_wrong_image_and_cut_transfer_preserve_previous_output(self):
         with tempfile.TemporaryDirectory() as t:
             slim,img,meta,output,_=self.fixture(t); output.write_bytes(b'previous IPA')
