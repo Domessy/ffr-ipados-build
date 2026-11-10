@@ -58,6 +58,8 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
+      - name: Exercise cache restoration with runner system Bash before compilation
+        run: python3 -m unittest -v security.test_oot2_workflow.WorkflowContractTests.test_snapshot_restore_executes_with_system_bash
       - name: Prepare exact candidate without private inputs
         run: |
           set -euo pipefail

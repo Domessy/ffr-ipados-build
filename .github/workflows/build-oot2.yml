@@ -403,17 +403,14 @@ jobs:
           if [ "$OOT2_CACHE_RESTORE" = metal-snapshot ] || [ "$OOT2_CACHE_RESTORE" = resume-v5 ] || [ "$OOT2_CACHE_RESTORE" = resume-v6 ]; then
             SNAPSHOT_ROUTE=oot2-metal-snapshot-info-v1
             SNAPSHOT_ROLE=metal-snapshot
-            ACCEPT_ARGS=()
             if [ "$OOT2_CACHE_RESTORE" = resume-v5 ]; then
               [[ "$OOT2_RUNTIME_VARIANT" = ipad-v5 ]] || { echo "Resume cache is specific to ipad-v5." >&2; exit 1; }
               SNAPSHOT_ROUTE=oot2-resume-v5-info
               SNAPSHOT_ROLE=resume-v5
-              ACCEPT_ARGS=(--translations)
             elif [ "$OOT2_CACHE_RESTORE" = resume-v6 ]; then
               [[ "$OOT2_RUNTIME_VARIANT" = ipad-v6 ]] || { echo "Resume cache is specific to ipad-v6." >&2; exit 1; }
               SNAPSHOT_ROUTE=oot2-resume-v6-info
               SNAPSHOT_ROLE=resume-v6
-              ACCEPT_ARGS=(--translations)
             fi
             # Direct SQLite avoids the flat tar extraction/import round trip.
             # Compile keys include MSL, flags and compiler; no chain relabel.
@@ -428,7 +425,13 @@ jobs:
             zstd -q -d -c "$(dirname "$DMSH_CAS")/metal-snapshot.zst" > "$DMSH_CAS.partial"
             rm "$(dirname "$DMSH_CAS")/metal-snapshot.zst"
             echo 'OOT2 cache decompressed; validating database and compiled blobs.'
-            python3 security/oot2_cache_snapshot.py accept "$(dirname "$DMSH_CAS")" "${ACCEPT_ARGS[@]}"
+            # macOS /bin/bash 3.2 treats empty arrays as unset under set -u.
+            # Keep metal-only validation strict; translations require resume mode.
+            if [ "$SNAPSHOT_ROLE" = metal-snapshot ]; then
+              python3 security/oot2_cache_snapshot.py accept "$(dirname "$DMSH_CAS")"
+            else
+              python3 security/oot2_cache_snapshot.py accept "$(dirname "$DMSH_CAS")" --translations
+            fi
           elif [ "$OOT2_CACHE_RESTORE" = empty ]; then
             echo "OOT2: new compile flags; initialize empty CAS without transferring incompatible libraries."
             python3 security/oot2_sqlite_cas.py prepare "$(dirname "$DMSH_CAS")"
