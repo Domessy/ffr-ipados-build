@@ -1,4 +1,4 @@
-name: OOT2 official iPad-v6 validation
+name: OOT2 official iPad-v7 validation
 
 on:
   workflow_dispatch:
@@ -19,7 +19,7 @@ permissions:
   contents: read
 
 jobs:
-  upstream-public-tests:
+  v7-public-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -48,7 +48,7 @@ jobs:
             python3 "$SRC/dm/gfx/tests/$test.py"
           done
 
-  upstream-ios-compile:
+  v7-ios-compile:
     runs-on: xcode-27
     timeout-minutes: 25
     env:
