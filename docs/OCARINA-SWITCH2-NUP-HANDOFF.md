@@ -756,3 +756,10 @@ Cache Metal-only préconstruit **11 524 360 758 octets compressés** (~10,73 Gio
 Passerelle PC déployée, **ops 49b96694b77dc1619ff8e04a2d34c4ee7728a679**, deux seuls fichiers publics gateway/local_bundle, sauvegarde resultats/gateway-v7-before-20261110 et hashes avant/après. Routes v7-ready, v6-ready et identité NUP réel testées avec succès. Aucun changement SSH/clé/pare-feu ni iPad, v6 valide/protégée conservée. Prochain dispatch prêt : **mode=build, runtime_variant=ipad-v7, ipa_layout=local-bundle, cache_restore=metal-snapshot**. NUP encore transféré ; app+shaders reviennent et sont assemblés localement avec le RomFS original. Kit v7 séparé et contrôles ZIP64 maintenus.
 
 **Aucun run privé IPA v7 lancé**, aucune nouvelle compilation complète de shaders, aucune lecture/intervention iPad pendant la préparation utilisateur. Ledger de référence resultats/ipad-v7-ready-20261110.json. Protocole livrables/PROTOCOLE-TEST-IPAD-V7-2026-11-10.md prêt ; la v7 reste un candidat à mesurer, pas une correction de performance validée M5.
+
+
+### 10/11/2026 — lancement privé v7 autorisé
+
+Sur demande explicite « Lances le run », dispatch **42872874295** à **19:12:49 Paris (18:12:49 UTC)** : https://github.com/Domessy/ffr-ipados-build/actions/runs/42872874295. Commit du workflow confirmé **ecccb1dc5a8537835436223789a83c9caaf3acc2**, entrées **mode=build, runtime_variant=ipad-v7, ipa_layout=local-bundle, cache_restore=metal-snapshot**. Job démarré, initialisation réussie ; aucune conclusion de compilation à ce stade. Aucun autre build privé actif au préflight ; route réelle oot2-local-bundle-v7-ready réussie (RomFS 26 247 576 430 octets).
+
+Cache Metal préparé réutilisé sous contrôle des clés natives, sans garantie de taux de hits ; le NUP est encore transféré au runner. Retour slim puis assemblage final sur CachyOS avec contrôles ZIP64 et chaîne bc8830d4ba5a. Aucun accès ni changement iPad. Ledger privé resultats/ipad-v7-build-request-20261110.json. Ce lancement remplace l’état « IPA v7 non lancée » du précédent checkpoint ; durée et bénéfices M5 restent à mesurer.
