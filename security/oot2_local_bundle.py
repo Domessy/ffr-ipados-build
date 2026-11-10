@@ -5,6 +5,7 @@ No signing, device access or modification of original inputs. Identity follows
 nxnative dm/tools/romfs_image.py (size + FNV-1a header/index); full image SHA256
 binds the local prepared input. The app's executable and resources stay byte exact.
 """
+import copy
 import hashlib
 import json
 import os
@@ -58,6 +59,45 @@ def regular(path):
         raise ValueError('local bundle input path')
 
 
+def extra_fields(data):
+    while data:
+        if len(data) < 4: raise ValueError('ZIP extra field truncated')
+        kind, size = struct.unpack_from('<HH', data)
+        if len(data) < 4 + size: raise ValueError('ZIP extra field truncated')
+        yield kind, data[4:4+size]
+        data = data[4+size:]
+
+
+def validate_zip_headers(path):
+    """Independent local/central checks: Python's reader tolerates stale ZIP64 sizes."""
+    with zipfile.ZipFile(path) as archive, open(path, 'rb') as raw:
+        for member in archive.infolist():
+            fields = list(extra_fields(member.extra))
+            if sum(kind == 1 for kind, _ in fields) > 1:
+                raise ValueError('ZIP duplicate central ZIP64 fields')
+            raw.seek(member.header_offset)
+            header = raw.read(30)
+            if len(header) != 30: raise ValueError('ZIP local header truncated')
+            sig, version, flags, method, tm, date, crc, packed, size, nlen, elen = struct.unpack('<4s5H3I2H', header)
+            if sig != b'PK\x03\x04' or flags & 9 or flags != member.flag_bits or method != member.compress_type:
+                raise ValueError('ZIP local header flags or method')
+            name, extra = raw.read(nlen), raw.read(elen)
+            if name.decode('utf-8' if flags & 0x800 else 'cp437') != member.filename:
+                raise ValueError('ZIP local member name')
+            zip64 = [value for kind, value in extra_fields(extra) if kind == 1]
+            if len(zip64) > 1: raise ValueError('ZIP duplicate local ZIP64 fields')
+            if size == 0xffffffff or packed == 0xffffffff:
+                values = zip64[0] if zip64 else b''
+                if size == 0xffffffff:
+                    if len(values) < 8: raise ValueError('ZIP local ZIP64 size missing')
+                    size, = struct.unpack_from('<Q', values); values = values[8:]
+                if packed == 0xffffffff:
+                    if len(values) < 8: raise ValueError('ZIP local ZIP64 compressed size missing')
+                    packed, = struct.unpack_from('<Q', values)
+            if (size, packed, crc) != (member.file_size, member.compress_size, member.CRC):
+                raise ValueError('ZIP local/central sizes or CRC differ')
+
+
 def bundle(slim, romfs, manifest, output):
     slim,romfs,manifest,output=map(Path,(slim,romfs,manifest,output))
     for p in (slim,romfs,manifest): regular(p)
@@ -91,7 +131,11 @@ def bundle(slim, romfs, manifest, output):
             print('OOT2 local assembly: copying compiled app resources.', flush=True)
             with zipfile.ZipFile(temp,'w',allowZip64=True) as dst:
                 for z in src.infolist():
-                    with src.open(z) as inp, dst.open(z,'w',force_zip64=True) as out:
+                    target = copy.copy(z)
+                    # Sizes/offsets belong to this new archive, not the source's ZIP64 extra.
+                    target.extra = b''.join(struct.pack('<HH', kind, len(value)) + value
+                                            for kind, value in extra_fields(z.extra) if kind != 1)
+                    with src.open(z) as inp, dst.open(target,'w',force_zip64=True) as out:
                         shutil.copyfileobj(inp,out,1<<20)
                 z=zipfile.ZipInfo(prefix+'romfs.img'); z.compress_type=zipfile.ZIP_STORED
                 z.external_attr=(stat.S_IFREG|0o644)<<16
@@ -106,6 +150,7 @@ def bundle(slim, romfs, manifest, output):
             with zipfile.ZipFile(temp) as check:
                 if check.getinfo(prefix+'romfs.img').file_size!=actual[0] or len(check.infolist())!=len(names)+1:
                     raise ValueError('completed IPA directory differs')
+            validate_zip_headers(temp)
             os.chmod(temp,0o600)
             with open(temp,'rb') as f: os.fsync(f.fileno())
             os.replace(temp,output)
