@@ -2,6 +2,11 @@
 """Production-workflow contracts; no secrets or game files required."""
 from pathlib import Path
 import re
+import os
+import subprocess
+import tempfile
+import textwrap
+import sys
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,8 +26,74 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn('SNAPSHOT_ROUTE=oot2-resume-v6-info', workflow)
         self.assertIn('[[ "$OOT2_RUNTIME_VARIANT" = ipad-v5 ]]', workflow)
         self.assertIn('SNAPSHOT_ROUTE=oot2-resume-v5-info', workflow)
-        self.assertIn('ACCEPT_ARGS=(--translations)', workflow)
-        self.assertIn('"${ACCEPT_ARGS[@]}"', workflow)
+        self.assertIn('if [ "$SNAPSHOT_ROLE" = metal-snapshot ]; then', workflow)
+
+    def test_snapshot_restore_executes_with_system_bash(self):
+        # Execute the production snapshot branch, including nounset, with tiny
+        # stand-ins for network/files. /bin/bash is 3.2 on the macOS runners.
+        workflow = BUILD.read_text()
+        step = workflow.split('      - name: Restaurer le cache de shaders OOT2', 1)[1]
+        script = textwrap.dedent(step.split('        run: |\n', 1)[1].split('\n      - name:', 1)[0])
+        branch = script[script.index('if [ "$OOT2_CACHE_RESTORE" = metal-snapshot ]'):]
+        branch = branch.split('elif [ "$OOT2_CACHE_RESTORE" = empty ]; then', 1)[0] + 'fi\n'
+        setup = r'''
+set -euo pipefail
+export DMSH_CAS="$RUNNER_TEMP/cas.db"
+ssh() { printf '%s\n' "$*" >> "$CALLS"; printf 'OOT2_METAL_SNAPSHOT_V1 1 1 1\n'; }
+df() { printf 'Filesystem blocks Used Available Capacity Mounted\nfixture 999999999 0 999999999 0%% /\n'; }
+python3() {
+  printf 'python' >> "$CALLS"
+  printf ' <%s>' "$@" >> "$CALLS"
+  printf '\n' >> "$CALLS"
+  case "$1" in
+    security/oot2_transfer.py) touch "$4" ;;
+    security/oot2_cache_snapshot.py) return "$ACCEPT_STATUS" ;;
+    *) return 99 ;;
+  esac
+}
+zstd() { printf 'fixture'; }
+'''
+        print(subprocess.check_output(['/bin/bash', '--version'], text=True).splitlines()[0])
+        with tempfile.TemporaryDirectory() as temp:
+            calls = Path(temp)/'calls'
+            cases = [('metal-snapshot', 'ipad-v7', 'oot2-metal-snapshot-info-v1', False),
+                     ('resume-v5', 'ipad-v5', 'oot2-resume-v5-info', True),
+                     ('resume-v6', 'ipad-v6', 'oot2-resume-v6-info', True)]
+            for mode, variant, route, translations in cases:
+                for accept_status in (0, 42):
+                    with self.subTest(mode=mode, accept_status=accept_status):
+                        calls.write_text('')
+                        env = {**os.environ, 'RUNNER_TEMP': temp, 'CALLS': str(calls),
+                               'OOT2_CACHE_RESTORE': mode, 'OOT2_RUNTIME_VARIANT': variant,
+                               'ACCEPT_STATUS': str(accept_status)}
+                        result = subprocess.run(['/bin/bash', '-c', setup + branch], env=env,
+                                                text=True, capture_output=True)
+                        self.assertEqual(result.returncode, accept_status, result.stderr)
+                        log = calls.read_text().splitlines()
+                        self.assertIn(route, log[0])
+                        self.assertIn(f'<{mode}>', log[1])
+                        expected = f'python <security/oot2_cache_snapshot.py> <accept> <{temp}>'
+                        if translations:
+                            expected += ' <--translations>'
+                        self.assertEqual(log[-1], expected)
+            for mode in ('resume-v5', 'resume-v6'):
+                with self.subTest(wrong_variant=mode):
+                    calls.write_text('')
+                    env = {**os.environ, 'RUNNER_TEMP': temp, 'CALLS': str(calls),
+                           'OOT2_CACHE_RESTORE': mode, 'OOT2_RUNTIME_VARIANT': 'ipad-v7',
+                           'ACCEPT_STATUS': '0'}
+                    result = subprocess.run(['/bin/bash', '-c', setup + branch], env=env,
+                                            text=True, capture_output=True)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertEqual(calls.read_text(), '')
+        # Confirm the old command really fails on the target shell; Linux Bash
+        # has different empty-array behavior, so it cannot prove this regression.
+        if sys.platform == 'darwin':
+            old = subprocess.run(['/bin/bash', '-uc',
+                                  'ACCEPT_ARGS=(); printf "%s" "${ACCEPT_ARGS[@]}"'],
+                                 text=True, capture_output=True)
+            self.assertNotEqual(old.returncode, 0)
+            self.assertIn('unbound variable', old.stderr)
 
     def test_ipad_v7_default_and_earlier_preparations_are_explicit(self):
         workflow = BUILD.read_text()
