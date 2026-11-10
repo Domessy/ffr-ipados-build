@@ -28,6 +28,7 @@ ROUTES = frozenset({
     "oot2-release-preflight-v1",
     "oot2-read-resume-v5", "oot2-resume-v5-info",
     "oot2-read-resume-v6", "oot2-resume-v6-info",
+    "oot2-write-host-kit-v7", "oot2-write-slim-v7", "oot2-local-bundle-v7-ready",
     "oot2-write-host-kit-v1",
     "oot2-write-host-kit-v5", "oot2-write-host-kit-v6", "oot2-write-slim-v6", "oot2-local-bundle-v6-ready",
 })
@@ -137,7 +138,7 @@ def dispatch(command, parent):
         else:
             parent.send_file(archive)
         return 0
-    if command == "oot2-local-bundle-v6-ready":
+    if command in ("oot2-local-bundle-v6-ready", "oot2-local-bundle-v7-ready"):
         try:
             from .oot2_local_bundle import identity, regular
         except ImportError:
@@ -148,7 +149,7 @@ def dispatch(command, parent):
         data = json.loads(meta.read_text())
         if data['source_identity'] != release_identity(nup_file()) or list(identity(image)) != data['identity']:
             raise ValueError('local bundle input identity')
-        print('OOT2_LOCAL_BUNDLE_READY_V6', image.stat().st_size)
+        print('OOT2_LOCAL_BUNDLE_READY_V7' if command.endswith('v7-ready') else 'OOT2_LOCAL_BUNDLE_READY_V6', image.stat().st_size)
         return 0
     previous = parent.CACHE, parent.CONFLICTS, parent.OUTPUT
     try:
@@ -157,24 +158,27 @@ def dispatch(command, parent):
             parent.read_cache()
         elif command == "oot2-write-cache":
             parent.write_cache()
-        elif command == "oot2-write-slim-v6":
-            parent.receive_file("ZeldaOcarinaOfTime-v6-slim.ipa", 8 * 1024**3)
+        elif command in ("oot2-write-slim-v6", "oot2-write-slim-v7"):
+            version = "v7" if command.endswith("-v7") else "v6"
+            filename = "ZeldaOcarinaOfTime-" + version + "-slim.ipa"
+            parent.receive_file(filename, 8 * 1024**3)
             try:
                 from .oot2_local_bundle import bundle
             except ImportError:
                 from oot2_local_bundle import bundle
-            stats = bundle(OUTPUT / "ZeldaOcarinaOfTime-v6-slim.ipa",
+            args = {"expected_chain": "bc8830d4ba5a"} if version == "v7" else {}
+            stats = bundle(OUTPUT / filename,
                            ROOT / "local-bundle-v6/extract/v131072/RomFS.img",
                            ROOT / "local-bundle-v6/romfs-manifest.json",
-                           OUTPUT / "ZeldaOcarinaOfTime.ipa")
-            (OUTPUT / "ipad-v6-local-bundle-result.json").write_text(json.dumps(stats, indent=2) + "\n")
+                           OUTPUT / "ZeldaOcarinaOfTime.ipa", **args)
+            (OUTPUT / ("ipad-" + version + "-local-bundle-result.json")).write_text(json.dumps(stats, indent=2) + "\n")
             print("OOT2_LOCAL_BUNDLE_OK", stats["ipa_bytes"])
         elif command == "oot2-write-ipa":
             parent.receive_file("ZeldaOcarinaOfTime.ipa", 50 * 1024**3)
         elif command == "oot2-write-log":
             parent.receive_file("oot2-build.log", 32 * 1024**2)
-        elif command in ("oot2-write-host-kit-v1", "oot2-write-host-kit-v5", "oot2-write-host-kit-v6"):
-            filename = ("OOT2HostKit-v6.tar.zst" if command.endswith("-v6") else "OOT2HostKit-v5.tar.zst" if command.endswith("-v5") else "OOT2HostKit-v4.tar.zst")
+        elif command in ("oot2-write-host-kit-v1", "oot2-write-host-kit-v5", "oot2-write-host-kit-v6", "oot2-write-host-kit-v7"):
+            filename = ("OOT2HostKit-v7.tar.zst" if command.endswith("-v7") else "OOT2HostKit-v6.tar.zst" if command.endswith("-v6") else "OOT2HostKit-v5.tar.zst" if command.endswith("-v5") else "OOT2HostKit-v4.tar.zst")
             parent.receive_file(filename, 1 * 1024**3)
         return 0
     finally:

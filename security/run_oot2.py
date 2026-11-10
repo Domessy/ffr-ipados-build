@@ -198,11 +198,11 @@ def compile_ipa():
            str(NUP), "-o", str(OUTPUT), "-p", "v131072",
            "--platform", "ios", "--work-dir", str(TEMP / "oot2-work"),
            "--show-fps", "--gpu", "none", *layout_args]
-    if os.environ.get("OOT2_RUNTIME_VARIANT") in ("upstream-v4", "ipad-v5", "ipad-v6"):
+    if os.environ.get("OOT2_RUNTIME_VARIANT") in ("upstream-v4", "ipad-v5", "ipad-v6", "ipad-v7"):
         # Bake the proven setting into this diagnostic IPA so deleting a data
         # container cannot silently restore anonymous guest memory. The host
         # reads Documents/env.txt first, so an explicit device override wins.
-        filename = ("oot2_ipad_v6_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v6" else "oot2_ipad_v5_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v5"
+        filename = ("oot2_ipad_v7_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v7" else "oot2_ipad_v6_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v6" else "oot2_ipad_v5_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v5"
                     else "oot2_ipados_defaults.env")
         defaults = WORKSPACE / "security" / filename
         if not defaults.is_file() or defaults.is_symlink():

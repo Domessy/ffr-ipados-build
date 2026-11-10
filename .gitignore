@@ -35,3 +35,5 @@ __pycache__/
 .DS_Store
 
 !security/oot2_ipad_v6_defaults.env
+
+!security/oot2_ipad_v7_defaults.env

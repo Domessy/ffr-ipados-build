@@ -67,6 +67,13 @@ class IpaLayoutTests(unittest.TestCase):
         self.assertIn('--keep-extracted', argv)
         self.assertTrue(argv[argv.index('--env-file') + 1].endswith('oot2_ipad_v6_defaults.env'))
 
+    def test_local_bundle_v7_keeps_native_separate_and_its_own_defaults(self):
+        rc, call, _ = self.exercise('local-bundle', 'ipad-v7')
+        self.assertEqual(rc, 0)
+        argv = call.args[0]
+        self.assertEqual(argv[argv.index('--romfs') + 1], 'separate')
+        self.assertTrue(argv[argv.index('--env-file') + 1].endswith('oot2_ipad_v7_defaults.env'))
+
     def test_bad_layout_starts_no_builder(self):
         rc, _, count = self.exercise('unknown')
         self.assertEqual(rc, 1)

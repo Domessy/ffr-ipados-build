@@ -49,6 +49,17 @@ class Oot2GatewayTests(unittest.TestCase):
                 self.assertEqual(bundle.call_args.args,(root/'out/ZeldaOcarinaOfTime-v6-slim.ipa',root/'local-bundle-v6/extract/v131072/RomFS.img',root/'local-bundle-v6/romfs-manifest.json',root/'out/ZeldaOcarinaOfTime.ipa'))
                 self.assertEqual(gw.dispatch('oot2-write-slim-v6 /arbitrary',parent),126)
 
+    def test_v7_slim_route_requires_its_shader_chain(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d).resolve()
+            with patch.object(gw,'ROOT',root), patch.object(gw,'OUTPUT',root/'out'), patch.object(parent,'receive_file') as receive, patch('security.oot2_local_bundle.bundle',return_value={'ipa_bytes':123}) as bundle:
+                (root/'out').mkdir()
+                self.assertEqual(gw.dispatch('oot2-write-slim-v7',parent),0)
+                receive.assert_called_once_with('ZeldaOcarinaOfTime-v7-slim.ipa',8<<30)
+                self.assertEqual(bundle.call_args.kwargs,{'expected_chain':'bc8830d4ba5a'})
+                self.assertEqual(bundle.call_args.args[1],root/'local-bundle-v6/extract/v131072/RomFS.img')
+                self.assertEqual(gw.dispatch('oot2-write-slim-v7 /arbitrary',parent),126)
+
     def test_local_bundle_preflight_rejects_a_different_source(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d).resolve(); folder=root/'local-bundle-v6/extract/v131072';folder.mkdir(parents=True)

@@ -24,9 +24,14 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn('ACCEPT_ARGS=(--translations)', workflow)
         self.assertIn('"${ACCEPT_ARGS[@]}"', workflow)
 
-    def test_ipad_v6_default_and_v5_preparation_are_explicit(self):
+    def test_ipad_v7_default_and_earlier_preparations_are_explicit(self):
         workflow = BUILD.read_text()
-        self.assertIn('default: ipad-v6', workflow)
+        self.assertIn('default: ipad-v7', workflow)
+        self.assertIn('default: metal-snapshot', workflow)
+        self.assertIn('2f131edc1b4586f89dd20b0d3de8e4f92ac3f74b', workflow)
+        self.assertIn('oot2_prepare_ipad_v7.py', workflow)
+        self.assertIn('IPA_ROUTE=oot2-write-slim-v7', workflow)
+        self.assertIn('KIT_ROUTE=oot2-write-host-kit-v7', workflow)
         self.assertIn('oot2_prepare_ipad_v6.py', workflow)
         self.assertIn('8d5d4f1b04610fef5a96521c72a4263d68794959', workflow)
         self.assertIn('python3 security/oot2_prepare_ipad_v5.py', workflow)
