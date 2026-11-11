@@ -97,7 +97,12 @@ zstd() { printf 'fixture'; }
 
     def test_ipad_v7_default_and_earlier_preparations_are_explicit(self):
         workflow = BUILD.read_text()
-        self.assertIn('default: ipad-v7', workflow)
+        self.assertIn('default: ipad-v8', workflow)
+        self.assertIn('          - ipad-v7', workflow)
+        self.assertIn('ccd834e06a3938834bb5579e2ccc6a0ad13d3970', workflow)
+        self.assertIn('oot2_prepare_ipad_v8.py', workflow)
+        self.assertIn('IPA_ROUTE=oot2-write-slim-v8', workflow)
+        self.assertIn('KIT_ROUTE=oot2-write-host-kit-v8', workflow)
         self.assertIn('default: metal-snapshot', workflow)
         self.assertIn('2f131edc1b4586f89dd20b0d3de8e4f92ac3f74b', workflow)
         self.assertIn('oot2_prepare_ipad_v7.py', workflow)

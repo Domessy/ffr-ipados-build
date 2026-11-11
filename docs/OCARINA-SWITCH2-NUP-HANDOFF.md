@@ -805,3 +805,14 @@ Discussion : premiers rapports performances dégradées M4/M1, puis mesures corr
 **PR2334 ouverte, non fusionnée**, head **393cda64387078d1353782dcd65e773dfdc4b176** : draw_barriers game neutralisé par présence image family heaps et toute barrière non nulle. Garde confirmée mot pour mot dans v7 et main (`!g_image_heap_n`). Proposition alias flush au début de passe + restriction des barrières complètes aux bits vertex/indirect. M1 Max auteur ~42,5→45,8fps/GPU22,9→20,9ms ; commentaire19548438 rapporte aucun gain mesurable M2 pour variante équivalente PR1970, autres jeux pas testés. Candidate audit/tests GPU ciblés avant intégration, sans promettre gain M5.
 
 Suite recommandée : recueillir d’abord test v7 installé à scène/réglages connus ; préparer séparément candidat avec correctifs officiels graphiques/streaming/recyclage et build multiprocessus, valider iOS et coût mémoire de compilation ; examiner PR2334 à part. Aucun nouveau run lancé pour cette veille.
+
+
+### 11/11/2026 — préparation du candidat ipad-v8 demandée
+
+Nouveau candidat séparé **ipad-v8**, base officielle immuable **ccd834e06a3938834bb5579e2ccc6a0ad13d3970**, chaîne officielle **d24f05cf9d78**. Les 46 commits post-v7 incluent NaN/blend-zero, limites uniformes arrondies à 256, stand-ins Metal4 inutiles, partial texture upload, parent sRGB résident, race dirty shared-page, recyclage heaps redimensionnés et finalisation shaders multiprocessus. PR1942/1927 host-only conservées, patch identique v7 réappliqué avec nouveaux hashes d’entrée ; telemetry et release NUP runner seul. PR2334 **exclue**, ordre des passes et bénéfice M5 à valider séparément. Shaders jamais réétiquetés.
+
+Defaults v8 DM_GUEST_FILE=1 et DM_NVN_RT_RECYCLE=1. **DM_GFX_SCALE=1** embarqué pour conserver le budget de pixels du précédent Docked ; choix Documents prioritaire, DM_GFX_SCALE=0 sélectionne la pleine échelle officielle. En Handheld, le précédent défaut était tier0 : ne pas comparer aveuglément Handheld v7 tier0 avec v8 tier1, noter explicitement l’échelle. Cible60/fps_hold off de profil avec choix utilisateur préservé. Génération du runner bornée **J=DMSH_PROCS=min(CPU,4)**, pas d’augmentation non bornée des compilateurs.
+
+Routes slim/kit/ready v8 distinctes, réception exige b-d24f05cf9d78.img ; RomFS original commun, assemblage PC et contrôle ZIP64 conservés. Restauration Metal-only avec appels Bash sans tableau vide, NUP toujours transféré. Kit host-only v8 séparé, pas de promesse sans NUP. Variantes v5/v6/v7 intactes.
+
+Validation locale initiale : **105 tests pipeline réussis**, préparation stricte pin/hashes, tamper/doublon/mauvais pin/rollback et contrôle négatif cadence réussis. CI v8 ajoute compilation et tests ciblés upload partiel/dirty pages/blend/border ; exécution Metal4 reste conditionnelle au matériel du runner. En attente des CIs avant fusion et dispatch privé. Aucun accès iPad, aucune IPA privée v8 lancée à ce checkpoint.
