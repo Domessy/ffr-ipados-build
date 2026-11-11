@@ -60,6 +60,17 @@ class Oot2GatewayTests(unittest.TestCase):
                 self.assertEqual(bundle.call_args.args[1],root/'local-bundle-v6/extract/v131072/RomFS.img')
                 self.assertEqual(gw.dispatch('oot2-write-slim-v7 /arbitrary',parent),126)
 
+    def test_v8_slim_route_requires_its_shader_chain(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d).resolve()
+            with patch.object(gw,'ROOT',root), patch.object(gw,'OUTPUT',root/'out'), patch.object(parent,'receive_file') as receive, patch('security.oot2_local_bundle.bundle',return_value={'ipa_bytes':123}) as bundle:
+                (root/'out').mkdir()
+                self.assertEqual(gw.dispatch('oot2-write-slim-v8',parent),0)
+                receive.assert_called_once_with('ZeldaOcarinaOfTime-v8-slim.ipa',8<<30)
+                self.assertEqual(bundle.call_args.kwargs,{'expected_chain':'d24f05cf9d78'})
+                self.assertEqual(bundle.call_args.args[1],root/'local-bundle-v6/extract/v131072/RomFS.img')
+                self.assertEqual(gw.dispatch('oot2-write-slim-v8 /arbitrary',parent),126)
+
     def test_local_bundle_preflight_rejects_a_different_source(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d).resolve(); folder=root/'local-bundle-v6/extract/v131072';folder.mkdir(parents=True)
@@ -67,6 +78,7 @@ class Oot2GatewayTests(unittest.TestCase):
             (root/'local-bundle-v6/romfs-manifest.json').write_text(json.dumps({'source_identity':'123:original','identity':[13,'hash']}))
             with patch.object(gw,'ROOT',root), patch.object(gw,'nup_file',return_value=root/'original.nup'), patch.object(gw,'release_identity',return_value='123:original'), patch('security.oot2_local_bundle.identity',return_value=(13,'hash')):
                 self.assertEqual(gw.dispatch('oot2-local-bundle-v6-ready',parent),0)
+                self.assertEqual(gw.dispatch('oot2-local-bundle-v8-ready',parent),0)
                 with patch.object(gw,'release_identity',return_value='456:different'):
                     with self.assertRaisesRegex(ValueError,'input identity'):gw.dispatch('oot2-local-bundle-v6-ready',parent)
 

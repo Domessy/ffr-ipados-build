@@ -74,6 +74,22 @@ class IpaLayoutTests(unittest.TestCase):
         self.assertEqual(argv[argv.index('--romfs') + 1], 'separate')
         self.assertTrue(argv[argv.index('--env-file') + 1].endswith('oot2_ipad_v7_defaults.env'))
 
+    def test_v8_bounded_workers_and_comparison_defaults(self):
+        with patch('os.cpu_count', return_value=12):
+            rc, call, _ = self.exercise('local-bundle', 'ipad-v8')
+        self.assertEqual(rc, 0)
+        env = call.kwargs['env']
+        self.assertEqual((env['J'], env['DMSH_PROCS']), ('4', '4'))
+        argv = call.args[0]
+        defaults = Path(argv[argv.index('--env-file') + 1])
+        self.assertEqual(defaults.name, 'oot2_ipad_v8_defaults.env')
+        self.assertIn('DM_GFX_SCALE=1', defaults.read_text())
+        self.assertIn('DM_GUEST_FILE=1', defaults.read_text())
+        self.assertEqual(argv[argv.index('--romfs') + 1], 'separate')
+        with patch('os.cpu_count', return_value=2):
+            _, call, _ = self.exercise('local-bundle', 'ipad-v8')
+        self.assertEqual(call.kwargs['env']['DMSH_PROCS'], '2')
+
     def test_bad_layout_starts_no_builder(self):
         rc, _, count = self.exercise('unknown')
         self.assertEqual(rc, 1)

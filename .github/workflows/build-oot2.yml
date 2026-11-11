@@ -16,7 +16,7 @@ on:
         description: iPad optimization candidate or preserved earlier experiments
         type: choice
         required: true
-        default: ipad-v7
+        default: ipad-v8
         options:
           - baseline
           - depth
@@ -27,6 +27,7 @@ on:
           - ipad-v5
           - ipad-v6
           - ipad-v7
+          - ipad-v8
 
       ipa_layout:
         description: Bundle on Mac, separate device data, or assemble full IPA on CachyOS
@@ -78,7 +79,7 @@ jobs:
       - name: Verifier les scripts et tests NUP avant tout transfert prive
         run: |
           set -euo pipefail
-          python3 -m py_compile security/oot2_prepare_ipad_v7.py security/oot2_ipad_v7_smoke.py security/oot2_local_bundle.py security/oot2_prepare_ipad_v6.py security/oot2_ipad_v6_smoke.py security/ffr_ssh_gate.py security/oot2_nup_info.py security/oot2_gateway.py security/oot2_transfer.py security/oot2_sqlite_cas.py security/oot2_patch_nup_release.py security/oot2_prepare_ipad_v5.py security/oot2_ipad_v5_smoke.py security/run_oot2.py security/test_oot2_sqlite_cas.py security/test_oot2_patch_nup_release.py security/test_oot2_nup_info.py security/test_oot2_gateway.py security/test_oot2_transfer.py security/test_oot2_setup.py security/test_oot2_workflow.py security/test_oot2_memory_report.py security/test_oot2_ipa_layout.py security/test_oot2_cache_snapshot.py security/test_oot2_export_buildkit.py security/test_oot2_local_bundle.py
+          python3 -m py_compile security/oot2_prepare_ipad_v8.py security/oot2_ipad_v8_smoke.py security/oot2_prepare_ipad_v7.py security/oot2_ipad_v7_smoke.py security/oot2_local_bundle.py security/oot2_prepare_ipad_v6.py security/oot2_ipad_v6_smoke.py security/ffr_ssh_gate.py security/oot2_nup_info.py security/oot2_gateway.py security/oot2_transfer.py security/oot2_sqlite_cas.py security/oot2_patch_nup_release.py security/oot2_prepare_ipad_v5.py security/oot2_ipad_v5_smoke.py security/run_oot2.py security/test_oot2_sqlite_cas.py security/test_oot2_patch_nup_release.py security/test_oot2_nup_info.py security/test_oot2_gateway.py security/test_oot2_transfer.py security/test_oot2_setup.py security/test_oot2_workflow.py security/test_oot2_memory_report.py security/test_oot2_ipa_layout.py security/test_oot2_cache_snapshot.py security/test_oot2_export_buildkit.py security/test_oot2_local_bundle.py
           bash -n security/setup_oot2.sh
           python3 -m unittest -v security/test_oot2_nup_info.py security/test_oot2_gateway.py security/test_oot2_transfer.py security/test_oot2_sqlite_cas.py security/test_oot2_patch_nup_release.py security/test_oot2_setup.py security/test_oot2_workflow.py security/test_oot2_memory_report.py security/test_oot2_ipa_layout.py security/test_oot2_cache_snapshot.py security/test_oot2_export_buildkit.py security/test_oot2_local_bundle.py
 
@@ -210,7 +211,7 @@ jobs:
             echo "Echec transitoire, nouvel essai dans 20 secondes."
             sleep 20
           done
-          if [ "$OOT2_RUNTIME_VARIANT" != ipad-v7 ]; then dotnet --version; fi
+          if [ "$OOT2_RUNTIME_VARIANT" != ipad-v7 ] && [ "$OOT2_RUNTIME_VARIANT" != ipad-v8 ]; then dotnet --version; fi
           python3 -m venv "$RUNNER_TEMP/oot2-venv"
           "$RUNNER_TEMP/oot2-venv/bin/python" -m pip install -q lz4 "capstone>=5,<6" fonttools nsz zbic "backports.zstd; python_version < '3.14'"
           # Pin the upstream code that processes the NUP; no keys are transferred.
@@ -219,6 +220,8 @@ jobs:
             NXNATIVE_SHA="1794a35a1a2462a75cb1730eee29d32fac81248c"
           elif [ "$OOT2_RUNTIME_VARIANT" = ipad-v5 ]; then
             NXNATIVE_SHA="7f50222003e4270e3655d4f798e85744d390edf0"
+          elif [ "$OOT2_RUNTIME_VARIANT" = ipad-v8 ]; then
+            NXNATIVE_SHA="ccd834e06a3938834bb5579e2ccc6a0ad13d3970"
           elif [ "$OOT2_RUNTIME_VARIANT" = ipad-v7 ]; then
             NXNATIVE_SHA="2f131edc1b4586f89dd20b0d3de8e4f92ac3f74b"
           elif [ "$OOT2_RUNTIME_VARIANT" = ipad-v6 ]; then
@@ -242,7 +245,9 @@ jobs:
           # Patch only this ephemeral checkout to close the mmap and unlink
           # the Mac-runner copy after extracting the RomFS; never touch the
           # local CachyOS NUP or any other game.
-          if [ "$OOT2_RUNTIME_VARIANT" = ipad-v7 ]; then
+          if [ "$OOT2_RUNTIME_VARIANT" = ipad-v8 ]; then
+            python3 security/oot2_prepare_ipad_v8.py "$RUNNER_TEMP/nxnative"
+          elif [ "$OOT2_RUNTIME_VARIANT" = ipad-v7 ]; then
             python3 security/oot2_prepare_ipad_v7.py "$RUNNER_TEMP/nxnative"
           elif [ "$OOT2_RUNTIME_VARIANT" = ipad-v6 ]; then
             python3 security/oot2_prepare_ipad_v6.py "$RUNNER_TEMP/nxnative"
@@ -253,7 +258,9 @@ jobs:
           else
             python3 security/oot2_patch_nup_release.py "$RUNNER_TEMP/nxnative/scripts/build_ipa_from_nsp.py"
           fi
-          if [ "$OOT2_RUNTIME_VARIANT" = ipad-v7 ]; then
+          if [ "$OOT2_RUNTIME_VARIANT" = ipad-v8 ]; then
+            echo "iPad-v8: official texture, memory, pipeline and multiprocess build updates; bounded concurrency."
+          elif [ "$OOT2_RUNTIME_VARIANT" = ipad-v7 ]; then
             echo "iPad-v7: official updates and reviewed pacing fixes; original shader chain."
           elif [ "$OOT2_RUNTIME_VARIANT" = ipad-v6 ]; then
             echo "iPad-v6: official reviewed revision, no experimental fork overlay."
@@ -376,7 +383,9 @@ jobs:
           if [ "${{ inputs.ipa_layout }}" = local-bundle ]; then
             LOCAL_ROUTE=oot2-local-bundle-v6-ready
             LOCAL_EXPECT=OOT2_LOCAL_BUNDLE_READY_V6
-            if [ "${{ inputs.runtime_variant }}" = ipad-v7 ]; then
+            if [ "${{ inputs.runtime_variant }}" = ipad-v8 ]; then
+              LOCAL_ROUTE=oot2-local-bundle-v8-ready
+            elif [ "${{ inputs.runtime_variant }}" = ipad-v7 ]; then
               LOCAL_ROUTE=oot2-local-bundle-v7-ready
               LOCAL_EXPECT=OOT2_LOCAL_BUNDLE_READY_V7
             else
@@ -485,7 +494,7 @@ jobs:
           python3 security/run_oot2.py
 
       - name: Conserver les entrees privees pour une future reconstruction du moteur
-        if: ${{ inputs.mode == 'build' && (inputs.runtime_variant == 'upstream-v4' || inputs.runtime_variant == 'ipad-v5' || inputs.runtime_variant == 'ipad-v6' || inputs.runtime_variant == 'ipad-v7') }}
+        if: ${{ inputs.mode == 'build' && (inputs.runtime_variant == 'upstream-v4' || inputs.runtime_variant == 'ipad-v5' || inputs.runtime_variant == 'ipad-v6' || inputs.runtime_variant == 'ipad-v7' || inputs.runtime_variant == 'ipad-v8') }}
         continue-on-error: true
         env:
           OOT2_RUNTIME_VARIANT: ${{ inputs.runtime_variant }}
@@ -495,6 +504,7 @@ jobs:
           KIT_ROUTE=oot2-write-host-kit-v1
           if [ "$OOT2_RUNTIME_VARIANT" = ipad-v5 ]; then KIT_VERSION=v5; KIT_ROUTE=oot2-write-host-kit-v5; fi
           if [ "$OOT2_RUNTIME_VARIANT" = ipad-v6 ]; then KIT_VERSION=v6; KIT_ROUTE=oot2-write-host-kit-v6; fi
+          if [ "$OOT2_RUNTIME_VARIANT" = ipad-v8 ]; then KIT_VERSION=v8; KIT_ROUTE=oot2-write-host-kit-v8; fi
           if [ "$OOT2_RUNTIME_VARIANT" = ipad-v7 ]; then KIT_VERSION=v7; KIT_ROUTE=oot2-write-host-kit-v7; fi
           python3 security/oot2_export_buildkit.py "$RUNNER_TEMP" "$RUNNER_TEMP/OOT2HostKit-$KIT_VERSION.tar.zst"
           ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 \
@@ -511,7 +521,9 @@ jobs:
           test -s "$RUNNER_TEMP/ZeldaOcarinaOfTime.ipa"
           IPA_ROUTE=oot2-write-ipa
           if [ "$OOT2_IPA_LAYOUT" = local-bundle ]; then
-            if [ "$OOT2_RUNTIME_VARIANT" = ipad-v7 ]; then
+            if [ "$OOT2_RUNTIME_VARIANT" = ipad-v8 ]; then
+              IPA_ROUTE=oot2-write-slim-v8
+            elif [ "$OOT2_RUNTIME_VARIANT" = ipad-v7 ]; then
               IPA_ROUTE=oot2-write-slim-v7
             else
               [[ "$OOT2_RUNTIME_VARIANT" = ipad-v6 ]] || exit 1

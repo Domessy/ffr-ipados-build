@@ -179,6 +179,11 @@ def compile_ipa():
         return 1
     env = dict(os.environ, DMSH_CAS=str(CAS_DB),
                OOT2_RELEASE_EPHEMERAL_NUP=str(NUP))
+    if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v8":
+        workers = min(os.cpu_count() or 2, 4)
+        env["J"] = str(workers)
+        env["DMSH_PROCS"] = str(workers)
+        print(f"OOT2 shader finishing: {workers} worker processes (bounded concurrency).", flush=True)
     # Preserve the restore's older mtimes; do not re-upload already stored files.
     since_ns = time.time_ns()
     last_sync = time.monotonic()
@@ -198,11 +203,11 @@ def compile_ipa():
            str(NUP), "-o", str(OUTPUT), "-p", "v131072",
            "--platform", "ios", "--work-dir", str(TEMP / "oot2-work"),
            "--show-fps", "--gpu", "none", *layout_args]
-    if os.environ.get("OOT2_RUNTIME_VARIANT") in ("upstream-v4", "ipad-v5", "ipad-v6", "ipad-v7"):
+    if os.environ.get("OOT2_RUNTIME_VARIANT") in ("upstream-v4", "ipad-v5", "ipad-v6", "ipad-v7", "ipad-v8"):
         # Bake the proven setting into this diagnostic IPA so deleting a data
         # container cannot silently restore anonymous guest memory. The host
         # reads Documents/env.txt first, so an explicit device override wins.
-        filename = ("oot2_ipad_v7_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v7" else "oot2_ipad_v6_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v6" else "oot2_ipad_v5_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v5"
+        filename = ("oot2_ipad_v8_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v8" else "oot2_ipad_v7_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v7" else "oot2_ipad_v6_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v6" else "oot2_ipad_v5_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v5"
                     else "oot2_ipados_defaults.env")
         defaults = WORKSPACE / "security" / filename
         if not defaults.is_file() or defaults.is_symlink():

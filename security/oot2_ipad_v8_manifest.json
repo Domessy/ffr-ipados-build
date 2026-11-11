@@ -1,0 +1,63 @@
+{
+  "base_revision": "ccd834e06a3938834bb5579e2ccc6a0ad13d3970",
+  "shader_chain": "d24f05cf9d78",
+  "native_changes": "Official pinned sources plus PR1942 frame-step recovery and PR1927 profile fps_hold off, bounded telemetry and runner-only NUP release. No shader/fork overlay.",
+  "previous_variant_preserved": "ipad-v7",
+  "defaults": [
+    "DM_GUEST_FILE=1",
+    "DM_NVN_RT_RECYCLE=1",
+    "DM_GFX_SCALE=1"
+  ],
+  "grass_prepass_enabled": false,
+  "experimental_fork_overlay_applied": false,
+  "m5_hardware_validated": false,
+  "included_fixes": [
+    "6f50de00",
+    "6d9edb07",
+    "6c676444",
+    "6c3aeb37",
+    "ab41d6a1",
+    "47773ed1",
+    "dbf84998",
+    "5e1c1aec",
+    "12a44e09",
+    "fd8188c9",
+    "2f131edc",
+    "0c8a3ac0",
+    "013c8755",
+    "04811a63",
+    "81906931",
+    "b54968e7",
+    "25c2546e",
+    "adaff735",
+    "f02d0474",
+    "e45694b7",
+    "918e9f34",
+    "0662f9d8",
+    "1d090a66",
+    "6a6a018d",
+    "707cac95",
+    "511a0a2c",
+    "8b55ebb3",
+    "d2556cff",
+    "1e69c180",
+    "e2df31ca",
+    "4b616bb5",
+    "06c2ea4c"
+  ],
+  "initial_cache_restore": "metal-snapshot",
+  "cache_note": "New official shader chain; exact MSL+flags+compiler compile keys only. Multiprocess finishing, capped at four workers on runner. No hit-rate or iPad FPS promise.",
+  "ipa_layout": "local-bundle",
+  "private_build_started": false,
+  "host_patch_sha256": "9fe39423ab72399e2692edd404edce1dc4cef6095d3382ddfff95efe13037696",
+  "host_patch_sources": {
+    "1942": "94a0c94e5b013ebcea94f0d02ee47ae6077ed931",
+    "1927": "a4d50d8136df25d86523c23a10714d350cf5e3f6"
+  },
+  "profile_default": "fps_hold off; user launcher choice preserved, target 60fps",
+  "graphics_scale": "DM_GFX_SCALE=1 keeps prior Docked scale. Handheld comparisons must account for tier 1 versus previous tier 0; Documents override DM_GFX_SCALE=0 selects official full tier.",
+  "excluded_unmerged_prs": [
+    "2334"
+  ],
+  "build_workers": "min(cpu_count,4), J and DMSH_PROCS explicitly bounded"
+}

@@ -27,7 +27,7 @@ def build_identity():
     variant = os.environ.get('OOT2_RUNTIME_VARIANT', 'upstream-v4')
     if variant == 'upstream-v4':
         return PIN, CHAIN, None
-    if variant in ('ipad-v5', 'ipad-v6', 'ipad-v7'):
+    if variant in ('ipad-v5', 'ipad-v6', 'ipad-v7', 'ipad-v8'):
         data = Path(__file__).with_name(f'oot2_{variant.replace("-", "_")}_manifest.json').read_bytes()
         manifest = json.loads(data)
         return manifest['base_revision'], manifest['shader_chain'], hashlib.sha256(data).hexdigest()
