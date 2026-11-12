@@ -1,0 +1,41 @@
+name: OOT2 production iOS link fixture
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/test-oot2-ios-link.yml'
+      - 'security/oot2_prepare_ipad_v8.py'
+      - 'security/oot2_ipad_v8_host.patch'
+      - 'security/oot2_ipad_v8_link.patch'
+permissions:
+  contents: read
+jobs:
+  v8-production-ios-link:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
+      GAME: '0400486024DEC000'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Prepare exact v8 source, no retail data
+        run: |
+          set -euo pipefail
+          brew install xcodegen
+          xcodebuild -downloadComponent MetalToolchain
+          SRC="$RUNNER_TEMP/v8-link-source"
+          git init -q "$SRC"
+          git -C "$SRC" remote add origin https://github.com/seedds/nxnative.git
+          git -C "$SRC" fetch -q --depth 1 origin ccd834e06a3938834bb5579e2ccc6a0ad13d3970
+          git -C "$SRC" checkout -q --detach FETCH_HEAD
+          python3 security/oot2_prepare_ipad_v8.py "$SRC"
+      - name: Build and link the production unsigned iOS app with synthetic modules
+        run: |
+          set -euo pipefail
+          rc=0
+          python3 "$RUNNER_TEMP/v8-link-source/dm/ios/tools/build_smoke.py" --output "$RUNNER_TEMP/v8-link-fixture" > "$RUNNER_TEMP/v8-link.log" 2>&1 || rc=$?
+          tail -140 "$RUNNER_TEMP/v8-link.log"
+          exit "$rc"
