@@ -1,0 +1,233 @@
+name: OOT2 iPad v8 - ahead-of-time pipelines without NUP
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        required: true
+        default: validate
+        description: Public iOS fixture or private v8 pipeline build
+        options: [validate, build]
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/prebake-oot2-v8.yml'
+      - 'security/oot2_ipad_aot.py'
+      - 'security/oot2_aot_pilot.py'
+      - 'security/oot2_aot_v8_*'
+      - 'security/test_oot2_ipad_aot.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oot2-aot-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'build' }}
+  cancel-in-progress: false
+
+jobs:
+  ios-aot:
+    if: github.event_name == 'pull_request' || inputs.mode == 'validate' || vars.FFR_SECURITY_READY == 'true'
+    runs-on: xcode-27
+    timeout-minutes: 300
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Prepare exact public AOT tools - no guest or shader build
+        run: |
+          set -euo pipefail
+          umask 077
+          SRC="$RUNNER_TEMP/nxnative"
+          git init -q "$SRC"
+          git -C "$SRC" remote add origin https://github.com/seedds/nxnative.git
+          git -C "$SRC" fetch -q --depth 1 origin ccd834e06a3938834bb5579e2ccc6a0ad13d3970
+          git -C "$SRC" checkout -q --detach FETCH_HEAD
+          python3 security/oot2_ipad_aot.py prepare-tools "$SRC"
+          python3 -m unittest -v security.test_oot2_ipad_aot security.test_oot2_gateway security.test_oot2_transfer
+          python3 -m venv "$RUNNER_TEMP/aot-venv"
+          "$RUNNER_TEMP/aot-venv/bin/python" -m pip install -q lz4
+          "$RUNNER_TEMP/aot-venv/bin/python" "$SRC/dm/tools/tests/test_pso_offline.py"
+      - name: Validate iOS render and compute archives plus incremental reuse
+        run: |
+          set -euo pipefail
+          xcodebuild -downloadComponent MetalToolchain
+          python3 "$RUNNER_TEMP/nxnative/dm/gfx/tools/own_compilers.py" --check-metal
+          "$RUNNER_TEMP/aot-venv/bin/python" security/oot2_aot_pilot.py "$RUNNER_TEMP/nxnative" "$RUNNER_TEMP/public-aot-pilot"
+      - name: Installer Tailscale en ligne de commande (sans action DNS)
+        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'build'
+        run: |
+          set -euo pipefail
+          export HOMEBREW_NO_AUTO_UPDATE=1
+          for attempt in 1 2 3; do
+            if brew install --formula tailscale; then break; fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep 15
+          done
+          command -v tailscale
+          command -v tailscaled
+
+      - name: Connecter Tailscale sans modifier les DNS macOS
+        env:
+          TS_AUTHKEY: ${{ secrets.FFR_TS_AUTHKEY }}
+        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'build'
+        run: |
+          set -euo pipefail
+          test -n "$TS_AUTHKEY"
+          TS_CLI="$(command -v tailscale)"
+          TS_DAEMON="$(command -v tailscaled)"
+          TS_SOCKET="$RUNNER_TEMP/oot2-tailscaled.sock"
+          # Temporary daemon with in-memory state; no persistent login data.
+          nohup sudo -n "$TS_DAEMON" --state=mem: --socket="$TS_SOCKET" \
+            > "$RUNNER_TEMP/oot2-tailscaled.log" 2>&1 < /dev/null &
+          echo "$!" > "$RUNNER_TEMP/oot2-tailscaled.pid"
+          daemon_ready=0
+          for attempt in $(seq 1 30); do
+            if sudo -n "$TS_CLI" --socket="$TS_SOCKET" status --json > /dev/null 2>&1; then
+              daemon_ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$daemon_ready" -ne 1 ]; then
+            echo 'Tailscale daemon did not become ready.' >&2
+            exit 1
+          fi
+          # No MagicDNS required: the host is reached by its Tailscale IPv4 address.
+          sudo -n "$TS_CLI" --socket="$TS_SOCKET" up \
+            --authkey="$TS_AUTHKEY" \
+            --accept-dns=false \
+            --timeout=120s \
+            --hostname="oot2-ci-${GITHUB_RUN_ID}"
+          sudo -n "$TS_CLI" --socket="$TS_SOCKET" status --json \
+            | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("BackendState") == "Running"; print("Tailscale running; macOS system DNS unchanged.")'
+
+      - name: Configurer SSH avec cle d'hote epinglee
+        env:
+          SSH_KEY: ${{ secrets.FFR_SSH_KEY }}
+          HOSTKEY: ${{ secrets.FFR_SSH_KNOWN_HOSTS }}
+          PC_IP: ${{ secrets.FFR_TS_HOST }}
+          PC_USER: ${{ secrets.FFR_SSH_USER }}
+        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'build'
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$SSH_KEY" > "$RUNNER_TEMP/oot2_ssh_key"
+          printf '%s\n' "$HOSTKEY" > "$RUNNER_TEMP/oot2_known_hosts"
+          chmod 600 "$RUNNER_TEMP/oot2_ssh_key" "$RUNNER_TEMP/oot2_known_hosts"
+          {
+            echo 'Host ffr-cachyos'
+            printf '  HostName %s\n' "$PC_IP"
+            printf '  User %s\n' "$PC_USER"
+            echo '  Port 22'
+            printf '  IdentityFile %s\n' "$RUNNER_TEMP/oot2_ssh_key"
+            printf '  UserKnownHostsFile %s\n' "$RUNNER_TEMP/oot2_known_hosts"
+            echo '  StrictHostKeyChecking yes'
+            echo '  IdentitiesOnly yes'
+            echo '  BatchMode yes'
+          } > "$HOME/.ssh/config"
+          chmod 600 "$HOME/.ssh/config"
+          echo 'Private AOT SSH channel ready.'
+
+
+      - name: Receive only validated v8 slim and optional pipeline cache
+        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'build'
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$RUNNER_TEMP/oot2-aot"
+          read -r MARK INPUT_BYTES INPUT_SHA CACHE_BYTES CACHE_SHA <<< "$(ssh ffr-cachyos oot2-aot-v8-info)"
+          [[ "$MARK" == OOT2_AOT_V8 && "$INPUT_BYTES" =~ ^[1-9][0-9]*$ && "$INPUT_SHA" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$CACHE_BYTES" =~ ^[0-9]+$ ]]
+          echo "AOT_INPUT_BYTES=$INPUT_BYTES" >> "$GITHUB_ENV"
+          echo "AOT_CACHE_BYTES=$CACHE_BYTES" >> "$GITHUB_ENV"
+          free_kb=$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')
+          (( free_kb > 40000000 ))
+          python3 security/oot2_transfer.py aot-input "$INPUT_BYTES" "$RUNNER_TEMP/oot2-aot/input.ipa"
+          python3 - "$RUNNER_TEMP/oot2-aot/input.ipa" "$INPUT_SHA" <<'PYCODE'
+          import sys
+          from security.oot2_ipad_aot import digest
+          assert digest(sys.argv[1]) == sys.argv[2], 'AOT input digest'
+          PYCODE
+          if [ "$CACHE_BYTES" -gt 0 ]; then
+            [[ "$CACHE_SHA" =~ ^[0-9a-f]{64}$ ]]
+            python3 security/oot2_transfer.py aot-cache "$CACHE_BYTES" "$RUNNER_TEMP/oot2-aot/cache.tar.gz"
+            python3 - "$RUNNER_TEMP/oot2-aot/cache.tar.gz" "$CACHE_SHA" "$RUNNER_TEMP/oot2-aot/work/cache" <<'PYCODE'
+          import sys
+          from security.oot2_ipad_aot import digest, restore_cache
+          assert digest(sys.argv[1]) == sys.argv[2], 'AOT cache digest'
+          restore_cache(sys.argv[1], sys.argv[3])
+          PYCODE
+          fi
+          echo 'Validated v8 input restored. No NUP upload or shader regeneration.'
+      - name: Build pair and compute archives then repack unchanged compiled app
+        id: archive
+        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'build'
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/aot-venv/bin/python" security/oot2_ipad_aot.py build "$RUNNER_TEMP/nxnative" "$RUNNER_TEMP/oot2-aot/input.ipa" "$RUNNER_TEMP/oot2-aot/work" "$RUNNER_TEMP/oot2-aot/output.ipa" > "$RUNNER_TEMP/oot2-aot/wrapper-private.log" 2>&1 &
+          AOT_PID=$!
+          CHECKPOINT_AT=$((SECONDS+600))
+          while kill -0 "$AOT_PID" 2>/dev/null; do
+            sleep 30
+            python3 - "$RUNNER_TEMP/oot2-aot" <<'PYCODE'
+          import sys
+          from pathlib import Path
+          from security.oot2_ipad_aot import public_progress
+          print('AOT iOS progress:',public_progress(Path(sys.argv[1])/'work'),flush=True)
+          PYCODE
+            if (( SECONDS >= CHECKPOINT_AT )); then
+              if python3 security/oot2_ipad_aot.py save-completed-cache "$RUNNER_TEMP/oot2-aot/work/cache" "$RUNNER_TEMP/oot2-aot/checkpoint.tar.gz" >> "$RUNNER_TEMP/oot2-aot/wrapper-private.log" 2>&1; then
+                ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 ffr-cachyos oot2-aot-v8-write-cache < "$RUNNER_TEMP/oot2-aot/checkpoint.tar.gz" && echo 'Private completed-batch checkpoint saved.' || echo 'Checkpoint transfer deferred.'
+              else
+                echo 'AOT checkpoint deferred; compiler continues.'
+              fi
+              CHECKPOINT_AT=$((SECONDS+600))
+            fi
+          done
+          wait "$AOT_PID"
+          bsdtar -tf "$RUNNER_TEMP/oot2-aot/output.ipa" > /dev/null 2>> "$RUNNER_TEMP/oot2-aot/wrapper-private.log"
+      - name: Save private compiler cache and diagnostics on CachyOS
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.mode == 'build'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          if [ -d "$RUNNER_TEMP/oot2-aot/work/cache" ]; then
+            SAVE_MODE=save-completed-cache
+            if [ "${{ steps.archive.outcome }}" = success ]; then SAVE_MODE=save-cache; fi
+            python3 security/oot2_ipad_aot.py "$SAVE_MODE" "$RUNNER_TEMP/oot2-aot/work/cache" "$RUNNER_TEMP/oot2-aot/saved-cache.tar.gz"
+            ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 ffr-cachyos oot2-aot-v8-write-cache < "$RUNNER_TEMP/oot2-aot/saved-cache.tar.gz"
+            echo 'Private incremental AOT cache saved to CachyOS.'
+          fi
+      - name: Save private detailed diagnostics even if cache backup failed
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.mode == 'build'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          python3 - "$RUNNER_TEMP/oot2-aot" <<'PYCODE' | ssh ffr-cachyos oot2-aot-v8-write-log
+          import sys
+          from security.oot2_ipad_aot import private_diagnostic
+          sys.stdout.buffer.write(private_diagnostic(sys.argv[1]))
+          PYCODE
+      - name: Return AOT slim - original RomFS added on CachyOS
+        if: success() && github.event_name == 'workflow_dispatch' && inputs.mode == 'build'
+        run: |
+          set -euo pipefail
+          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=12 ffr-cachyos oot2-aot-v8-write-slim < "$RUNNER_TEMP/oot2-aot/output.ipa"
+          echo 'Complete AOT IPA assembled on CachyOS under its own filename.'
+      - name: Fermer la connexion Tailscale ephemere
+        if: always()
+        run: |
+          TS_SOCKET="$RUNNER_TEMP/oot2-tailscaled.sock"
+          if command -v tailscale >/dev/null 2>&1; then
+            sudo -n tailscale --socket="$TS_SOCKET" logout > /dev/null 2>&1 || true
+          fi
+          if [ -s "$RUNNER_TEMP/oot2-tailscaled.pid" ]; then
+            sudo -n kill "$(cat "$RUNNER_TEMP/oot2-tailscaled.pid")" > /dev/null 2>&1 || true
+          fi
+          rm -f "$RUNNER_TEMP/oot2_ssh_key" || true
