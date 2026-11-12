@@ -13,7 +13,9 @@ static int fixture_rows(NSString *path) {
     for (unsigned offset = 0; offset <= 8; offset += 4) {
         pso_key k = {.samples = 1, .cfmt = {MTLPixelFormatRGBA8Unorm}, .chmask = 15};
         k.attr[0] = (va_st){.fmt = (uint32_t)fmt, .offset = offset}; k.stream[0] = (vs_st){.stride = 32, .divisor = offset == 8 ? 2 : 0};
-        pso_skey sk; char hex[sizeof sk * 2 + 1]; pso_skey_from(&k, v, f, 0, NULL, &sk); pso_skey_hex(&sk, hex);
+        pso_skey sk; char hex[sizeof sk * 2 + 1]; pso_skey_from(&k, v, f, 0, NULL, &sk);
+        if (offset == 8) { sk.fz = 1; sk.merged = 1; sk.fz_desc.kind = 1; sk.fz_desc.fx[0] = -1; sk.fz_desc.fbmask = 1; }
+        pso_skey_hex(&sk, hex);
         [text appendFormat:@"R\t%s\n", hex];
     }
     v->stage = 4;

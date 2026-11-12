@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/test-oot2-fullwarm-v8.yml'
       - 'security/oot2_fullwarm*'
+      - 'security/test_oot2_fullwarm.py'
 
 permissions:
   contents: read
@@ -34,7 +35,7 @@ jobs:
           git -C "$SRC" fetch -q --depth 1 origin ccd834e06a3938834bb5579e2ccc6a0ad13d3970
           git -C "$SRC" checkout -q --detach FETCH_HEAD
           python3 security/oot2_fullwarm_prepare.py "$SRC"
-          python3 -m unittest -v security.test_oot2_ipad_aot security.test_oot2_gateway security.test_oot2_transfer
+          python3 -m unittest -v security.test_oot2_ipad_aot security.test_oot2_gateway security.test_oot2_transfer security.test_oot2_fullwarm
           python3 -m venv "$RUNNER_TEMP/aot-venv"
           "$RUNNER_TEMP/aot-venv/bin/python" -m pip install -q lz4
           "$RUNNER_TEMP/aot-venv/bin/python" "$SRC/dm/tools/tests/test_pso_offline.py"
@@ -91,3 +92,18 @@ jobs:
           "$RUNNER_TEMP/aot-venv/bin/python" security/oot2_fullwarm.py compile "$SRC" "$RUNNER_TEMP/fullwarm-fixture/msl/b-d24f05cf9d78" "$RUNNER_TEMP/fullwarm-scripts" "$RUNNER_TEMP/fullwarm-cache" "$RUNNER_TEMP/fullwarm-bundle"
           find "$RUNNER_TEMP/fullwarm-cache" -name '*.mtl4a' -exec shasum -a 256 {} \; > "$RUNNER_TEMP/fullwarm-after.txt"
           cmp "$RUNNER_TEMP/fullwarm-before.txt" "$RUNNER_TEMP/fullwarm-after.txt"
+
+          python3 - "$RUNNER_TEMP/fullwarm-bundle/fullwarm.json" <<'PYCODE'
+          import json,sys
+          m=json.load(open(sys.argv[1]));assert m['reused_groups']==len(m['archives'])
+          print('PASS: every full R/M group reused without recompilation.')
+          PYCODE
+      - name: Validate production iOS loader link and host-kit reconstruction
+        run: |
+          set -euo pipefail
+          brew install xcodegen zstd
+          SRC="$RUNNER_TEMP/nxnative"
+          GAME=0400486024DEC000 python3 "$SRC/dm/ios/tools/build_smoke.py" --output "$RUNNER_TEMP/fullwarm-link-fixture" > "$RUNNER_TEMP/fullwarm-link.log" 2>&1 || { tail -100 "$RUNNER_TEMP/fullwarm-link.log"; exit 1; }
+          python3 security/oot2_fullwarm_host_fixture.py "$SRC" "$RUNNER_TEMP/fullwarm-link-fixture" "$RUNNER_TEMP/fullwarm-host-fixture" > "$RUNNER_TEMP/fullwarm-host.log" 2>&1 || { tail -120 "$RUNNER_TEMP/fullwarm-host.log"; exit 1; }
+          tail -3 "$RUNNER_TEMP/fullwarm-link.log"
+          tail -3 "$RUNNER_TEMP/fullwarm-host.log"

@@ -116,7 +116,7 @@
  }
  static NSDictionary *pre_json(NSString *key) { NSData *d = msl_data([NSString stringWithFormat:@"%@/%@_b.json", g_msl_dir, key]); return d ? [NSJSONSerialization JSONObjectWithData:d options:0 error:nil] : nil; }
  // The base of one pair as the draws make it (pso_desc_pull / pso_desc), or nil when the pair is left to the draws. Call inside an autorelease pool
-@@ -12785,9 +12825,9 @@
+@@ -12785,9 +12825,13 @@
      id<MTLLibrary> lib = fs->bflib;
      if (!lib) { os_unfair_lock_unlock(&g_fz_fn_lock); return nil; }
      MTLFunctionConstantValues *cv = [MTLFunctionConstantValues new];
@@ -126,7 +126,11 @@
 +    for (int i = 0; i < nfc; i++) { int v = fx[i]; full_cv_set(cv, &v, MTLDataTypeInt, (NSUInteger)i); }
 +    for (int q = 0; q < 8; q++) { bool b = fbmask >> q & 1; full_cv_set(cv, &b, MTLDataTypeBool, (NSUInteger)(32 + q)); }
 +    for (int j = 0; j < fs->rf.nfo; j++) for (int q = 0; q < 8; q++) { bool b = lmap[q] == fs->rf.fo_color[j]; full_cv_set(cv, &b, MTLDataTypeBool, (NSUInteger)(64 + 8 * j + q)); }
++#ifdef OOT2_FULLWARM_TOOL
++    NSError *e = nil; id<MTLFunction> f = fn_spec(lib, @"main0_f", cv, &e);
++#else
      NSError *e = nil; id<MTLFunction> f = fn4_note([lib newFunctionWithName:@"main0_f" constantValues:cv error:&e], lib, @"main0_f", cv);
++#endif
      if (!f) MLOG("[RED] readable-tile version specialization failed %s (mask %02x): %s", fs->key, fbmask, e.localizedDescription.UTF8String);
      NvBfFn *s = [NvBfFn new]; s->k = k; s->fn = f;
 @@ -17102,3 +17142,7 @@

@@ -11,6 +11,9 @@ using namespace metal;
 constant bool dm_border_off [[function_constant(120)]];
 struct In { float4 p [[attribute(0)]]; };
 vertex float4 vmain(In v [[stage_in]]) { return dm_border_off ? v.p : v.p * 2.0; }
+constant int merged_slot [[function_constant(0)]];
+constant bool merged_read [[function_constant(32)]];
+fragment float4 main0_f() { return float4(merged_read ? float(merged_slot + 2) : 0.5); }
 fragment float4 fmain() { return float4(1, 0.5, 0.25, 1); }
 struct V { float4 p [[position]]; };
 struct P { uint n; };
@@ -39,6 +42,9 @@ def fixture(root, native, executable):
     for index, (key, (stage, entry)) in enumerate(entries.items()):
         (libs / f'{key}_b.metallib').write_bytes(library.read_bytes())
         reflection = {'chain': CHAIN, 'route': 'B', 'entry': entry, 'bindings': [], 'vertex_inputs': []}
+        if key == 'f':
+            reflection['fetch'] = {'calls': [{'fc': 0, 'tex_reg': 0, 'varying_locn': 0}], 'outputs': []}
+            (libs / 'f_bf.metallib').write_bytes(library.read_bytes())
         if key == 'v': reflection['vertex_inputs'] = [{'location': 0, 'msl_type': 'float4'}]
         if key in ('t', 'm', 'n'):
             reflection['mesh_stage'] = {'kind': 'ts' if key == 't' else 'ms', 'threads': 1, 'payload': 16, 'task': key == 'm'}

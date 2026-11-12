@@ -43,7 +43,7 @@ def export(root, inputs, output):
 def validate_export(directory):
     directory = Path(directory)
     meta = json.loads((directory / 'coverage.json').read_text())
-    if (meta.get('chain') != CHAIN or meta.get('failed_tasks') != 0
+    if (meta.get('chain') != CHAIN or meta.get('failed_tasks') != 0 or meta.get('stale_keys', 0) != 0
         or meta.get('pipeline_creation_used') is not False or meta.get('new_shaders_compiled') is not False):
         raise ValueError('full prewarm exporter failed coverage/identity')
     scripts = sorted(directory.glob('prewarm-*.mtl4-json'))
@@ -109,7 +109,7 @@ def compile_lists(root, image, scripts, cache, bundle):
     coverage = validate_export(scripts)
     sys.path.insert(0, str(root.resolve() / 'dm/gfx/tools')); import pso_offline as po
     toolchain = po.tool_version('ios'); cache.mkdir(parents=True, exist_ok=True); bundle.mkdir(parents=True, exist_ok=True)
-    archives = {}
+    archives = {}; reused = 0
     for index, script in enumerate(sorted(scripts.glob('prewarm-*.mtl4-json'))):
         work = cache / f'{index:05d}'; work.mkdir(exist_ok=True)
         data = materialize(json.loads(script.read_text()), image, work / 'libraries', po)
@@ -124,6 +124,7 @@ def compile_lists(root, image, scripts, cache, bundle):
             po.compile_archive(js, part, work, GPU, 'ios', '27.0', count)
             if part.stat().st_size < 32: raise ValueError('full prewarm archive empty')
             os.replace(part, archive); key_file.write_text(key + '\n')
+        else: reused += 1
         shutil.rmtree(work / 'libraries')
         name = f'{GPU}-prewarm-{index:05d}.mtl4a'
         target = bundle / name
@@ -131,7 +132,9 @@ def compile_lists(root, image, scripts, cache, bundle):
         archives[name] = {'bytes': target.stat().st_size, 'sha256': digest(target), 'key': key}
         print(f'Full prewarm: groups={index+1}/{coverage["periods"]}; progress={100*(index+1)/coverage["periods"]:.1f}%', flush=True)
     report = {'format': 1, 'chain': CHAIN, 'gpu': GPU, 'platform': 'ios', 'coverage': coverage, 'archives': archives,
-              'metal_tt': toolchain, 'index_mode': 'Metal descriptor lookup; no Mac filename/digest index copied'}
+              'metal_tt': toolchain, 'reused_groups': reused, 'index_mode': 'Metal descriptor lookup; no Mac filename/digest index copied'}
+    for stale in bundle.glob(GPU + '-prewarm-*.mtl4a'):
+        if stale.name not in archives: stale.unlink()
     (bundle / 'fullwarm.json').write_text(json.dumps(report, indent=2) + '\n')
     (bundle / 'prewarm.tsv').write_text(f'chain\t{CHAIN}\nplatform\tios\ngpu\t{GPU}\nfiles\t{len(archives)}\n')
     return report
