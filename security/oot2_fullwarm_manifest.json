@@ -10,18 +10,22 @@
   "files": {
     "oot2_fullwarm_constants.inc": {
       "path": "dm/gfx/nvn/oot2_fullwarm_constants.inc",
-      "sha256": "c2ba0590c6ac71d94f273fca2390d679635a9e13d6a12d04a6c83f24e3f80aba"
+      "sha256": "2bc7ecbf0ffbcc64016bbf01092057b1099fd877e81997bba85053406a8629e1"
     },
     "oot2_fullwarm_export.inc": {
       "path": "dm/gfx/nvn/oot2_fullwarm_export.inc",
-      "sha256": "b68b1987e04b327bad5ae74a1a117a515b1d99f3cc6986cf494b5f86247d1d20"
+      "sha256": "daad936675f9e79e80664dcb5c52454814948a824a7ae21bdcc608ef2cd236a8"
     },
     "oot2_fullwarm_harness.m": {
       "path": "dm/gfx/tests/oot2_fullwarm_harness.m",
-      "sha256": "f4e34c0de2f8b23b8d4d39f1472aa42d4553c54c89eb96aa4af1173e53f85e47"
+      "sha256": "609a01202a376c8b69794678b028ce2e303d6f7f670160d98090658ef40601be"
     }
   },
   "no_runtime_metal4_compiler_required": true,
   "new_shader_chain": false,
-  "device_runtime_validated": false
+  "device_runtime_validated": false,
+  "base_originals": {
+    "dm/gfx/nvn/nvn_mtl.m": "0084f9d988b41a7a8d291e239ea1ba3b0e03cd2e4025aed3587c133c2deedfb1",
+    "dm/gfx/tests/Makefile": "f3df20c8d6693c810547ad8975de1d75beb38fd5d8108be85d7600f8dc4e46bb"
+  }
 }

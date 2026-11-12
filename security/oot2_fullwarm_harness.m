@@ -30,7 +30,12 @@ static int fixture_constants(void) {
     MTLFunctionConstantValues *a = [MTLFunctionConstantValues new];
     full_cv_set(a, &value, MTLDataTypeInt, 1); full_cv_set(a, &yes, MTLDataTypeBool, 2);
     MTL4SpecializedFunctionDescriptor *fd = [MTL4SpecializedFunctionDescriptor new]; full_cv_bind(fd, a);
-    MTLFunctionConstantValues *b = full_cv_copy_from(fd); full_cv_set(b, &yes, MTLDataTypeBool, 3);
+    MTL4RenderPipelineDescriptor *pipeline = [MTL4RenderPipelineDescriptor new];
+    pipeline.vertexFunctionDescriptor = fd;
+    MTL4SpecializedFunctionDescriptor *copied = (id)pipeline.vertexFunctionDescriptor;
+    NSDictionary *copiedValues = full_cv_values(copied);
+    if (copiedValues.count != 2 || [copiedValues[@1][@"value"][@"data"] intValue] != -7) return 8;
+    MTLFunctionConstantValues *b = full_cv_copy_from(copied); full_cv_set(b, &yes, MTLDataTypeBool, 3);
     NSDictionary *before = objc_getAssociatedObject(fd, &full_cv_tag), *after = objc_getAssociatedObject(b, &full_cv_tag);
     if (before.count != 2 || after.count != 3 || [before[@1][@"value"][@"data"] intValue] != -7) return 6;
     puts("PASS: typed function constants survive descriptor copy without changing the original."); return 0;

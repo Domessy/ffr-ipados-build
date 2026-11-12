@@ -27,7 +27,7 @@ static NSString *full_function(MTL4FunctionDescriptor *descriptor) {
     if ([descriptor isKindOfClass:MTL4SpecializedFunctionDescriptor.class]) {
         MTL4SpecializedFunctionDescriptor *special = (id)descriptor;
         NSString *base = full_function(special.functionDescriptor); if (!base) return nil;
-        NSDictionary *recorded = objc_getAssociatedObject(special, &full_cv_tag);
+        NSDictionary *recorded = full_cv_values(special);
         if (!recorded && special.constantValues) { fprintf(stderr, "Untracked function constants\n"); return nil; }
         NSArray *indices = [[recorded allKeys] sortedArrayUsingSelector:@selector(compare:)];
         NSMutableArray *values = [NSMutableArray array]; for (NSNumber *index in indices) [values addObject:recorded[index]];

@@ -6,7 +6,7 @@ from pathlib import Path
 import subprocess
 
 TYPES = ('MTLPixelFormat', 'MTLVertexFormat', 'MTLVertexStepFunction', 'MTLPrimitiveTopologyClass',
-         'MTLBlendFactor', 'MTLBlendOperation', 'MTLColorWriteMask', 'MTL4BlendState',
+         'MTLBlendFactor', 'MTLBlendOperation', 'MTL4BlendState',
          'MTL4AlphaToCoverageState')
 
 
