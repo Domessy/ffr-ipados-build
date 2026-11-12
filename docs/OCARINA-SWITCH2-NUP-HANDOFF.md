@@ -957,3 +957,12 @@ Audit CPU supplémentaire du manifeste privé :2691R,164M,1fragment fusionné,0c
 **Chemin prêt pour le prochain build :prebake-oot2-full-v8.yml, modebuild.** Source v8slim protégée3,48Go + hostkit60,61Mo + caches existants ; aucun NUP, aucune régénération de shaders. Hôte iOS reconstruit uniquement pour le loader des archives complètes. Sortie distincteZeldaOcarinaOfTime-ipad-v8-fullwarm-livecontainer.ipa, avec RomFS original ajouté sur CachyOS. Route PC active, commitops7cb681d ; sauvegardes et données privées préservées. Aucun nouveau build privé dispatché pour cette demande « prochain build » ; le run bases/compute43297917465 demeure indépendant, sans archives R/M complètes.
 
 À valider sur M5 : archives ouvertes ET pipelines trouvés (les deux preuves), temps préparation premier/deuxième lancement, même trajet/réglages, mémoire/Jetsam. Protocole full R/M ajouté et reprise mise à jour. Aucun gain FPS, RAM ou durée de quelques secondes garanti.
+
+
+### 13/11/2026 — livraison v8 AOT bases/compute vérifiée
+
+Run43297917465 terminé success, durée2h25, assemblage local automatique réussi. IPA complète :resultats/ZeldaOcarinaOfTime-ipad-v8-aot-livecontainer.ipa, **34190457382 octets (34,19Go)**. Archives compilées pouriOS27.0/applegpu_g17g :33365 bases,4125 compute,0échec,0rest. Cache privé incrémentalOOT2Aot-v8-g17g-cache.tar.gz conservé (~4,3Gio).
+
+Vérification indépendante sur CachyOS : en-têtesZIP64 valides, lecture du catalogue par libarchive réussie, tous les membres de l’IPA relus avec contrôleCRC, ressources de l’IPA source inchangées parSHA256, RomFS originalSHA256872de47b913bb97890880e9f17dccedc4144953a258e9a6aecf04c379427a669. Preuve :resultats/ipad-v8-aot-delivery-verified-20261113.json. Aucun fichier privé écrasé, aucune installation/signature/action iPad.
+
+Cette IPA contient seulement les bases/compute précompilés, même hôte/shaders v8 ; les listes complètes R/M dePR76 n’y figurent pas. Leur workflow séparé est prêt pour le prochain build, pas encore dispatché. Test de cette livraison : Metal4 pipelines activé, relever ouverture de l’archive et compteurs from the archive, temps de préparation premier/deuxième lancement, même trajet et mémoire. Gains sur M5 encore non mesurés.
