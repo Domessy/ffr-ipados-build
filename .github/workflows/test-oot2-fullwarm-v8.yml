@@ -1,0 +1,51 @@
+name: OOT2 full iOS prewarm validation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/test-oot2-fullwarm-v8.yml'
+      - 'security/oot2_fullwarm*'
+
+permissions:
+  contents: read
+
+jobs:
+  ios-aot:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Prepare exact public AOT tools - no guest or shader build
+        run: |
+          set -euo pipefail
+          umask 077
+          SRC="$RUNNER_TEMP/nxnative"
+          git init -q "$SRC"
+          git -C "$SRC" remote add origin https://github.com/seedds/nxnative.git
+          git -C "$SRC" fetch -q --depth 1 origin ccd834e06a3938834bb5579e2ccc6a0ad13d3970
+          git -C "$SRC" checkout -q --detach FETCH_HEAD
+          python3 security/oot2_ipad_aot.py prepare-tools "$SRC"
+          python3 -m unittest -v security.test_oot2_ipad_aot security.test_oot2_gateway security.test_oot2_transfer
+          python3 -m venv "$RUNNER_TEMP/aot-venv"
+          "$RUNNER_TEMP/aot-venv/bin/python" -m pip install -q lz4
+          "$RUNNER_TEMP/aot-venv/bin/python" "$SRC/dm/tools/tests/test_pso_offline.py"
+      - name: Validate iOS render and compute archives plus incremental reuse
+        run: |
+          set -euo pipefail
+          xcodebuild -downloadComponent MetalToolchain
+          python3 "$RUNNER_TEMP/nxnative/dm/gfx/tools/own_compilers.py" --check-metal
+          "$RUNNER_TEMP/aot-venv/bin/python" security/oot2_aot_pilot.py "$RUNNER_TEMP/nxnative" "$RUNNER_TEMP/public-aot-pilot"
+      - name: Probe unified libraries and complete descriptor capture
+        run: |
+          set -euo pipefail
+          xcrun clang -fobjc-arc -framework Metal -framework Foundation security/oot2_fullwarm_probe.m -o "$RUNNER_TEMP/fullwarm-probe"
+          "$RUNNER_TEMP/fullwarm-probe" "$RUNNER_TEMP/public-aot-pilot/libraries/v.metallib" "$RUNNER_TEMP/public-aot-pilot/libraries/f.metallib" "$RUNNER_TEMP/fullwarm-probe.mtl4-json"
