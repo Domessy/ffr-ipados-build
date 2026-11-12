@@ -1,5 +1,7 @@
 # The Legend of Zelda: Ocarina of Time — Switch 2 NUP → IPA iPadOS
 
+**Run AOT actif43297917465 (12/11/2026)** : préparation de bases/compute iOS depuis la v8 validée, sans NUP ni nouveau shader ; contrôles Apple, Tailscale et SSH réussis, transfert du slim en cours au dernier relevé. Ne pas confondre avec le port complet R/M ni une mise à jour du moteur. Voir dernière section.
+
 État courant au 12/11/2026 : **v8 complète construite et vérifiée**, run **43151522116 success**. Livraison resultats/ZeldaOcarinaOfTime-ipad-v8-d24f05cf9d78-livecontainer.ipa, **29 824 192 354 octets** (~29,82 Go). Voir la dernière section pour les contrôles et limites ; les sections précédentes sont historiques.
 
 État historique au 06/11/2026 (supersédé par la reprise du 07/11 en fin de document) : NUP utilisateur inspecté **localement par l’utilisateur** (en-tête et TOC seulement), aucune donnée du jeu ni clé transférée à GitHub, IPA non construite. Les tests synthétiques du pipeline initial ont réussi ; correctif de compatibilité standalone fusionné (PR #23, commit `409e38d`), validation locale du NUP réussie. Aucun lancement automatique sur l’iPad.
