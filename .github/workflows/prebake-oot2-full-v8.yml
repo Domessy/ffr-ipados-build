@@ -231,10 +231,9 @@ jobs:
           import sys
           from pathlib import Path
           import json
-          root=Path(sys.argv[1]);groups=list((root/'cache/work').glob('*/key'))
-          coverage=root/'scripts/coverage.json';total=json.loads(coverage.read_text())['periods'] if coverage.exists() else 0
-          size=sum(p.stat().st_size for p in (root/'cache/work').glob('*/*.mtl4a'))
-          print(f'Full R/M prewarm: {len(groups)}/{total} groups; {100*len(groups)/total if total else 0:.1f}%; {size/1024**3:.2f} GiB',flush=True)
+          root=Path(sys.argv[1]);phase=root/'phase.json';progress=root/'cache/progress.json'
+          print('Full prewarm:',json.loads(phase.read_text()) if phase.exists() else {'phase':'starting'},
+              json.loads(progress.read_text()) if progress.exists() else {'completed':0,'total':'pending'},flush=True)
           PYCODE
           done
           wait "$FULL_PID"

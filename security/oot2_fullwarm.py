@@ -110,6 +110,13 @@ def compile_lists(root, image, scripts, cache, bundle):
     sys.path.insert(0, str(root.resolve() / 'dm/gfx/tools')); import pso_offline as po
     toolchain = po.tool_version('ios'); cache.mkdir(parents=True, exist_ok=True); bundle.mkdir(parents=True, exist_ok=True)
     archives = {}; reused = 0
+    def progress(done):
+        path = cache.parent / 'progress.json'; temporary = path.with_suffix('.partial')
+        temporary.write_text(json.dumps({'completed': done, 'total': coverage['periods'],
+            'percent': round(100*done/coverage['periods'], 1), 'reused': reused,
+            'gib': round(sum(item['bytes'] for item in archives.values()) / 1024**3, 2)}))
+        os.replace(temporary, path)
+    progress(0)
     for index, script in enumerate(sorted(scripts.glob('prewarm-*.mtl4-json'))):
         work = cache / f'{index:05d}'; work.mkdir(exist_ok=True)
         data = materialize(json.loads(script.read_text()), image, work / 'libraries', po)
@@ -133,6 +140,7 @@ def compile_lists(root, image, scripts, cache, bundle):
         target = bundle / name
         shutil.copyfile(archive, target)
         archives[name] = {'bytes': target.stat().st_size, 'sha256': digest(target), 'key': key}
+        progress(index+1)
         print(f'Full prewarm: groups={index+1}/{coverage["periods"]}; progress={100*(index+1)/coverage["periods"]:.1f}%', flush=True)
     report = {'format': 1, 'chain': CHAIN, 'gpu': GPU, 'platform': 'ios', 'coverage': coverage, 'archives': archives,
               'metal_tt': toolchain, 'reused_groups': reused, 'index_mode': 'Metal descriptor lookup; no Mac filename/digest index copied'}
