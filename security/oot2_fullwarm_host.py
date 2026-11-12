@@ -93,7 +93,10 @@ def rebuild(root, kit, slim, output):
     # Real captured profile and real patched modules, never synthetic code.
     config = run(sys.executable, ios / 'tools/gen_build.py', root / 'dm/host', gen, capture=True).stdout
     header = root / 'dm/host/gen' / TITLE / 'game_profile.h'
-    if header.read_bytes() != (captured / 'generated/game_profile.h').read_bytes():
+    # The generated comment names its source path, which changes on relocation.
+    def definitions(path):
+        return [line for line in path.read_text().splitlines() if not line.startswith('//')]
+    if definitions(header) != definitions(captured / 'generated/game_profile.h'):
         raise ValueError('regenerated host profile differs')
     sys.path.insert(0, str(root / 'dm/games')); import game
     modules = game.load(captured / 'profile' / TITLE).modules_in(captured / 'patched')

@@ -18,6 +18,8 @@ DESTINATIONS = {"resume-v8": ("oot2-shader-cas", "metal-snapshot.zst"), "resume-
                 "metal-snapshot": ("oot2-shader-cas", "metal-snapshot.zst")}
 MiB = 1024 ** 2
 DESTINATIONS.update({'aot-input': ('oot2-aot', 'input.ipa'), 'aot-cache': ('oot2-aot', 'cache.tar.gz')})
+ROUTES.update({'fullwarm-kit': 'oot2-fullwarm-v8-read-kit', 'fullwarm-cache': 'oot2-fullwarm-v8-read-cache'})
+DESTINATIONS.update({'fullwarm-kit': ('oot2-fullwarm', 'hostkit.tar.zst'), 'fullwarm-cache': ('oot2-fullwarm', 'cache.tar.gz')})
 GiB = 1024 ** 3
 MAX_SIZE = 80 * GiB
 REPORT_EVERY = 10.0

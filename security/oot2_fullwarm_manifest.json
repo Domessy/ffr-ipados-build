@@ -14,7 +14,7 @@
     },
     "oot2_fullwarm_export.inc": {
       "path": "dm/gfx/nvn/oot2_fullwarm_export.inc",
-      "sha256": "daad936675f9e79e80664dcb5c52454814948a824a7ae21bdcc608ef2cd236a8"
+      "sha256": "7da50da42862067011a5c3e688d2bd829396a4ca70a2a6d45b1aa2c315d8d239"
     },
     "oot2_fullwarm_harness.m": {
       "path": "dm/gfx/tests/oot2_fullwarm_harness.m",

@@ -114,7 +114,9 @@ static int full_task(WarmTask *task) {
     if (!vs || (task->fkey.length && !fs)) return 0;
     if (task->kind == 3) {
         NvShader *ts = task->tkey ? warm_shader(task->tkey, 3) : nil;
-        if ((task->tkey && !ts) || vs->stage != 4 || vs->mesh_kind != 2 || !vs->fn || (!ts && !vs->mesh_obj)) return 0;
+        if (vs->stage != 4 || vs->mesh_kind != 2 || !vs->fn ||
+            (fs && (fs->stage != 1 || !fs->fn)) ||
+            (task->tkey ? (!ts || ts->stage != 3 || ts->mesh_kind != 1 || !ts->fn || vs->mesh_notask) : !vs->mesh_notask)) return 0;
         MTLRenderPipelineDescriptor *r = pso_desc(&sk.k, nil, fs, nil, 0);
         id<MTLFunction> ff = r.fragmentFunction;
         if (!ff) return 0; // No invented library for an embedded fallback function.
@@ -141,6 +143,27 @@ static int full_task(WarmTask *task) {
 static int full_export_lists(NSString *manifest, NSString *directory) {
     full_directory = directory; full_reset();
     [NSFileManager.defaultManager createDirectoryAtPath:directory withIntermediateDirectories:YES attributes:nil error:nil];
+    // warm_parse deliberately skips invalid rows for gameplay. Offline builds
+    // must account for them explicitly before claiming complete list coverage.
+    NSMutableSet *input_seen = [NSMutableSet set], *render_seen = [NSMutableSet set];
+    unsigned expected_r = 0, expected_m = 0, invalid = 0;
+    NSString *text = [NSString stringWithContentsOfFile:manifest encoding:NSUTF8StringEncoding error:nil];
+    if (!text) return 1;
+    for (NSString *line in [text componentsSeparatedByString:@"\n"]) {
+        if ([input_seen containsObject:line]) continue;
+        [input_seen addObject:line]; NSArray *c = [line componentsSeparatedByString:@"\t"];
+        if ([c[0] isEqualToString:@"R"]) {
+            pso_skey sk;
+            if (c.count != 2 || pso_skey_parse([c[1] UTF8String], &sk)) { invalid++; continue; }
+            NSData *key = [NSData dataWithBytes:&sk length:sizeof sk];
+            if (![render_seen containsObject:key]) { [render_seen addObject:key]; expected_r++; }
+        } else if ([c[0] isEqualToString:@"M"]) {
+            pso_skey sk;
+            if (c.count != 3 || pso_mesh_skey_parse([c[2] UTF8String], &sk)) { invalid++; continue; }
+            expected_m++;
+        }
+    }
+    if (invalid) { fprintf(stderr, "Invalid recorded R/M rows: %u\n", invalid); return 1; }
     shmap_load(); warm_load_begin(); long lines = 0;
     NSArray<WarmTask *> *tasks = warm_parse(@[manifest], &lines);
     for (WarmTask *task in tasks) {
@@ -151,6 +174,7 @@ static int full_export_lists(NSString *manifest, NSString *directory) {
         if (full_render.count + full_mesh.count >= 256) full_flush();
     }
     full_flush();
+    if (expected_r != full_rrows || expected_m != full_mrows) full_failed++;
     NSDictionary *coverage = @{@"chain": @(DMSH_CHAIN), @"render_rows": @(full_rrows), @"mesh_rows": @(full_mrows),
         @"rows": @(full_rows), @"failed_tasks": @(full_failed), @"periods": @(full_period), @"stale_keys": @(g_warm_skip_stale),
         @"emitted_render": @(full_emitted_r), @"emitted_mesh": @(full_emitted_m),

@@ -20,6 +20,8 @@ CONFLICTS = ROOT / "shader-cache-conflicts"
 OUTPUT = ROOT / "resultats"
 
 ROUTES = frozenset({
+    "oot2-fullwarm-v8-info", "oot2-fullwarm-v8-read-kit", "oot2-fullwarm-v8-read-cache",
+    "oot2-fullwarm-v8-write-cache", "oot2-fullwarm-v8-write-log", "oot2-fullwarm-v8-write-slim",
     "oot2-aot-v8-info", "oot2-aot-v8-read-input", "oot2-aot-v8-read-cache",
     "oot2-aot-v8-write-slim", "oot2-aot-v8-write-cache", "oot2-aot-v8-write-log",
     "oot2-diagnose-v1", "oot2-probe-v1", "oot2-manifest-v1", "oot2-space-v1",
@@ -106,6 +108,58 @@ def diagnose():
 def dispatch(command, parent):
     if command not in ROUTES:
         return 126
+    if command.startswith('oot2-fullwarm-v8-'):
+        try:
+            from .oot2_ipad_aot import digest, inspect_ipa, CHAIN, GPU
+        except ImportError:
+            from oot2_ipad_aot import digest, inspect_ipa, CHAIN, GPU
+        kit = OUTPUT / 'OOT2HostKit-v8.tar.zst'
+        cache = OUTPUT / 'OOT2Fullwarm-v8-g17g-cache.tar.gz'
+        if command == 'oot2-fullwarm-v8-info':
+            if kit.is_symlink() or cache.is_symlink(): raise ValueError('full prewarm symlink')
+            print('OOT2_FULLWARM_V8', kit.stat().st_size, digest(kit),
+                  cache.stat().st_size if cache.exists() else 0, digest(cache) if cache.exists() else '-')
+            return 0
+        if command in ('oot2-fullwarm-v8-read-kit', 'oot2-fullwarm-v8-read-cache'):
+            parent.send_file(kit if command.endswith('-kit') else cache)
+            return 0
+        previous = parent.OUTPUT; parent.OUTPUT = OUTPUT
+        try:
+            if command == 'oot2-fullwarm-v8-write-cache': parent.receive_file(cache.name, 12 << 30)
+            elif command == 'oot2-fullwarm-v8-write-log': parent.receive_file('oot2-fullwarm-v8-private.log', 32 << 20)
+            else:
+                import zipfile, hashlib
+                name = 'ZeldaOcarinaOfTime-v8-fullwarm-slim.ipa'
+                parent.receive_file(name, 16 << 30)
+                prefix = inspect_ipa(OUTPUT / name)
+                with zipfile.ZipFile(OUTPUT / name) as z:
+                    report = json.loads(z.read(prefix + 'pso/fullwarm.json'))
+                    if report['chain'] != CHAIN or report['gpu'] != GPU or report['platform'] != 'ios':
+                        raise ValueError('full prewarm target')
+                    coverage = report['coverage']
+                    if (coverage['failed_tasks'] or coverage['stale_keys'] or not coverage['render_rows'] or not coverage['mesh_rows']
+                        or coverage['render_rows'] != coverage['emitted_render'] or coverage['mesh_rows'] != coverage['emitted_mesh']
+                        or coverage['periods'] != len(report['archives'])): raise ValueError('full prewarm coverage')
+                    z.getinfo(prefix + 'pso/' + GPU + '.mtl4a')
+                    for filename, meta in report['archives'].items():
+                        if not re.fullmatch(GPU + r'-prewarm-[0-9]{5}\.mtl4a', filename): raise ValueError('full prewarm filename')
+                        item = z.getinfo(prefix + 'pso/' + filename)
+                        if item.file_size != meta['bytes'] or item.file_size < 32: raise ValueError('full prewarm size')
+                        h = hashlib.sha256()
+                        with z.open(item) as stream:
+                            while block := stream.read(8 << 20): h.update(block)
+                        if h.hexdigest() != meta['sha256']: raise ValueError('full prewarm checksum')
+                try:
+                    from .oot2_local_bundle import bundle
+                except ImportError:
+                    from oot2_local_bundle import bundle
+                stats = bundle(OUTPUT / name, ROOT / 'local-bundle-v6/extract/v131072/RomFS.img',
+                    ROOT / 'local-bundle-v6/romfs-manifest.json',
+                    OUTPUT / 'ZeldaOcarinaOfTime-ipad-v8-fullwarm-livecontainer.ipa', expected_chain=CHAIN)
+                (OUTPUT / 'ipad-v8-fullwarm-local-bundle-result.json').write_text(json.dumps(stats, indent=2) + '\n')
+                print('OOT2_FULLWARM_LOCAL_BUNDLE_OK', stats['ipa_bytes'])
+        finally: parent.OUTPUT = previous
+        return 0
     if command.startswith('oot2-aot-v8-'):
         try:
             from .oot2_ipad_aot import digest, inspect_ipa, CHAIN, GPU

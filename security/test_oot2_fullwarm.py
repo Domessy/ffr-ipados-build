@@ -53,4 +53,44 @@ class FullwarmTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'library path'): fw.validate_export(root)
 
 
+
+class FullwarmPackagingTests(unittest.TestCase):
+    def test_rebuilt_host_is_only_changed_original_and_corrupt_archive_is_rejected(self):
+        import struct, zipfile
+        from security.test_oot2_ipad_aot import AotTests
+        from security.oot2_fullwarm_pack import repack
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);slim,base,prefix=AotTests().fixture(root)
+            (base/'rest_pairs.tsv').write_text('# remaining pairs\n')
+            full=root/'full';full.mkdir();name=fw.GPU+'-prewarm-00000.mtl4a'
+            binary=full/name;binary.write_bytes(b'compiled mesh/render archive'*8)
+            report={'chain':fw.CHAIN,'gpu':fw.GPU,'platform':'ios','coverage':{
+                'failed_tasks':0,'render_rows':1,'emitted_render':1,'mesh_rows':1,'emitted_mesh':1,'periods':1},
+                'archives':{name:{'bytes':binary.stat().st_size,'sha256':fw.digest(binary)}}}
+            (full/'fullwarm.json').write_text(json.dumps(report));(full/'prewarm.tsv').write_text('full fixture\n')
+            host=root/'host';host.write_bytes(struct.pack('<IIII',0xfeedfacf,0x100000c,0,2)+bytes(64))
+            out=root/'out.ipa';repack(slim,base,full,host,out)
+            with zipfile.ZipFile(slim) as before,zipfile.ZipFile(out) as after:
+                for name in before.namelist():
+                    self.assertEqual(after.read(name),host.read_bytes() if name==prefix+'Game' else before.read(name))
+                self.assertFalse(any('staging-only' in name for name in after.namelist()))
+            binary.write_bytes(b'corruption'*32)
+            with self.assertRaisesRegex(ValueError,'archive identity'):repack(slim,base,full,host,root/'bad.ipa')
+            self.assertFalse((root/'bad.ipa').exists())
+
+    def test_hostkit_rejects_path_escape_before_writing(self):
+        import io,tarfile,subprocess
+        from security.oot2_fullwarm_host import unpack,PIN,TITLE
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);data=b'evil';manifest={'format':1,'title':TITLE,'package':'v131072','source_revision':PIN,
+                'shader_chain':fw.CHAIN,'optimization_recipe_sha256':fw.digest(Path(__file__).with_name('oot2_ipad_v8_manifest.json')),
+                'files':{'../escape':{'bytes':len(data),'sha256':__import__('hashlib').sha256(data).hexdigest()}}}
+            tarpath=root/'input.tar'
+            with tarfile.open(tarpath,'w') as tar:
+                for name,raw in [('manifest.json',json.dumps(manifest).encode()),('../escape',data)]:
+                    member=tarfile.TarInfo(name);member.size=len(raw);tar.addfile(member,io.BytesIO(raw))
+            subprocess.run(['zstd','-q',str(tarpath)],check=True)
+            with self.assertRaisesRegex(ValueError,'host kit member'):unpack(str(tarpath)+'.zst',root/'unpacked')
+            self.assertFalse((root/'escape').exists());self.assertFalse((root/'unpacked').exists())
+
 if __name__ == '__main__': unittest.main()
