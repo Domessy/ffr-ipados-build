@@ -269,7 +269,7 @@ jobs:
             # Link the actual production app with public synthetic modules before
             # spending time on private cache/NUP transfers. No signing or device.
             rc=0
-            "$RUNNER_TEMP/oot2-venv/bin/python" "$RUNNER_TEMP/nxnative/dm/ios/tools/build_smoke.py" --output "$RUNNER_TEMP/oot2-public-link-check" > "$RUNNER_TEMP/oot2-public-link-check.log" 2>&1 || rc=$?
+            GAME=0400486024DEC000 "$RUNNER_TEMP/oot2-venv/bin/python" "$RUNNER_TEMP/nxnative/dm/ios/tools/build_smoke.py" --output "$RUNNER_TEMP/oot2-public-link-check" > "$RUNNER_TEMP/oot2-public-link-check.log" 2>&1 || rc=$?
             tail -60 "$RUNNER_TEMP/oot2-public-link-check.log"
             [ "$rc" -eq 0 ] || exit "$rc"
           fi

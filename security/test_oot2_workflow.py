@@ -28,6 +28,22 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn('SNAPSHOT_ROUTE=oot2-resume-v5-info', workflow)
         self.assertIn('if [ "$SNAPSHOT_ROLE" = metal-snapshot ]; then', workflow)
 
+    def test_private_link_preflight_sets_profile_without_inherited_game(self):
+        workflow = BUILD.read_text()
+        anchor = '          if [ "$OOT2_RUNTIME_VARIANT" = ipad-v8 ]; then\n            "$RUNNER_TEMP/oot2-venv/bin/python" security/oot2_shader_identity.py'
+        start = workflow.index(anchor)
+        script = textwrap.dedent(workflow[start:workflow.index('          fi\n', start)+len('          fi\n')])
+        with tempfile.TemporaryDirectory() as temp:
+            executable = Path(temp)/'oot2-venv/bin/python'
+            executable.parent.mkdir(parents=True)
+            executable.write_text('#!/bin/bash\ncase "$1" in *build_smoke.py) [ "${GAME:-}" = 0400486024DEC000 ] || exit 43 ;; esac\n')
+            executable.chmod(0o700)
+            env = {**os.environ, 'RUNNER_TEMP': temp, 'OOT2_RUNTIME_VARIANT': 'ipad-v8'}
+            env.pop('GAME', None)
+            env.pop('DM_GAME', None)
+            result = subprocess.run(['/bin/bash', '-c', 'set -euo pipefail\n'+script], env=env, text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+
     def test_snapshot_restore_executes_with_system_bash(self):
         # Execute the production snapshot branch, including nounset, with tiny
         # stand-ins for network/files. /bin/bash is 3.2 on the macOS runners.
