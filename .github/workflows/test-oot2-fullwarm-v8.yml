@@ -47,14 +47,20 @@ jobs:
       - name: Inspect public Metal pipeline script schema
         run: |
           set -euo pipefail
-          TOOL_ROOT="$(dirname "$(dirname "$(xcrun --find metal-tt)")")"
-          rg --files "$TOOL_ROOT" | rg 'metal4.*script|metal.*pipelines' | head -12 || true
-          xcrun -sdk iphoneos metal-tt -help | head -70
-          PAGE="$(rg --files "$TOOL_ROOT" | rg '/metal4-pipelines-script\.5(\.gz)?$' | head -1)"
-          if [ -n "$PAGE" ]; then
-            if [[ "$PAGE" == *.gz ]]; then gzip -dc "$PAGE" > "$RUNNER_TEMP/metal4-schema.txt"; else cp "$PAGE" "$RUNNER_TEMP/metal4-schema.txt"; fi
-            rg -n -i -A 5 -B 2 'write.mask|vertex.descriptor|mesh.render|constantint|constantuint|sample.count|threadgroup' "$RUNNER_TEMP/metal4-schema.txt" | head -220
-          fi
+          python3 - <<'PYCODE'
+          import subprocess,gzip,re
+          from pathlib import Path
+          tool=Path(subprocess.check_output(['xcrun','--find','metal-tt'],text=True).strip()).parent.parent
+          pages=list(tool.rglob('metal4-pipelines-script.5*'))
+          print('SCHEMA PAGES',*[str(x) for x in pages])
+          assert pages, 'Metal4 script manual absent'
+          raw=pages[0].read_bytes(); raw=gzip.decompress(raw) if pages[0].suffix=='.gz' else raw
+          lines=raw.decode().splitlines(); found=set()
+          for i,line in enumerate(lines):
+              if re.search('write.mask|vertex.descriptor|mesh.render|ConstantInt|ConstantUInt|threadgroup|step.function',line,re.I):
+                  found.update(range(max(0,i-2),min(len(lines),i+7)))
+          for i in sorted(found): print(str(i)+': '+lines[i])
+          PYCODE
       - name: Probe unified libraries and record unavailable GPU path
         run: |
           set -euo pipefail
