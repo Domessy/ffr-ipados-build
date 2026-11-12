@@ -23,7 +23,7 @@ class Oot2GatewayTests(unittest.TestCase):
                 self.assertEqual(gw.dispatch('oot2-release-preflight-v1 /arbitrary', parent), 126)
 
     def test_resume_snapshot_routes_are_fixed_and_separate(self):
-        for version in ("v5", "v6"):
+        for version in ("v5", "v6", "v8"):
             with tempfile.TemporaryDirectory() as d:
                 root = Path(d)
                 archive = root / 'snapshot'

@@ -189,6 +189,19 @@ class ResumeViewTests(unittest.TestCase):
             self.assertEqual(rows['index/123.json'], (view/'index/123.json').read_bytes())
             self.assertEqual(len(rows), 6)
 
+    def test_compact_resume_keeps_exact_outputs_without_other_metal(self):
+        with tempfile.TemporaryDirectory() as t:
+            resume, cache, conflicts, view, _, new = self.fixture(Path(t).resolve())
+            p = cache/'variant/safe/ios/side.metallib'
+            p.parent.mkdir(parents=True)
+            p.write_bytes(b'cached side variant')
+            result = resume.stage(cache, conflicts, view, new['code_fp'], include_metal=False)
+            self.assertEqual(result['indices'], 1)
+            self.assertFalse((view/'metallib').exists())
+            self.assertEqual((view/'variant/safe/ios/side.metallib').read_bytes(), b'cached side variant')
+            self.assertTrue((view/'shader'/new['digest']/'ios/123_b.metallib').is_file())
+            self.assertTrue((cache/'metallib/ios/key.metallib').is_file())
+
     def test_incomplete_translation_aborts_without_publishing(self):
         with tempfile.TemporaryDirectory() as t:
             resume, cache, conflicts, view, _, new = self.fixture(Path(t).resolve())

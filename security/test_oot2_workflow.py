@@ -58,7 +58,8 @@ zstd() { printf 'fixture'; }
             calls = Path(temp)/'calls'
             cases = [('metal-snapshot', 'ipad-v7', 'oot2-metal-snapshot-info-v1', False),
                      ('resume-v5', 'ipad-v5', 'oot2-resume-v5-info', True),
-                     ('resume-v6', 'ipad-v6', 'oot2-resume-v6-info', True)]
+                     ('resume-v6', 'ipad-v6', 'oot2-resume-v6-info', True),
+                     ('resume-v8', 'ipad-v8', 'oot2-resume-v8-info', True)]
             for mode, variant, route, translations in cases:
                 for accept_status in (0, 42):
                     with self.subTest(mode=mode, accept_status=accept_status):
@@ -76,7 +77,7 @@ zstd() { printf 'fixture'; }
                         if translations:
                             expected += ' <--translations>'
                         self.assertEqual(log[-1], expected)
-            for mode in ('resume-v5', 'resume-v6'):
+            for mode in ('resume-v5', 'resume-v6', 'resume-v8'):
                 with self.subTest(wrong_variant=mode):
                     calls.write_text('')
                     env = {**os.environ, 'RUNNER_TEMP': temp, 'CALLS': str(calls),

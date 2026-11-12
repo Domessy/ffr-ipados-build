@@ -49,6 +49,7 @@ on:
           - metal-snapshot
           - resume-v5
           - resume-v6
+          - resume-v8
           - empty
 
 permissions:
@@ -212,7 +213,12 @@ jobs:
             sleep 20
           done
           if [ "$OOT2_RUNTIME_VARIANT" != ipad-v7 ] && [ "$OOT2_RUNTIME_VARIANT" != ipad-v8 ]; then dotnet --version; fi
-          python3 -m venv "$RUNNER_TEMP/oot2-venv"
+          if [ "$OOT2_RUNTIME_VARIANT" = ipad-v8 ]; then
+            brew install python@3.15
+            "$(brew --prefix python@3.15)/bin/python3.15" -m venv "$RUNNER_TEMP/oot2-venv"
+          else
+            python3 -m venv "$RUNNER_TEMP/oot2-venv"
+          fi
           "$RUNNER_TEMP/oot2-venv/bin/python" -m pip install -q lz4 "capstone>=5,<6" fonttools nsz zbic "backports.zstd; python_version < '3.14'"
           # Pin the upstream code that processes the NUP; no keys are transferred.
           NXNATIVE_SHA="c229bd7d52e30f072362e31c7b1e3206d107d4cd"
@@ -257,6 +263,15 @@ jobs:
             python3 security/oot2_prepare_upstream.py "$RUNNER_TEMP/nxnative"
           else
             python3 security/oot2_patch_nup_release.py "$RUNNER_TEMP/nxnative/scripts/build_ipa_from_nsp.py"
+          fi
+          if [ "$OOT2_RUNTIME_VARIANT" = ipad-v8 ]; then
+            "$RUNNER_TEMP/oot2-venv/bin/python" security/oot2_shader_identity.py "$RUNNER_TEMP/nxnative" --expected 11d56ddb97e0a09976da63c7c2a40f0e615f1183b8245045e9f24356a79f6fab
+            # Link the actual production app with public synthetic modules before
+            # spending time on private cache/NUP transfers. No signing or device.
+            rc=0
+            "$RUNNER_TEMP/oot2-venv/bin/python" "$RUNNER_TEMP/nxnative/dm/ios/tools/build_smoke.py" --output "$RUNNER_TEMP/oot2-public-link-check" > "$RUNNER_TEMP/oot2-public-link-check.log" 2>&1 || rc=$?
+            tail -60 "$RUNNER_TEMP/oot2-public-link-check.log"
+            [ "$rc" -eq 0 ] || exit "$rc"
           fi
           if [ "$OOT2_RUNTIME_VARIANT" = ipad-v8 ]; then
             echo "iPad-v8: official texture, memory, pipeline and multiprocess build updates; bounded concurrency."
@@ -409,10 +424,14 @@ jobs:
           export DMSH_CAS="$RUNNER_TEMP/oot2-shader-cas/cas.db"
           umask 077
           mkdir -p "$(dirname "$DMSH_CAS")"
-          if [ "$OOT2_CACHE_RESTORE" = metal-snapshot ] || [ "$OOT2_CACHE_RESTORE" = resume-v5 ] || [ "$OOT2_CACHE_RESTORE" = resume-v6 ]; then
+          if [ "$OOT2_CACHE_RESTORE" = metal-snapshot ] || [ "$OOT2_CACHE_RESTORE" = resume-v5 ] || [ "$OOT2_CACHE_RESTORE" = resume-v6 ] || [ "$OOT2_CACHE_RESTORE" = resume-v8 ]; then
             SNAPSHOT_ROUTE=oot2-metal-snapshot-info-v1
             SNAPSHOT_ROLE=metal-snapshot
-            if [ "$OOT2_CACHE_RESTORE" = resume-v5 ]; then
+            if [ "$OOT2_CACHE_RESTORE" = resume-v8 ]; then
+              [[ "$OOT2_RUNTIME_VARIANT" = ipad-v8 ]] || { echo "Resume cache is specific to ipad-v8." >&2; exit 1; }
+              SNAPSHOT_ROUTE=oot2-resume-v8-info
+              SNAPSHOT_ROLE=resume-v8
+            elif [ "$OOT2_CACHE_RESTORE" = resume-v5 ]; then
               [[ "$OOT2_RUNTIME_VARIANT" = ipad-v5 ]] || { echo "Resume cache is specific to ipad-v5." >&2; exit 1; }
               SNAPSHOT_ROUTE=oot2-resume-v5-info
               SNAPSHOT_ROLE=resume-v5
