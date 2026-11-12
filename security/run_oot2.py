@@ -84,12 +84,18 @@ def checkpoint(since_ns, final=False):
 
 def sync_private_diagnostic():
     """Send a bounded snapshot privately; never echo the logfile in public CI."""
-    if not LOG.is_file():
-        return
-    # Last 8 MiB only; gateway atomically replaces the previous diagnostic.
-    with LOG.open("rb") as f:
-        f.seek(max(0, LOG.stat().st_size - 8 * 1024**2))
-        data = f.read(8 * 1024**2)
+    # Keep the final linker error too: the NSP summary only reports exit 1.
+    # Every path is fixed and sent privately, never echoed into Actions output.
+    paths = [LOG, TEMP / "oot2-work/logs/build_ipa.log",
+             TEMP / "oot2-work/ipa/build/ios/pkg/build.log"]
+    parts = []
+    for path in paths:
+        if not path.is_file() or path.is_symlink():
+            continue
+        with path.open("rb") as source:
+            source.seek(max(0, path.stat().st_size - 2 * 1024**2))
+            parts.append(b"\n--- private " + path.name.encode() + b" ---\n" + source.read(2 * 1024**2))
+    data = b"".join(parts)[-8 * 1024**2:]
     if not data:
         return
     try:

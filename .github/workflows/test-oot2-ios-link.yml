@@ -32,6 +32,7 @@ jobs:
           git -C "$SRC" fetch -q --depth 1 origin ccd834e06a3938834bb5579e2ccc6a0ad13d3970
           git -C "$SRC" checkout -q --detach FETCH_HEAD
           python3 security/oot2_prepare_ipad_v8.py "$SRC"
+          python3 security/oot2_shader_identity.py "$SRC" --expected 11d56ddb97e0a09976da63c7c2a40f0e615f1183b8245045e9f24356a79f6fab
       - name: Build and link the production unsigned iOS app with synthetic modules
         run: |
           set -euo pipefail

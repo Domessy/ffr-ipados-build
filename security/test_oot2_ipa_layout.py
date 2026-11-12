@@ -38,6 +38,22 @@ class IpaLayoutTests(unittest.TestCase):
                     rc = mod.compile_ipa()
                 return rc, launch.call_args, launch.call_count
 
+    def test_private_diagnostic_includes_linker_log_without_public_leak(self):
+        with tempfile.TemporaryDirectory() as temp:
+            with patch.dict(os.environ, {'RUNNER_TEMP': temp, 'GITHUB_WORKSPACE': str(ROOT)}):
+                spec = importlib.util.spec_from_file_location('oot2_diagnostic_fixture', ROOT/'security/run_oot2.py')
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+            mod.LOG.write_text('generic build failed')
+            path = Path(temp)/'oot2-work/ipa/build/ios/pkg/build.log'
+            path.parent.mkdir(parents=True)
+            path.write_text('Undefined symbols: _probe_atrace synthetic diagnostic')
+            with patch.object(mod.subprocess, 'run', return_value=Mock(returncode=0)) as send, patch('builtins.print') as emit:
+                mod.sync_private_diagnostic()
+            self.assertIn(b'_probe_atrace', send.call_args.kwargs['input'])
+            self.assertNotIn('_probe_atrace', str(emit.call_args_list))
+            self.assertLess(len(send.call_args.kwargs['input']), 8*1024**2)
+
     def test_default_bundle_stays_compatible(self):
         rc, call, _ = self.exercise(None)
         self.assertEqual(rc, 0)

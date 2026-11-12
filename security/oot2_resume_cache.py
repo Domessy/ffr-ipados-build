@@ -15,7 +15,7 @@ except ImportError:
 
 HEX = re.compile(r'[0-9a-f]{64}\Z')
 
-def stage(cache, conflicts, output, code_fp):
+def stage(cache, conflicts, output, code_fp, include_metal=True):
     cache, conflicts, output = map(safe_dir, (cache, conflicts, output))
     if not HEX.fullmatch(code_fp) or output.exists():
         raise ValueError('resume identity or existing destination')
@@ -44,7 +44,7 @@ def stage(cache, conflicts, output, code_fp):
         raise ValueError('resume has no matching indices')
     output.parent.mkdir(parents=True, exist_ok=True)
     temp = Path(tempfile.mkdtemp(prefix='.resume-', dir=output.parent))
-    counts = {'indices': len(selected), 'files': 0, 'bytes': 0, 'code_fp': code_fp}
+    counts = {'indices': len(selected), 'files': 0, 'bytes': 0, 'code_fp': code_fp, 'include_metal': include_metal}
     def link(p, name):
         safe_dir(p.parent)
         if p.is_symlink() or not p.is_file() or not cache_name(name, True):
@@ -68,7 +68,9 @@ def stage(cache, conflicts, output, code_fp):
             for f in root.rglob('*'):
                 if f.is_symlink(): raise ValueError('resume symlink')
                 if f.is_file(): link(f, f.relative_to(cache).as_posix())
-        for ns in ('metallib', 'variant'):
+        # Primary libraries are in shader/<digest>; retain side variants. The
+        # optional compile namespace is unnecessary for an exact completed build.
+        for ns in (('metallib', 'variant') if include_metal else ('variant',)):
             for f in (cache / ns).rglob('*'):
                 if f.is_symlink(): raise ValueError('resume symlink')
                 if f.is_file(): link(f, f.relative_to(cache).as_posix())

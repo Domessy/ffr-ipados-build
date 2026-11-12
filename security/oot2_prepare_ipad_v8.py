@@ -14,6 +14,7 @@ from oot2_patch_nup_release import patch as release_nup
 PIN = 'ccd834e06a3938834bb5579e2ccc6a0ad13d3970'
 CHAIN = 'd24f05cf9d78'
 ORIGINALS = {
+    "dm/host/probe.c": "c78eadf5b842901bc90d23426651c788bbb27e3af3e95b49ca92d6565cf9b6f7",
     "dm/gfx/nvn/nvn_mtl.m": "0084f9d988b41a7a8d291e239ea1ba3b0e03cd2e4025aed3587c133c2deedfb1",
     "dm/gfx/nvn/dmsh_chain.h": "e702728e36963f0cab3843bfe197142f49b363b8724ad1bfacd868035cb471cd",
     "scripts/build_ipa_from_nsp.py": "7724aa0dee54a9ccdfe626106168240a787b00a98397f2ed071ad3233baeeb7d",
@@ -33,6 +34,10 @@ def prepare(root):
         p = root / name
         if p.is_symlink() or hashlib.sha256(p.read_bytes()).hexdigest() != expected:
             raise ValueError('ipad-v8 source differs or was already prepared: ' + name)
+    link = Path(__file__).with_name('oot2_ipad_v8_link.patch')
+    if hashlib.sha256(link.read_bytes()).hexdigest() != 'f56f20ef2e5fb1dff6f07a076a225387bef6c87f8764bb2f09fe6936242c9841':
+        raise ValueError('v8 link patch digest')
+    subprocess.run(['git', '-C', str(root), 'apply', '--check', str(link)], check=True)
     telemetry = Path(__file__).with_name('oot2_telemetry.patch')
     host = Path(__file__).with_name('oot2_ipad_v8_host.patch')
     if hashlib.sha256(host.read_bytes()).hexdigest() != '9fe39423ab72399e2692edd404edce1dc4cef6095d3382ddfff95efe13037696':
@@ -43,6 +48,7 @@ def prepare(root):
     # both inputs if an unexpected helper/IO failure interrupts preparation.
     originals = {n: (root / n).read_bytes() for n in ORIGINALS}
     try:
+        subprocess.run(['git', '-C', str(root), 'apply', str(link)], check=True)
         release_nup(root / 'scripts/build_ipa_from_nsp.py')
         subprocess.run(['git', '-C', str(root), 'apply', str(telemetry)], check=True)
         subprocess.run(['git', '-C', str(root), 'apply', str(host)], check=True)
@@ -51,7 +57,7 @@ def prepare(root):
             (root / n).write_bytes(data)
         raise
     assert f'"{CHAIN}"' in (root / 'dm/gfx/nvn/dmsh_chain.h').read_text()
-    print(f'OOT2 ipad-v8 prepared: {PIN}, original shader chain {CHAIN}; reviewed frame pacing #1942 and profile #1927, telemetry and runner NUP release; original shader chain preserved')
+    print(f'OOT2 ipad-v8 prepared: {PIN}, original shader chain {CHAIN}; official iOS link fix b21eb3fb, reviewed frame pacing #1942 and profile #1927, telemetry and runner NUP release; original shader chain preserved')
 
 
 if __name__ == '__main__':
