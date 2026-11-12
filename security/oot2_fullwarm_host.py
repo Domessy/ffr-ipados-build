@@ -82,11 +82,13 @@ def rebuild(root, kit, slim, output):
     gen = project / 'Gen'
     for name in ('Sources', 'tools'): (project / name).symlink_to(ios / name, target_is_directory=True)
     shutil.copyfile(ios / 'project.yml', project / 'project.yml')
+    icons = list((gen / 'Assets.xcassets').glob('*.appiconset'))
+    if len(icons) > 1: raise ValueError('ambiguous captured icon set')
     env = {k: v for k, v in os.environ.items() if not k.startswith(('DM_', 'DMSH_'))}
     env.update(GAME=TITLE, DM_GAME=TITLE, DM_GAMES_DIR=str(captured / 'profile'), DM_GAMES_FIRST='1',
                DM_BUNDLE_ID=original_info['CFBundleIdentifier'], DM_DISPLAY_NAME=original_info.get('CFBundleDisplayName', 'Ocarina of Time'),
                DM_APP_VERSION=original_info.get('CFBundleShortVersionString', '1.0'), DM_TEAM_ID='', DM_SCHEME_NAME='DmIOS',
-               DM_APPICON='AppIcon', DM_SHOW_FPS='YES', DM_LANG='en-US')
+               DM_APPICON=icons[0].stem if icons else '', DM_SHOW_FPS='YES', DM_LANG='en-US')
     def run(*command, capture=False):
         return subprocess.run([str(c) for c in command], cwd=project, env=env, check=True,
                               text=True, stdout=subprocess.PIPE if capture else None)
