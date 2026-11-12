@@ -44,8 +44,22 @@ jobs:
           xcodebuild -downloadComponent MetalToolchain
           python3 "$RUNNER_TEMP/nxnative/dm/gfx/tools/own_compilers.py" --check-metal
           "$RUNNER_TEMP/aot-venv/bin/python" security/oot2_aot_pilot.py "$RUNNER_TEMP/nxnative" "$RUNNER_TEMP/public-aot-pilot"
-      - name: Probe unified libraries and complete descriptor capture
+      - name: Inspect public Metal pipeline script schema
+        run: |
+          set -euo pipefail
+          TOOL_ROOT="$(dirname "$(dirname "$(xcrun --find metal-tt)")")"
+          rg --files "$TOOL_ROOT" | rg 'metal4.*script|metal.*pipelines' | head -12 || true
+          xcrun -sdk iphoneos metal-tt -help | head -70
+          PAGE="$(rg --files "$TOOL_ROOT" | rg '/metal4-pipelines-script\.5(\.gz)?$' | head -1)"
+          if [ -n "$PAGE" ]; then
+            if [[ "$PAGE" == *.gz ]]; then gzip -dc "$PAGE" > "$RUNNER_TEMP/metal4-schema.txt"; else cp "$PAGE" "$RUNNER_TEMP/metal4-schema.txt"; fi
+            rg -n -i -A 5 -B 2 'write.mask|vertex.descriptor|mesh.render|constantint|constantuint|sample.count|threadgroup' "$RUNNER_TEMP/metal4-schema.txt" | head -220
+          fi
+      - name: Probe unified libraries and record unavailable GPU path
         run: |
           set -euo pipefail
           xcrun clang -fobjc-arc -framework Metal -framework Foundation security/oot2_fullwarm_probe.m -o "$RUNNER_TEMP/fullwarm-probe"
-          "$RUNNER_TEMP/fullwarm-probe" "$RUNNER_TEMP/public-aot-pilot/libraries/v.metallib" "$RUNNER_TEMP/public-aot-pilot/libraries/f.metallib" "$RUNNER_TEMP/fullwarm-probe.mtl4-json"
+          rc=0
+          "$RUNNER_TEMP/fullwarm-probe" "$RUNNER_TEMP/public-aot-pilot/libraries/v.metallib" "$RUNNER_TEMP/public-aot-pilot/libraries/f.metallib" "$RUNNER_TEMP/fullwarm-probe.mtl4-json" || rc=$?
+          [[ "$rc" == 0 || "$rc" == 4 ]]
+          echo "Runtime compiler capability probe exit=$rc (4 means no Metal4 compiler; offline export must work without it)."
