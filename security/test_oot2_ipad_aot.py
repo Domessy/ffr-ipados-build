@@ -73,6 +73,31 @@ class AotTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'cache'): aot.restore_cache(archive, root / 'out')
                 self.assertFalse((root / 'escape').exists())
 
+    def test_live_checkpoint_omits_uncommitted_groups(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d); cache = root / 'cache'
+            ready = cache / 'work/batches.applegpu_g17g/00001'; ready.mkdir(parents=True)
+            (ready / 'applegpu_g17g.mtl4a').write_bytes(b'completed')
+            (ready / 'key.applegpu_g17g').write_text('stable key')
+            busy = cache / 'work/batches.applegpu_g17g/00002'; busy.mkdir()
+            (busy / 'applegpu_g17g.mtl4a').write_bytes(b'previous binary with key removed')
+            checkpoint = root / 'checkpoint.tar.gz'; aot.save_completed_cache(cache, checkpoint)
+            aot.restore_cache(checkpoint, root / 'restored')
+            self.assertEqual((root / 'restored/work/batches.applegpu_g17g/00001/applegpu_g17g.mtl4a').read_bytes(), b'completed')
+            self.assertFalse((root / 'restored/work/batches.applegpu_g17g/00002').exists())
+
+    def test_public_progress_is_numeric_and_private_diagnostic_keeps_nested_errors(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d); (root / 'work/cache/work/batches.g17g/00001').mkdir(parents=True)
+            (root / 'work/aot-private.log').write_text('pso_offline: 34649 pairs: 33365 bases, 0 left\npso_offline: 4125 compute shaders: 4125 compute pipelines,\nPRIVATE_SHADER_NAME')
+            (root / 'work/cache/work/batches.g17g/00001/key.g17g').write_text('key')
+            (root / 'work/cache/work/metal-tt.g17g.log').write_text('synthetic private compiler error')
+            progress = aot.public_progress(root / 'work')
+            self.assertEqual(progress['total_batches'], 292)
+            self.assertEqual(progress['completed_batches'], 1)
+            self.assertNotIn('PRIVATE_SHADER_NAME', str(progress))
+            self.assertIn(b'synthetic private compiler error', aot.private_diagnostic(root))
+
     def test_gateway_reads_only_fixed_aot_input_and_rejects_arguments(self):
         with tempfile.TemporaryDirectory() as d:
             out = Path(d)

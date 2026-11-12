@@ -8,6 +8,7 @@ import argparse
 import copy
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import plistlib
@@ -183,28 +184,87 @@ def save_cache(folder, archive):
 def restore_cache(archive, folder):
     folder = Path(folder); folder.mkdir(parents=True, exist_ok=True)
     with tarfile.open(archive, 'r:gz') as src:
-        members = src.getmembers(); total = 0
+        members = src.getmembers(); total = 0; seen = set()
         for m in members:
             p = Path(m.name); total += m.size
             if not m.isfile() or p.is_absolute() or '..' in p.parts or '\\' in m.name or total > MAX_CACHE:
                 raise ValueError('invalid AOT cache member')
             if p.parts[0] not in ('work', 'bundle'): raise ValueError('invalid AOT cache root')
+            if m.name in seen: raise ValueError('duplicate AOT cache member')
+            seen.add(m.name)
         if len(members) > 20000: raise ValueError('too many AOT cache members')
         for m in members:
             dest = folder / m.name; dest.parent.mkdir(parents=True, exist_ok=True)
             with src.extractfile(m) as inp, dest.open('wb') as out: shutil.copyfileobj(inp, out)
 
 
+def private_diagnostic(root):
+    root = Path(root)
+    files = [root / 'wrapper-private.log', root / 'work/aot-private.log', root / 'work/aot-result.json']
+    files += sorted((root / 'work/cache/work').rglob('*.log'))
+    parts = []; left = 24 << 20
+    for path in files:
+        if not path.is_file() or path.is_symlink() or left <= 0: continue
+        take = min(left, 2 << 20, path.stat().st_size)
+        with path.open('rb') as f:
+            f.seek(max(0, path.stat().st_size - take)); parts.append(f.read())
+        parts.append(b'\n'); left -= take + 1
+    return b''.join(parts)
+
+
+def public_progress(work):
+    work = Path(work); log = work / 'aot-private.log'
+    text = ''
+    if log.is_file():
+        with log.open('rb') as source: text = source.read(65536).decode('utf8', errors='replace')
+    bases = re.search(r'pso_offline: \d+ pairs: (\d+) bases,', text)
+    computes = re.search(r'pso_offline: \d+ compute shaders: (\d+) compute pipelines,', text)
+    total = math.ceil(int(bases[1]) / 1000) + math.ceil(int(computes[1]) / 16) if bases and computes else 0
+    groups = list((work / 'cache/work').glob('batches.*/*/key.*'))
+    done = len(groups)
+    size = sum(p.stat().st_size for p in (work / 'cache/work').glob('batches.*/*/*.mtl4a') if p.is_file())
+    return {'completed_batches': done, 'total_batches': total,
+            'percent': min(100, round(100 * done / total, 1)) if total else 0,
+            'compiled_archive_gib': round(size / 1024**3, 2)}
+
+
+def save_completed_cache(folder, archive):
+    """Checkpoint committed groups during compilation, never an in-flight binary.
+
+    compile_batch removes its key before replacing a binary, and publishes the
+    new key last. Check both before and after streaming a group into the tar.
+    A race discards the entire checkpoint; a later checkpoint retries it.
+    """
+    folder, archive = Path(folder), Path(archive)
+    temp = archive.with_name(archive.name + '.partial')
+    try:
+        with tarfile.open(temp, 'w:gz', compresslevel=1) as out:
+            for key in sorted((folder / 'work').glob('batches.*/*/key.*')):
+                binary = key.parent / (key.name.removeprefix('key.') + '.mtl4a')
+                if not binary.is_file() or binary.is_symlink() or key.is_symlink(): continue
+                kb = key.read_bytes(); before = binary.stat()
+                files = [binary, key] + list(key.parent.glob('failed.*.tsv'))
+                for path in files: out.add(path, arcname=path.relative_to(folder).as_posix(), recursive=False)
+                after = binary.stat()
+                if key.read_bytes() != kb or (before.st_ino, before.st_size, before.st_mtime_ns) != (after.st_ino, after.st_size, after.st_mtime_ns):
+                    raise ValueError('AOT group changed during checkpoint')
+        if temp.stat().st_size > MAX_CACHE: raise ValueError('AOT checkpoint exceeds limit')
+        os.replace(temp, archive)
+    finally:
+        temp.unlink(missing_ok=True)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__); sub = ap.add_subparsers(dest='mode', required=True)
     p = sub.add_parser('prepare-tools'); p.add_argument('root', type=Path)
     p = sub.add_parser('build'); p.add_argument('root', type=Path); p.add_argument('slim', type=Path); p.add_argument('work', type=Path); p.add_argument('output', type=Path)
-    for name in ('save-cache', 'restore-cache'):
+    for name in ('save-cache', 'restore-cache', 'save-completed-cache'):
         p = sub.add_parser(name); p.add_argument('source', type=Path); p.add_argument('destination', type=Path)
     a = ap.parse_args()
     if a.mode == 'prepare-tools': prepare_tools(a.root)
     elif a.mode == 'save-cache': save_cache(a.source, a.destination)
     elif a.mode == 'restore-cache': restore_cache(a.source, a.destination)
+    elif a.mode == 'save-completed-cache': save_completed_cache(a.source, a.destination)
     else:
         bundle = compile_archive(a.root, a.slim, a.work)
         result = repack(a.slim, bundle, a.output)

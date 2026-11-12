@@ -171,18 +171,26 @@ jobs:
           set -euo pipefail
           "$RUNNER_TEMP/aot-venv/bin/python" security/oot2_ipad_aot.py build "$RUNNER_TEMP/nxnative" "$RUNNER_TEMP/oot2-aot/input.ipa" "$RUNNER_TEMP/oot2-aot/work" "$RUNNER_TEMP/oot2-aot/output.ipa" > "$RUNNER_TEMP/oot2-aot/wrapper-private.log" 2>&1 &
           AOT_PID=$!
+          CHECKPOINT_AT=$((SECONDS+600))
           while kill -0 "$AOT_PID" 2>/dev/null; do
             sleep 30
             python3 - "$RUNNER_TEMP/oot2-aot" <<'PYCODE'
           import sys
           from pathlib import Path
-          p=Path(sys.argv[1]); log=p/'work/aot-private.log'
-          count=sum(1 for f in (p/'work/cache/work').glob('batches.*/*/key.*'))
-          print(f'AOT iOS: completed_cached_batches={count}; private_log_bytes={log.stat().st_size if log.exists() else 0}',flush=True)
+          from security.oot2_ipad_aot import public_progress
+          print('AOT iOS progress:',public_progress(Path(sys.argv[1])/'work'),flush=True)
           PYCODE
+            if (( SECONDS >= CHECKPOINT_AT )); then
+              if python3 security/oot2_ipad_aot.py save-completed-cache "$RUNNER_TEMP/oot2-aot/work/cache" "$RUNNER_TEMP/oot2-aot/checkpoint.tar.gz" >> "$RUNNER_TEMP/oot2-aot/wrapper-private.log" 2>&1; then
+                ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 ffr-cachyos oot2-aot-v8-write-cache < "$RUNNER_TEMP/oot2-aot/checkpoint.tar.gz" && echo 'Private completed-batch checkpoint saved.' || echo 'Checkpoint transfer deferred.'
+              else
+                echo 'AOT checkpoint deferred; compiler continues.'
+              fi
+              CHECKPOINT_AT=$((SECONDS+600))
+            fi
           done
           wait "$AOT_PID"
-          bsdtar -tf "$RUNNER_TEMP/oot2-aot/output.ipa" > /dev/null
+          bsdtar -tf "$RUNNER_TEMP/oot2-aot/output.ipa" > /dev/null 2>> "$RUNNER_TEMP/oot2-aot/wrapper-private.log"
       - name: Save private compiler cache and diagnostics on CachyOS
         if: always() && github.event_name == 'workflow_dispatch' && inputs.mode == 'build'
         continue-on-error: true
@@ -195,15 +203,8 @@ jobs:
           fi
           python3 - "$RUNNER_TEMP/oot2-aot" <<'PYCODE' | ssh ffr-cachyos oot2-aot-v8-write-log
           import sys
-          from pathlib import Path
-          root=Path(sys.argv[1])
-          for rel in ('wrapper-private.log','work/aot-private.log','work/aot-result.json'):
-              p=root/rel
-              if p.is_file():
-                  with p.open('rb') as f:
-                      f.seek(max(0,p.stat().st_size-(8<<20)))
-                      sys.stdout.buffer.write(f.read())
-                      sys.stdout.buffer.write(b'\n')
+          from security.oot2_ipad_aot import private_diagnostic
+          sys.stdout.buffer.write(private_diagnostic(sys.argv[1]))
           PYCODE
       - name: Return AOT slim - original RomFS added on CachyOS
         if: success() && github.event_name == 'workflow_dispatch' && inputs.mode == 'build'
