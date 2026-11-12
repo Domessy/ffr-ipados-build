@@ -20,6 +20,8 @@ CONFLICTS = ROOT / "shader-cache-conflicts"
 OUTPUT = ROOT / "resultats"
 
 ROUTES = frozenset({
+    "oot2-aot-v8-info", "oot2-aot-v8-read-input", "oot2-aot-v8-read-cache",
+    "oot2-aot-v8-write-slim", "oot2-aot-v8-write-cache", "oot2-aot-v8-write-log",
     "oot2-diagnose-v1", "oot2-probe-v1", "oot2-manifest-v1", "oot2-space-v1",
     "oot2-read-nup", "oot2-read-cache", "oot2-write-cache",
     "oot2-write-ipa", "oot2-write-log",
@@ -104,6 +106,48 @@ def diagnose():
 def dispatch(command, parent):
     if command not in ROUTES:
         return 126
+    if command.startswith('oot2-aot-v8-'):
+        try:
+            from .oot2_ipad_aot import digest, inspect_ipa, CHAIN, GPU
+        except ImportError:
+            from oot2_ipad_aot import digest, inspect_ipa, CHAIN, GPU
+        source = OUTPUT / 'ZeldaOcarinaOfTime-v8-aot-input.ipa'
+        cache = OUTPUT / 'OOT2Aot-v8-g17g-cache.tar.gz'
+        if command == 'oot2-aot-v8-info':
+            inspect_ipa(source)
+            if source.is_symlink() or cache.is_symlink(): raise ValueError('AOT input symlink')
+            print('OOT2_AOT_V8', source.stat().st_size, digest(source),
+                  cache.stat().st_size if cache.exists() else 0,
+                  digest(cache) if cache.exists() else '-')
+            return 0
+        if command in ('oot2-aot-v8-read-input', 'oot2-aot-v8-read-cache'):
+            parent.send_file(source if command.endswith('-input') else cache)
+            return 0
+        previous = parent.OUTPUT
+        parent.OUTPUT = OUTPUT
+        try:
+            if command == 'oot2-aot-v8-write-cache': parent.receive_file(cache.name, 12 << 30)
+            elif command == 'oot2-aot-v8-write-log': parent.receive_file('oot2-aot-v8-private.log', 32 << 20)
+            else:
+                name = 'ZeldaOcarinaOfTime-v8-aot-slim.ipa'
+                parent.receive_file(name, 16 << 30)
+                prefix = inspect_ipa(OUTPUT / name)
+                import zipfile
+                with zipfile.ZipFile(OUTPUT / name) as z:
+                    z.getinfo(prefix + 'pso/' + GPU + '.mtl4a')
+                try:
+                    from .oot2_local_bundle import bundle
+                except ImportError:
+                    from oot2_local_bundle import bundle
+                stats = bundle(OUTPUT / name,
+                               ROOT / 'local-bundle-v6/extract/v131072/RomFS.img',
+                               ROOT / 'local-bundle-v6/romfs-manifest.json',
+                               OUTPUT / 'ZeldaOcarinaOfTime-ipad-v8-aot-livecontainer.ipa', expected_chain=CHAIN)
+                (OUTPUT / 'ipad-v8-aot-local-bundle-result.json').write_text(json.dumps(stats, indent=2) + '\n')
+                print('OOT2_AOT_LOCAL_BUNDLE_OK', stats['ipa_bytes'])
+        finally:
+            parent.OUTPUT = previous
+        return 0
     if command == "oot2-diagnose-v1":
         return diagnose()
     if command == "oot2-probe-v1":

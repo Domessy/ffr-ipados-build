@@ -1,0 +1,15 @@
+{
+  "base": "ccd834e06a3938834bb5579e2ccc6a0ad13d3970",
+  "chain": "d24f05cf9d78",
+  "tools_source": "0c078130f6db7d0d32c1dc28146feaf97713f008",
+  "patch_sha256": "bd2cc749f0cc192fe944582c87f85c9a06a985460642c5235e2f480feb92afcf",
+  "originals": {
+    "dm/gfx/tools/pso_offline.py": "8678ab591847af4a086ee031a59f8b6eea714aa140401ff795937c4728cbd667",
+    "dm/tools/tests/test_pso_offline.py": "d9fe56b429b9c287ae48c00409cf1355b79a761a89480c0f66b15a035b4dc49c"
+  },
+  "architecture": "applegpu_g17g",
+  "architecture_evidence": "https://github.com/seedds/nxnative/blob/0c078130f6db7d0d32c1dc28146feaf97713f008/dm/games/0100D5B026844000/README.md",
+  "scope": "Pair bases and compute pipelines; full R/M prewarm lists are not generated",
+  "native_host_changed": false,
+  "shader_translation_changed": false
+}
