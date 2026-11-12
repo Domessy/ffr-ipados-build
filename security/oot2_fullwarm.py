@@ -113,8 +113,9 @@ def compile_lists(root, image, scripts, cache, bundle):
     for index, script in enumerate(sorted(scripts.glob('prewarm-*.mtl4-json'))):
         work = cache / f'{index:05d}'; work.mkdir(exist_ok=True)
         data = materialize(json.loads(script.read_text()), image, work / 'libraries', po)
-        key = group_key(data, toolchain); key_file = work / 'key'; archive = work / f'{GPU}.mtl4a'
-        if not (archive.is_file() and key_file.is_file() and key_file.read_text().strip() == key):
+        key = group_key(data, toolchain); key_file = work / 'key'; archive = work / f'{GPU}.mtl4a'; checksum = work / 'sha256'
+        if not (archive.is_file() and not archive.is_symlink() and key_file.is_file() and checksum.is_file()
+                and key_file.read_text().strip() == key and checksum.read_text().strip() == digest(archive)):
             key_file.unlink(missing_ok=True)
             js = work / 'pipelines.mtl4-json'; js.write_text(json.dumps(data, sort_keys=True))
             part = work / 'archive.partial'; part.unlink(missing_ok=True)
@@ -123,8 +124,10 @@ def compile_lists(root, image, scripts, cache, bundle):
             # publish a partial archive while calling the list fully prepared.
             po.compile_archive(js, part, work, GPU, 'ios', '27.0', count)
             if part.stat().st_size < 32: raise ValueError('full prewarm archive empty')
-            os.replace(part, archive); key_file.write_text(key + '\n')
+            os.replace(part, archive)
+            checksum.write_text(digest(archive) + '\n'); key_file.write_text(key + '\n')
         else: reused += 1
+        subprocess.run([str(root / 'dm/gfx/tests/oot2_fullwarm_export'), '--validate-archive', str(archive)], check=True)
         shutil.rmtree(work / 'libraries')
         name = f'{GPU}-prewarm-{index:05d}.mtl4a'
         target = bundle / name
