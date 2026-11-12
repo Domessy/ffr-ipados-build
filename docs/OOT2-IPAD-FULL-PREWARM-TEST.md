@@ -1,0 +1,12 @@
+# Validation iPad — archives complètes des listes R/M
+
+Build futur distinct v8-fullwarm, même chaîne d24f05cf9d78. Ne pas confondre avec v8-aot (bases/compute seulement).
+
+1. Conserver sauvegardes et caches existants. Relever le nom exact de l’IPA, l’espace disponible, la version iPadOS et les réglages. Activer Metal 4 pipelines avant lancement ; conserver les mêmes options, résolution et mode console que la comparaison.
+2. Après installation par l’utilisateur, relever le délai Play→fin de préparation→personnage contrôlable. Faire un deuxième lancement dans les mêmes conditions. Avec les caches existants, le premier essai n’est pas une mesure à froid ; le noter. Ne pas effacer les données pour obtenir artificiellement un essai froid.
+3. Récupérer Documents/log.txt après fermeture normale par l’utilisateur. Chercher « pipeline archive bundled with the app » pour les bases, « prewarm archive bundled with the app » pour les listes complètes : fichiers ouverts/présents, MB, temps. Toute erreur « failed to open » ou construction sur appareil doit être conservée pour diagnostic. Le compte des pipelines uniques peut être inférieur aux lignes de la liste.
+4. Relever « pipeline bases so far » : compiled/from the archive/reused ; « pipeline prewarm » pour les mesh : from archive/built. Comparer à la v8-aot sur un parcours identique. Un chargement de fichier seul ne prouve pas un lookup réussi.
+5. Jouer 10 minutes dans la zone de départ : même sauvegarde, trajet, rotations de caméra et transitions porte/intérieur/extérieur. Noter durée et fréquence des pauses, FPS habituel/minimum, brillance et scintillement. Le HUD de performance peut être activé pour un passage séparé, en notant son état.
+6. Relever la mémoire et l’état thermique disponibles dans les diagnostics, puis toute terminaison/Jetsam et son heure. Arrêter le test si la pression mémoire entraîne des fermetures répétées ; conserver le rapport pour l’analyse.
+
+Critère de succès : archives complètes ouvertes ET pipelines rendus/mesh trouvés dans les archives, préparation moins coûteuse, ressources inchangées et aucune nouvelle instabilité. Aucun gain FPS ou délai de quelques secondes n’est acquis avant cette validation. Le préchauffage couvre les listes enregistrées, pas tous les états futurs possibles du jeu.
