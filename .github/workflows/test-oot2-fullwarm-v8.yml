@@ -33,7 +33,7 @@ jobs:
           git -C "$SRC" remote add origin https://github.com/seedds/nxnative.git
           git -C "$SRC" fetch -q --depth 1 origin ccd834e06a3938834bb5579e2ccc6a0ad13d3970
           git -C "$SRC" checkout -q --detach FETCH_HEAD
-          python3 security/oot2_ipad_aot.py prepare-tools "$SRC"
+          python3 security/oot2_fullwarm_prepare.py "$SRC"
           python3 -m unittest -v security.test_oot2_ipad_aot security.test_oot2_gateway security.test_oot2_transfer
           python3 -m venv "$RUNNER_TEMP/aot-venv"
           "$RUNNER_TEMP/aot-venv/bin/python" -m pip install -q lz4
@@ -69,3 +69,25 @@ jobs:
           "$RUNNER_TEMP/fullwarm-probe" "$RUNNER_TEMP/public-aot-pilot/libraries/v.metallib" "$RUNNER_TEMP/public-aot-pilot/libraries/f.metallib" "$RUNNER_TEMP/fullwarm-probe.mtl4-json" || rc=$?
           [[ "$rc" == 0 || "$rc" == 4 ]]
           echo "Runtime compiler capability probe exit=$rc (4 means no Metal4 compiler; offline export must work without it)."
+      - name: Export full native R/M descriptors without a runtime compiler
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/nxnative"
+          python3 security/oot2_fullwarm.py build-exporter "$SRC"
+          TOOL="$SRC/dm/gfx/tests/oot2_fullwarm_export"
+          "$TOOL" --fixture-constants
+          "$RUNNER_TEMP/aot-venv/bin/python" security/oot2_fullwarm_fixture.py "$RUNNER_TEMP/fullwarm-fixture" "$SRC" "$TOOL"
+          python3 security/oot2_fullwarm.py export "$SRC" "$RUNNER_TEMP/fullwarm-fixture" "$RUNNER_TEMP/fullwarm-scripts"
+          "$RUNNER_TEMP/aot-venv/bin/python" security/oot2_fullwarm.py compile "$SRC" "$RUNNER_TEMP/fullwarm-fixture/msl/b-d24f05cf9d78" "$RUNNER_TEMP/fullwarm-scripts" "$RUNNER_TEMP/fullwarm-cache" "$RUNNER_TEMP/fullwarm-bundle"
+          python3 - "$RUNNER_TEMP/fullwarm-bundle" <<'PYCODE'
+          import json,sys
+          from pathlib import Path
+          p=Path(sys.argv[1]);m=json.loads((p/'fullwarm.json').read_text());c=m['coverage']
+          assert c['render_rows']==3 and c['mesh_rows']==2 and c['failed_tasks']==0
+          print('Full native R/M export and iOS archive compilation passed:',c)
+          PYCODE
+          for a in "$RUNNER_TEMP/fullwarm-bundle/"*.mtl4a; do "$TOOL" --validate-archive "$a"; done
+          find "$RUNNER_TEMP/fullwarm-cache" -name '*.mtl4a' -exec shasum -a 256 {} \; > "$RUNNER_TEMP/fullwarm-before.txt"
+          "$RUNNER_TEMP/aot-venv/bin/python" security/oot2_fullwarm.py compile "$SRC" "$RUNNER_TEMP/fullwarm-fixture/msl/b-d24f05cf9d78" "$RUNNER_TEMP/fullwarm-scripts" "$RUNNER_TEMP/fullwarm-cache" "$RUNNER_TEMP/fullwarm-bundle"
+          find "$RUNNER_TEMP/fullwarm-cache" -name '*.mtl4a' -exec shasum -a 256 {} \; > "$RUNNER_TEMP/fullwarm-after.txt"
+          cmp "$RUNNER_TEMP/fullwarm-before.txt" "$RUNNER_TEMP/fullwarm-after.txt"

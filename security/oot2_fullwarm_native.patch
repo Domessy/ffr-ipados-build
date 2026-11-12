@@ -1,0 +1,149 @@
+--- a/dm/gfx/nvn/nvn_mtl.m
++++ b/dm/gfx/nvn/nvn_mtl.m
+@@ -6085,6 +6085,13 @@
+ // A library's name that stays the same from one start to the next, for the pipeline archive's index (arch_key): the file it came from, by its path under the shader folder (an app
+ // update or another container moves the folder). A pipeline from a library with no name has no key: it is looked up in the files without an index, as every pipeline was before
+ static char g_lib_tag;
++#ifdef OOT2_FULLWARM_TOOL
++#include "oot2_fullwarm_constants.inc"
++#else
++#define full_cv_set(v,p,t,i) [(v) setConstantValue:(p) type:(t) atIndex:(i)]
++#define full_cv_bind(d,v) ((d).constantValues = (v))
++#define full_cv_copy_from(d) [(d).constantValues copy]
++#endif
+ static id<MTLLibrary> lib_tag(id<MTLLibrary> lib, NSString *name) { if (lib && name) objc_setAssociatedObject(lib, &g_lib_tag, name, OBJC_ASSOCIATION_COPY_NONATOMIC); return lib; }
+ static NSString *lib_name(NSString *path) {
+     NSString *dir = g_msl_dir ? [g_msl_dir stringByAppendingString:@"/"] : nil;
+@@ -6127,7 +6134,7 @@
+     if (!f || !lib || !name) return f;
+     MTL4LibraryFunctionDescriptor *ld = [MTL4LibraryFunctionDescriptor new]; ld.library = lib; ld.name = name;
+     MTL4FunctionDescriptor *d = ld;
+-    if (cv) { MTL4SpecializedFunctionDescriptor *sd = [MTL4SpecializedFunctionDescriptor new]; sd.functionDescriptor = ld; sd.constantValues = cv; d = sd; }
++    if (cv) { MTL4SpecializedFunctionDescriptor *sd = [MTL4SpecializedFunctionDescriptor new]; sd.functionDescriptor = ld; full_cv_bind(sd, cv); d = sd; }
+     os_unfair_lock_lock(&g_fn4_lock);
+     if (!g_fn4) g_fn4 = [[NSMapTable alloc] initWithKeyOptions:NSPointerFunctionsStrongMemory | NSPointerFunctionsObjectPointerPersonality valueOptions:NSPointerFunctionsStrongMemory capacity:0];   // by identity: a function made again from the same library and name (other constants: bf_fn) is another function
+     [g_fn4 setObject:d forKey:f];
+@@ -6204,13 +6211,13 @@
+         MTLFunctionConstantValues *cv = nil;
+         if ([fd isKindOfClass:MTL4SpecializedFunctionDescriptor.class]) {
+             MTL4SpecializedFunctionDescriptor *sd = (MTL4SpecializedFunctionDescriptor *)fd;
+-            cv = [sd.constantValues copy]; fd = sd.functionDescriptor;
++            cv = full_cv_copy_from(sd); fd = sd.functionDescriptor;
+         }
+         MTL4LibraryFunctionDescriptor *ld = [fd isKindOfClass:MTL4LibraryFunctionDescriptor.class] ? (MTL4LibraryFunctionDescriptor *)fd : nil;
+         if (!ld || ![ld.library newFunctionWithName:ld.name].functionConstantsDictionary[@"dm_border_off"]) { o->none = 1; return nil; }   // the entry's, not f's: a specialized f lists no constants
+         if (!cv) cv = [MTLFunctionConstantValues new];
+-        BOOL yes = YES; [cv setConstantValue:&yes type:MTLDataTypeBool atIndex:DMSH_BORDER_FC];
+-        MTL4SpecializedFunctionDescriptor *sd = [MTL4SpecializedFunctionDescriptor new]; sd.functionDescriptor = ld; sd.constantValues = cv;
++        BOOL yes = YES; full_cv_set(cv, &yes, MTLDataTypeBool, DMSH_BORDER_FC);
++        MTL4SpecializedFunctionDescriptor *sd = [MTL4SpecializedFunctionDescriptor new]; sd.functionDescriptor = ld; full_cv_bind(sd, cv);
+         o->cv = cv; o->d4 = sd;
+         return o;
+     }
+@@ -8292,7 +8299,7 @@
+     id<MTLFunction> f = nil; NSNumber *k = @(w << 8 | (targets & 0xff));
+     if (fs->lfn_state == 1 && !(f = fs->lfn[k])) {
+         MTLFunctionConstantValues *cv = [MTLFunctionConstantValues new];
+-        for (int n = 0; n < 8; n++) { bool on = targets >> n & 1; [cv setConstantValue:&on type:MTLDataTypeBool atIndex:DMSH_LOGIC_FC + n]; }
++        for (int n = 0; n < 8; n++) { bool on = targets >> n & 1; full_cv_set(cv, &on, MTLDataTypeBool, DMSH_LOGIC_FC + n); }
+         NSString *name = [base.name stringByAppendingString:@"_l"];
+         f = fn4_note([fs->llib newFunctionWithName:name constantValues:cv error:&e], fs->llib, name, cv);
+         if (!f) why = "no entry point";
+@@ -8752,6 +8759,33 @@
+     g_arch_bundle = a; g_bundle_dir = dir; [archp addObject:a];
+     MLOG("pipeline archive bundled with the app: %s, %.1f MB, opened in %.1f ms", p.UTF8String, [[NSFileManager.defaultManager attributesOfItemAtPath:p error:nil] fileSize] / 1048576.0, (bp_now() - t0) / 1e6);
+ }
++static NSUInteger g_prewarm_files;
++static NSMutableArray<id<MTL4Archive>> *g_prewarm_open;
++static NSString *prewarm_prefix(NSString *gpu) { return [gpu stringByAppendingString:@"-prewarm-"]; }
++static void pso_bundle_open_prewarm(NSMutableArray<id<MTL4Archive>> *arch) {
++    const char *e = getenv("DM_PSO_BUNDLE");
++    if (!e || !*e || !strcmp(e, "off")) return;
++    NSString *dir = @(e), *gpu = [(id)g_dev respondsToSelector:@selector(architecture)] ? g_dev.architecture.name : nil; if (!gpu) return;
++    NSString *pre = prewarm_prefix(gpu);
++    NSArray<NSString *> *names = [[[NSFileManager.defaultManager contentsOfDirectoryAtPath:dir error:nil]
++        filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"self BEGINSWITH %@ AND self ENDSWITH '.mtl4a'", pre]] sortedArrayUsingSelector:@selector(compare:)];
++    if (!names.count) return;
++    uint64_t t0 = bp_now(); unsigned long long bytes = 0; NSUInteger n = 0, nidx = 0, nkeys = 0, nplain = 0; g_prewarm_open = [NSMutableArray array];
++    for (NSString *name in names) {
++        NSString *p = [dir stringByAppendingPathComponent:name]; NSError *ae = nil;
++        id<MTL4Archive> a = arch_file_ok(p) ? [g_dev newArchiveWithURL:[NSURL fileURLWithPath:p] error:&ae] : nil;
++        if (!a) { MLOG("[RED] prewarm archive bundled with the app: %s not usable (%s): its bases are built on the device", p.UTF8String, ae ? ae.localizedDescription.UTF8String : "not a pipeline archive"); continue; }
++        int complete = 0; NSData *keys = arch_keys_read(arch_keys_path(p), &complete);
++        n++; bytes += [[NSFileManager.defaultManager attributesOfItemAtPath:p error:nil] fileSize];
++        if (keys && complete) {
++            const uint64_t *kv = keys.bytes; nidx++;
++            for (NSUInteger j = 0; j < keys.length / sizeof(uint64_t); j++) if (!nvn_hm_get(&g_arch_ix, &kv[j])) { nvn_hm_put(&g_arch_ix, &kv[j], (__bridge void *)a); nkeys++; }
++        } else [arch insertObject:a atIndex:nplain++];
++        [g_prewarm_open addObject:a];   // the archives stay open for the run
++    }
++    g_prewarm_files = n;
++    MLOG("prewarm archive bundled with the app: %lu of %lu files, %lu with an index of %lu bases, %.1f MB, opened in %.1f ms", (unsigned long)n, (unsigned long)names.count, (unsigned long)nidx, (unsigned long)nkeys, bytes / 1048576.0, (bp_now() - t0) / 1e6);
++}
+ // gpuarchiver-* folders are Metal's private compiler state. On the Mac their parent is shared by every program: a directory appearing during our capture or flush may belong
+ // to another compiler, and serialization success does not end its lifetime. Only our output archives are ours to remove. iOS can reclaim previous runs' app-private folders
+ // at cold start, before this run captures anything; never infer ownership from a live directory delta or remove compiler state at flush/exit.
+@@ -8884,6 +8918,7 @@
+         NSMutableArray<id<MTL4Archive>> *arch = [NSMutableArray array], *archp = [NSMutableArray array];
+         arch_open_begin();   // every archive opened from here to arch_open_end is mapped: the bundled one and the device's
+         pso_bundle_open(archp);   // first: it holds every pair's base
++        pso_bundle_open_prewarm(arch); // Full iOS R/M descriptors compiled offline.
+         if (g_arch_dir) {
+             g_arch_q = dispatch_queue_create("dm.nvn.pso-archive", dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_UTILITY, 0));
+             g_arch_pending = dispatch_group_create();
+@@ -8949,7 +8984,12 @@
+         }
+     });
+ }
+-static int pso4_compiler(void) { pso4_init(); return g_comp4 != nil; }   // render pipelines go through the Metal 4 compiler (fn_spec)
++static int pso4_compiler(void) {
++#ifdef OOT2_FULLWARM_TOOL
++    if (g_full_export) return 1; // Descriptor metadata, never a pipeline compiler.
++#endif
++    pso4_init(); return g_comp4 != nil;
++}   // render pipelines go through the Metal 4 compiler (fn_spec)
+ // Compute pipelines from the archive bundled with the app: it holds one per compute shader of the shader map and of the prewarm list's C rows (pso_offline.py), made from <key>_b's
+ // function alone. A compute pipeline depends on nothing else here: the MTLDevice builds it from the function (newComputePipelineStateWithFunction, no threadgroup size or other
+ // option; the dispatch gives the threadgroup size), so the lookup names the function alone too, by the descriptor shader_load noted (fn4_note). One the bundle does not hold
+@@ -9463,8 +9503,8 @@
+     MTL4LibraryFunctionDescriptor *ld = [MTL4LibraryFunctionDescriptor new]; ld.library = lib; ld.name = name;
+     if (!f.functionConstantsDictionary.count) return ld;
+     MTLFunctionConstantValues *cv = [MTLFunctionConstantValues new];
+-    if (f.functionConstantsDictionary[@"dm_border_off"]) { BOOL yes = YES; [cv setConstantValue:&yes type:MTLDataTypeBool atIndex:DMSH_BORDER_FC]; }
+-    MTL4SpecializedFunctionDescriptor *sd = [MTL4SpecializedFunctionDescriptor new]; sd.functionDescriptor = ld; sd.constantValues = cv; return sd;
++    if (f.functionConstantsDictionary[@"dm_border_off"]) { BOOL yes = YES; full_cv_set(cv, &yes, MTLDataTypeBool, DMSH_BORDER_FC); }
++    MTL4SpecializedFunctionDescriptor *sd = [MTL4SpecializedFunctionDescriptor new]; sd.functionDescriptor = ld; full_cv_bind(sd, cv); return sd;
+ }
+ static NSDictionary *pre_json(NSString *key) { NSData *d = msl_data([NSString stringWithFormat:@"%@/%@_b.json", g_msl_dir, key]); return d ? [NSJSONSerialization JSONObjectWithData:d options:0 error:nil] : nil; }
+ // The base of one pair as the draws make it (pso_desc_pull / pso_desc), or nil when the pair is left to the draws. Call inside an autorelease pool
+@@ -12785,9 +12825,9 @@
+     id<MTLLibrary> lib = fs->bflib;
+     if (!lib) { os_unfair_lock_unlock(&g_fz_fn_lock); return nil; }
+     MTLFunctionConstantValues *cv = [MTLFunctionConstantValues new];
+-    for (int i = 0; i < nfc; i++) { int v = fx[i]; [cv setConstantValue:&v type:MTLDataTypeInt atIndex:(NSUInteger)i]; }
+-    for (int q = 0; q < 8; q++) { bool b = fbmask >> q & 1; [cv setConstantValue:&b type:MTLDataTypeBool atIndex:(NSUInteger)(32 + q)]; }
+-    for (int j = 0; j < fs->rf.nfo; j++) for (int q = 0; q < 8; q++) { bool b = lmap[q] == fs->rf.fo_color[j]; [cv setConstantValue:&b type:MTLDataTypeBool atIndex:(NSUInteger)(64 + 8 * j + q)]; }
++    for (int i = 0; i < nfc; i++) { int v = fx[i]; full_cv_set(cv, &v, MTLDataTypeInt, (NSUInteger)i); }
++    for (int q = 0; q < 8; q++) { bool b = fbmask >> q & 1; full_cv_set(cv, &b, MTLDataTypeBool, (NSUInteger)(32 + q)); }
++    for (int j = 0; j < fs->rf.nfo; j++) for (int q = 0; q < 8; q++) { bool b = lmap[q] == fs->rf.fo_color[j]; full_cv_set(cv, &b, MTLDataTypeBool, (NSUInteger)(64 + 8 * j + q)); }
+     NSError *e = nil; id<MTLFunction> f = fn4_note([lib newFunctionWithName:@"main0_f" constantValues:cv error:&e], lib, @"main0_f", cv);
+     if (!f) MLOG("[RED] readable-tile version specialization failed %s (mask %02x): %s", fs->key, fbmask, e.localizedDescription.UTF8String);
+     NvBfFn *s = [NvBfFn new]; s->k = k; s->fn = f;
+@@ -17102,3 +17142,7 @@
+ #include "nvn_capture.inc"   // DM_NVN_CAPTURE (one frame for dm/gfx/tests/nvn_replay)
+ #include "nvn_ndve.inc"      // DM_NDVE_ENGINE (nn::ndve's movie network)
+ #pragma clang attribute pop
++
++#ifdef OOT2_FULLWARM_TOOL
++#include "oot2_fullwarm_export.inc"
++#endif
+--- a/dm/gfx/tests/Makefile
++++ b/dm/gfx/tests/Makefile
+@@ -626,3 +626,7 @@
+ 	MTL_DEBUG_LAYER=1 DM_NVN_ENC_THREAD=0 ./t_pool_standin
+ 	MTL_DEBUG_LAYER=1 DM_NVN_ENC_THREAD=1 ./t_pool_standin
+ 	MTL_DEBUG_LAYER=1 DM_NVN_ENC_THREAD=0 DM_NVN_POOL_STANDIN=0 ./t_pool_standin
++
++# CPU-only native descriptor exporter: does not create a Metal pipeline.
++oot2_fullwarm_export: oot2_fullwarm_harness.m $(MTL_T_DEP)
++	clang $(CFLAGS) -DOOT2_FULLWARM_TOOL -fobjc-arc -o $@ oot2_fullwarm_harness.m $(MTL_T_SRC) $(FW)
