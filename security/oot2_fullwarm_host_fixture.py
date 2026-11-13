@@ -12,7 +12,7 @@ from oot2_fullwarm_host import PIN, CHAIN, TITLE, rebuild
 from oot2_ipad_aot import TABLES, digest
 
 
-def main(native, smoke, output):
+def main(native, smoke, output, base_archive=None, full=None):
     native, smoke, output = map(Path, (native, smoke, output)); output.mkdir()
     files = {}
     for path in (smoke / 'patched').iterdir(): files['patched/' + path.name] = path
@@ -48,6 +48,21 @@ def main(native, smoke, output):
         z.writestr(prefix + f'msl/b-{CHAIN}.img', b'Synthetic marker; no game shaders')
     executable = rebuild(native, kit, slim, output / 'rebuilt')
     if executable.stat().st_size < 100000: raise ValueError('missing compiled host')
+    if base_archive is not None:
+        from oot2_fullwarm_pack import repack
+        from oot2_ipad_aot import GPU
+        base=output/'base';base.mkdir()
+        shutil.copyfile(base_archive,base/(GPU+'.mtl4a'))
+        (base/'archive.tsv').write_text(f'platform\tios\t27.0\narch\t{GPU}\nbases\t1\n')
+        (base/'prebuilt.tsv').write_text(f'chain\t{CHAIN}\n')
+        (base/'rest_pairs.tsv').write_text('# synthetic fixture\n')
+        full=Path(full);report=json.loads((full/'fullwarm.json').read_text())
+        report['host']=json.loads((output/'rebuilt/host-result.json').read_text())
+        (full/'fullwarm.json').write_text(json.dumps(report))
+        result=repack(slim,base,full,executable,output/'verified-output.ipa')
+        assert result['original_resources_preserved_except_executable']
+        assert report['host']['host_refresh']['upstream']
+        print('PASS: complete synthetic IPA repacked with actual iOS archives and rebuilt host; original resources rehashed.')
     print('PASS: verified host-kit unpack, actual gen_embed, production unsigned iOS rebuild; no retail data.')
 
 

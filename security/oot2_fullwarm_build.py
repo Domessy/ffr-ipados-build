@@ -3,10 +3,16 @@
 import json
 from pathlib import Path
 import sys
-from oot2_ipad_aot import CHAIN, extract_inputs
-from oot2_fullwarm import export, compile_lists
-from oot2_fullwarm_host import rebuild
-from oot2_fullwarm_pack import repack
+try:
+    from .oot2_ipad_aot import CHAIN, extract_inputs
+    from .oot2_fullwarm import export, compile_lists
+    from .oot2_fullwarm_host import rebuild
+    from .oot2_fullwarm_pack import repack
+except ImportError:
+    from oot2_ipad_aot import CHAIN, extract_inputs
+    from oot2_fullwarm import export, compile_lists
+    from oot2_fullwarm_host import rebuild
+    from oot2_fullwarm_pack import repack
 
 
 def build(native, slim, kit, base_work, output):
@@ -18,10 +24,14 @@ def build(native, slim, kit, base_work, output):
     inputs=base_work/'inputs'
     if not inputs.exists():extract_inputs(slim,inputs)
     export(native,inputs,output/'scripts')
-    phase('compiling iOS render/mesh archives')
-    compile_lists(native,inputs/f'msl/b-{CHAIN}',output/'scripts',output/'cache/work',output/'cache/bundle')
+    # Validate the actual captured modules and link the new host before spending
+    # time compiling the complete private render/mesh lists.
     phase('rebuilding unsigned iOS host')
     executable=rebuild(native,kit,slim,output/'host')
+    phase('compiling iOS render/mesh archives')
+    report=compile_lists(native,inputs/f'msl/b-{CHAIN}',output/'scripts',output/'cache/work',output/'cache/bundle')
+    report['host']=json.loads((output/'host/host-result.json').read_text())
+    (output/'cache/bundle/fullwarm.json').write_text(json.dumps(report,indent=2)+'\n')
     phase('packing and verifying original resources')
     result=repack(slim,base_work/'cache/bundle',output/'cache/bundle',executable,output/'output.ipa')
     (output/'result.json').write_text(json.dumps(result,indent=2)+'\n')

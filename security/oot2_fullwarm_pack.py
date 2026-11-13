@@ -41,6 +41,7 @@ def check_full_bundle(bundle):
 def repack(slim, base, full, host, output):
     slim, base, full, host, output = map(Path, (slim, base, full, host, output))
     prefix = inspect_ipa(slim); check_bundle(base); report = check_full_bundle(full)
+    if report.get('host') and report['host']['sha256'] != digest(host): raise ValueError('full prewarm host identity')
     raw = host.read_bytes()
     if len(raw) < 32 or struct.unpack_from('<III', raw) != (0xfeedfacf, 0x100000c, 0):
         # arm64e and other architectures are intentionally outside this recipe.
