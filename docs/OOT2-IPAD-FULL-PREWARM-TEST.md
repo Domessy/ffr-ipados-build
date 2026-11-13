@@ -10,3 +10,8 @@ Build futur distinct v8-fullwarm, même chaîne d24f05cf9d78. Ne pas confondre a
 6. Relever la mémoire et l’état thermique disponibles dans les diagnostics, puis toute terminaison/Jetsam et son heure. Arrêter le test si la pression mémoire entraîne des fermetures répétées ; conserver le rapport pour l’analyse.
 
 Critère de succès : archives complètes ouvertes ET pipelines rendus/mesh trouvés dans les archives, préparation moins coûteuse, ressources inchangées et aucune nouvelle instabilité. Aucun gain FPS ou délai de quelques secondes n’est acquis avant cette validation. Le préchauffage couvre les listes enregistrées, pas tous les états futurs possibles du jeu.
+
+
+## Complément — correctifs hôte du 13 novembre
+
+La recette PR80 conserve les textures actives et réutilise leurs vues, ajuste les buffers de visibilité, limite les prédictions répétées et corrige les invalidations sparse et l’ordre des archives. Comparer aussi un passage caméra immobile puis les mêmes rotations/transitions ; relever séparément scintillement, textures brillantes et pauses. Faire un passage prolongé de 15–20 minutes si la session est stable et noter mémoire/thermique : conserver davantage de textures actives peut accroître la mémoire résidente. Le plafond des buffers de visibilité est de32Mio, alloué à la demande. Ne pas attribuer une variation au patch à partir d’un seul instantané FPS. Les tests publics valident CPU/compilation/assemblage, pas le rendu ni la pression mémoire du M5.
