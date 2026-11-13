@@ -1,7 +1,7 @@
 {
   "base": "ccd834e06a3938834bb5579e2ccc6a0ad13d3970",
   "chain": "d24f05cf9d78",
-  "patch_sha256": "dc5484289ec5a8e35f06a622fa0e5f7e9339a830d35ac3bd3b9d7c3775f99496",
+  "patch_sha256": "07a68c2a2cad99ec2809e425e96d9a572968fd289cfde5f43b514361bc2de6b3",
   "originals": {
     "dm/gfx/nvn/hle_nvn.c": "65c51df1710812e86f7729c91b865e8c4ea0d523899ad0488618a5cadb3fa661",
     "dm/gfx/nvn/nvn_mtl.m": "127a12fca465b8f4a69505c2df8896a56ceee1890cd97ef4be425640b8efc6a6",
@@ -24,7 +24,7 @@
     "dm/gfx/tests/t_pso_archive.m": "f9948372a988ba6047fea048e6ec66d6e8d585bcd930d819732a5c9fdf713475",
     "dm/gfx/tests/t_pso_depth_stencil.m": "1118fc2be94c3744426b51d680777c77211ebd5310ef1fa53c8f289d83dbc808",
     "dm/gfx/tests/t_pso_pending.m": "608e84270314ea3eb72d60cd858b2b0a621f2d54bad7dfc966b1a02d93233eaf",
-    "dm/gfx/tests/t_sparse_pool_cache.m": "c994f0732a27b706a545b7da26b76c1e2b7c6c8455cb83ef3e3c993f8906c16b",
+    "dm/gfx/tests/t_sparse_pool_cache.m": "e69a6f4b75a3639c4c04ff7934139eb5411fba21373154b4e3e0d12dfcb39a66",
     "dm/gfx/tests/t_vc_ghost.m": "c2c3ecbb3dd112c9e31573c1ddc65b32dfc10061c0d5718fecf817aac5152a8c",
     "dm/gfx/tests/t_wait_event.m": "c8a08e48d64a3a9a9464e6ff2cca068fa2c858ef68720cec8690d1a81d4bec91"
   },
