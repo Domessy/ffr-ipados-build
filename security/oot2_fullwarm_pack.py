@@ -15,18 +15,21 @@ import tempfile
 import zipfile
 try:
     from .oot2_ipad_aot import CHAIN, GPU, check_bundle, digest, inspect_ipa
+    from .oot2_fullwarm import validate_render_coverage
     from .oot2_local_bundle import validate_zip_headers, extra_fields
 except ImportError:
     from oot2_ipad_aot import CHAIN, GPU, check_bundle, digest, inspect_ipa
+    from oot2_fullwarm import validate_render_coverage
     from oot2_local_bundle import validate_zip_headers, extra_fields
 
 
 def check_full_bundle(bundle):
     bundle = Path(bundle); report = json.loads((bundle / 'fullwarm.json').read_text())
     c = report['coverage']
+    validate_render_coverage(c)
     if (report['chain'] != CHAIN or report['gpu'] != GPU or report['platform'] != 'ios'
         or c['failed_tasks'] or not c['render_rows'] or not c['mesh_rows']
-        or c['render_rows'] != c['emitted_render'] or c['mesh_rows'] != c['emitted_mesh']
+        or c['mesh_rows'] != c['emitted_mesh']
         or c['periods'] != len(report['archives'])): raise ValueError('full prewarm coverage')
     for name, meta in report['archives'].items():
         path = bundle / name

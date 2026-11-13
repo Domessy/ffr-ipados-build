@@ -6,7 +6,7 @@ static NSMutableArray *full_libraries, *full_functions, *full_specialized, *full
 static NSMutableDictionary *full_library_names;
 static NSString *full_directory;
 static unsigned full_period, full_rows, full_failed, full_rrows, full_mrows;
-static unsigned full_emitted_r, full_emitted_m;
+static unsigned full_emitted_r, full_emitted_m, full_device_r;
 
 static void full_reset(void) {
     full_libraries = [NSMutableArray array]; full_functions = [NSMutableArray array]; full_specialized = [NSMutableArray array];
@@ -134,6 +134,13 @@ static int full_task(WarmTask *task) {
         }
         pso_key key = sk.k; key.vs = (__bridge void *)vs; key.fs = (__bridge void *)fs; key.fsfn = (__bridge void *)fsfn;
         MTLRenderPipelineDescriptor *r = pso_desc(&key, vs, fs, fsfn, sk.merged);
+        // pso_desc4 deliberately returns nil for rasterized depth-only rows:
+        // Metal 4 requires a fragment, while the runtime uses MTLDevice here.
+        // Keep those exact recorded rows in native device prewarm; never invent
+        // a fragment, disable rasterization, or silently omit their coverage.
+        if (!fs && !sk.fz && r.rasterizationEnabled && !r.fragmentFunction) {
+            full_device_r++; continue;
+        }
         int unspecialized = r.rasterizationEnabled && ![r.label isEqualToString:PSO_WHOLE];
         if (!full_add_render(pso_desc4(r, unspecialized, !key.border))) ok = 0;
         if (full_render.count + full_mesh.count >= 256) full_flush();
@@ -177,10 +184,11 @@ static int full_export_lists(NSString *manifest, NSString *directory) {
     if (expected_r != full_rrows || expected_m != full_mrows) full_failed++;
     NSDictionary *coverage = @{@"chain": @(DMSH_CHAIN), @"render_rows": @(full_rrows), @"mesh_rows": @(full_mrows),
         @"rows": @(full_rows), @"failed_tasks": @(full_failed), @"periods": @(full_period), @"stale_keys": @(g_warm_skip_stale),
-        @"emitted_render": @(full_emitted_r), @"emitted_mesh": @(full_emitted_m),
+        @"emitted_render": @(full_emitted_r), @"device_render_rows": @(full_device_r),
+        @"device_render_reason": @"metal4_requires_fragment", @"emitted_mesh": @(full_emitted_m),
         @"pipeline_creation_used": @NO, @"new_shaders_compiled": @NO};
     NSData *report = [NSJSONSerialization dataWithJSONObject:coverage options:NSJSONWritingSortedKeys error:nil];
     [report writeToFile:[directory stringByAppendingPathComponent:@"coverage.json"] atomically:YES];
-    printf("Full prewarm descriptors: R=%u M=%u failed=%u periods=%u\n", full_rrows, full_mrows, full_failed, full_period);
-    return full_failed || !full_rrows || !full_mrows || full_emitted_r != full_rrows || full_emitted_m != full_mrows;
+    printf("Full prewarm descriptors: R=%u M=%u device-depth=%u failed=%u periods=%u\n", full_rrows, full_mrows, full_device_r, full_failed, full_period);
+    return full_failed || !full_rrows || !full_mrows || full_emitted_r + full_device_r != full_rrows || full_emitted_m != full_mrows;
 }

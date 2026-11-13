@@ -46,6 +46,21 @@ class FullwarmTests(unittest.TestCase):
             coverage['failed_tasks'] = 1; (root/'coverage.json').write_text(json.dumps(coverage))
             with self.assertRaisesRegex(ValueError, 'coverage'): fw.validate_export(root)
 
+    def test_depth_only_rows_are_accounted_without_weakening_other_coverage(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d); coverage, _ = self.fixture(root)
+            coverage.update(render_rows=3, device_render_rows=2,
+                            device_render_reason='metal4_requires_fragment')
+            def save(): (root/'coverage.json').write_text(json.dumps(coverage))
+            save(); self.assertEqual(fw.validate_export(root)['device_render_rows'], 2)
+            for change in ({'device_render_rows': 1}, {'device_render_rows': -1},
+                           {'device_render_rows': True}, {'device_render_reason': 'unknown'}):
+                original = coverage.copy(); coverage.update(change); save()
+                with self.assertRaises(ValueError): fw.validate_export(root)
+                coverage = original
+            coverage['failed_tasks'] = 1; save()
+            with self.assertRaises(ValueError): fw.validate_export(root)
+
     def test_untrusted_script_library_path_rejected(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d); _, cfg = self.fixture(root); cfg['libraries'][0]['path'] = '../escape.metallib'
@@ -65,7 +80,8 @@ class FullwarmPackagingTests(unittest.TestCase):
             full=root/'full';full.mkdir();name=fw.GPU+'-prewarm-00000.mtl4a'
             binary=full/name;binary.write_bytes(b'compiled mesh/render archive'*8)
             report={'chain':fw.CHAIN,'gpu':fw.GPU,'platform':'ios','coverage':{
-                'failed_tasks':0,'render_rows':1,'emitted_render':1,'mesh_rows':1,'emitted_mesh':1,'periods':1},
+                'failed_tasks':0,'render_rows':2,'emitted_render':1,'device_render_rows':1,
+                'device_render_reason':'metal4_requires_fragment','mesh_rows':1,'emitted_mesh':1,'periods':1},
                 'archives':{name:{'bytes':binary.stat().st_size,'sha256':fw.digest(binary)}}}
             (full/'fullwarm.json').write_text(json.dumps(report));(full/'prewarm.tsv').write_text('full fixture\n')
             host=root/'host';host.write_bytes(struct.pack('<IIII',0xfeedfacf,0x100000c,0,2)+bytes(64))

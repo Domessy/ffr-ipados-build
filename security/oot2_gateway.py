@@ -137,8 +137,13 @@ def dispatch(command, parent):
                     if report['chain'] != CHAIN or report['gpu'] != GPU or report['platform'] != 'ios':
                         raise ValueError('full prewarm target')
                     coverage = report['coverage']
+                    try:
+                        from .oot2_fullwarm import validate_render_coverage
+                    except ImportError:
+                        from oot2_fullwarm import validate_render_coverage
+                    validate_render_coverage(coverage)
                     if (coverage['failed_tasks'] or coverage['stale_keys'] or not coverage['render_rows'] or not coverage['mesh_rows']
-                        or coverage['render_rows'] != coverage['emitted_render'] or coverage['mesh_rows'] != coverage['emitted_mesh']
+                        or coverage['mesh_rows'] != coverage['emitted_mesh']
                         or coverage['periods'] != len(report['archives'])): raise ValueError('full prewarm coverage')
                     z.getinfo(prefix + 'pso/' + GPU + '.mtl4a')
                     for filename, meta in report['archives'].items():
