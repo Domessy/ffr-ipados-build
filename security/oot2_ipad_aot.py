@@ -257,7 +257,9 @@ def save_completed_cache(folder, archive):
 def main():
     ap = argparse.ArgumentParser(description=__doc__); sub = ap.add_subparsers(dest='mode', required=True)
     p = sub.add_parser('prepare-tools'); p.add_argument('root', type=Path)
-    p = sub.add_parser('build'); p.add_argument('root', type=Path); p.add_argument('slim', type=Path); p.add_argument('work', type=Path); p.add_argument('output', type=Path)
+    for mode in ('build', 'build-cache'):
+        p = sub.add_parser(mode); p.add_argument('root', type=Path); p.add_argument('slim', type=Path); p.add_argument('work', type=Path)
+        if mode == 'build': p.add_argument('output', type=Path)
     for name in ('save-cache', 'restore-cache', 'save-completed-cache'):
         p = sub.add_parser(name); p.add_argument('source', type=Path); p.add_argument('destination', type=Path)
     a = ap.parse_args()
@@ -267,6 +269,9 @@ def main():
     elif a.mode == 'save-completed-cache': save_completed_cache(a.source, a.destination)
     else:
         bundle = compile_archive(a.root, a.slim, a.work)
+        if a.mode == 'build-cache':
+            print('AOT archive cache verified; intermediate IPA omitted.', flush=True)
+            return
         result = repack(a.slim, bundle, a.output)
         (a.work / 'aot-result.json').write_text(json.dumps(result, indent=2) + '\n')
         print('AOT slim IPA packed; original resources verified.', flush=True)

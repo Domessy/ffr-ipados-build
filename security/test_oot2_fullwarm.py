@@ -85,7 +85,15 @@ class FullwarmPackagingTests(unittest.TestCase):
                 'archives':{name:{'bytes':binary.stat().st_size,'sha256':fw.digest(binary)}}}
             (full/'fullwarm.json').write_text(json.dumps(report));(full/'prewarm.tsv').write_text('full fixture\n')
             host=root/'host';host.write_bytes(struct.pack('<IIII',0xfeedfacf,0x100000c,0,2)+bytes(64))
-            out=root/'out.ipa';repack(slim,base,full,host,out)
+            out=root/'out.ipa'
+            from unittest.mock import patch
+            from types import SimpleNamespace
+            with patch('security.oot2_fullwarm_pack.shutil.disk_usage', return_value=SimpleNamespace(free=1)):
+                with self.assertRaisesRegex(ValueError, 'insufficient disk'):
+                    repack(slim,base,full,host,out)
+            self.assertFalse(out.exists())
+            self.assertFalse(list(root.glob('.oot2-fullwarm-*')))
+            repack(slim,base,full,host,out)
             with zipfile.ZipFile(slim) as before,zipfile.ZipFile(out) as after:
                 for name in before.namelist():
                     self.assertEqual(after.read(name),host.read_bytes() if name==prefix+'Game' else before.read(name))

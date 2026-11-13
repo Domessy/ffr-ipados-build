@@ -13,6 +13,14 @@ from security import ffr_ssh_gate as gate
 
 
 class AotTests(unittest.TestCase):
+    def test_cache_only_mode_never_builds_an_intermediate_ipa(self):
+        with patch('sys.argv', ['oot2_ipad_aot.py', 'build-cache', '/native', '/input.ipa', '/work']), \
+             patch.object(aot, 'compile_archive', return_value=Path('/cache/bundle')) as compile_cache, \
+             patch.object(aot, 'repack') as repack:
+            aot.main()
+            compile_cache.assert_called_once_with(Path('/native'), Path('/input.ipa'), Path('/work'))
+            repack.assert_not_called()
+
     def fixture(self, root):
         slim = root / 'input.ipa'; prefix = 'Payload/Game.app/'
         with zipfile.ZipFile(slim, 'w') as z:

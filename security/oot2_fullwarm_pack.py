@@ -52,6 +52,17 @@ def repack(slim, base, full, host, output):
     if struct.unpack_from('<I', raw, 12)[0] != 2: raise ValueError('host is not executable')
     if output.exists() or output.is_symlink(): raise ValueError('full IPA output exists')
     output.parent.mkdir(parents=True, exist_ok=True)
+    # Budget the uncompressed original plus every pipeline and a conservative
+    # ZIP/header reserve. Fail before writing a multi-GB partial IPA.
+    with zipfile.ZipFile(slim) as source:
+        originals = sum(item.file_size for item in source.infolist())
+        entries = len(source.infolist())
+    pipelines = sum(path.stat().st_size for folder in (base, full) for path in folder.iterdir() if path.is_file())
+    required = originals + host.stat().st_size + pipelines + (entries + 64) * 65536 + (1 << 30)
+    free = shutil.disk_usage(output.parent).free
+    print(f'Full IPA disk budget: free={free / 1024**3:.2f} GiB required={required / 1024**3:.2f} GiB', flush=True)
+    if free < required:
+        raise ValueError(f'insufficient disk for full IPA: free={free} required={required}')
     fd, temporary = tempfile.mkstemp(prefix='.oot2-fullwarm-', dir=output.parent); os.close(fd)
     hashes = {}; replaced = []
     try:
