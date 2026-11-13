@@ -171,6 +171,8 @@ jobs:
           from security.oot2_ipad_aot import digest, restore_cache
           assert digest(sys.argv[1]) == sys.argv[2], 'AOT cache digest'
           restore_cache(sys.argv[1], sys.argv[3])
+          from pathlib import Path
+          Path(sys.argv[1]).unlink()  # Verified extracted cache remains; compressed transfer copy is redundant.
           PYCODE
           fi
           echo 'Validated v8 input restored. No NUP upload or shader regeneration.'
@@ -191,14 +193,16 @@ jobs:
           from security.oot2_ipad_aot import digest, restore_cache
           assert digest(sys.argv[1]) == sys.argv[2], 'full cache transfer digest'
           restore_cache(sys.argv[1], sys.argv[3])
+          from pathlib import Path
+          Path(sys.argv[1]).unlink()  # Verified extracted cache remains; compressed transfer copy is redundant.
           PYCODE
           fi
-      - name: Build pair and compute archives then repack unchanged compiled app
+      - name: Build pair and compute archives without an intermediate IPA
         id: archive
         if: github.event_name == 'workflow_dispatch' && inputs.mode == 'build'
         run: |
           set -euo pipefail
-          "$RUNNER_TEMP/aot-venv/bin/python" security/oot2_ipad_aot.py build "$RUNNER_TEMP/nxnative" "$RUNNER_TEMP/oot2-aot/input.ipa" "$RUNNER_TEMP/oot2-aot/work" "$RUNNER_TEMP/oot2-aot/output.ipa" > "$RUNNER_TEMP/oot2-aot/wrapper-private.log" 2>&1 &
+          "$RUNNER_TEMP/aot-venv/bin/python" security/oot2_ipad_aot.py build-cache "$RUNNER_TEMP/nxnative" "$RUNNER_TEMP/oot2-aot/input.ipa" "$RUNNER_TEMP/oot2-aot/work" > "$RUNNER_TEMP/oot2-aot/wrapper-private.log" 2>&1 &
           AOT_PID=$!
           CHECKPOINT_AT=$((SECONDS+600))
           while kill -0 "$AOT_PID" 2>/dev/null; do
@@ -219,7 +223,6 @@ jobs:
             fi
           done
           wait "$AOT_PID"
-          bsdtar -tf "$RUNNER_TEMP/oot2-aot/output.ipa" > /dev/null 2>> "$RUNNER_TEMP/oot2-aot/wrapper-private.log"
       - name: Compile all native render mesh rows and rebuild only the iOS host
         if: success() && github.event_name == 'workflow_dispatch' && inputs.mode == 'build'
         run: |
