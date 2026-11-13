@@ -15,3 +15,8 @@ Critère de succès : archives complètes ouvertes ET pipelines rendus/mesh trou
 ## Complément — correctifs hôte du 13 novembre
 
 La recette PR80 conserve les textures actives et réutilise leurs vues, ajuste les buffers de visibilité, limite les prédictions répétées et corrige les invalidations sparse et l’ordre des archives. Comparer aussi un passage caméra immobile puis les mêmes rotations/transitions ; relever séparément scintillement, textures brillantes et pauses. Faire un passage prolongé de 15–20 minutes si la session est stable et noter mémoire/thermique : conserver davantage de textures actives peut accroître la mémoire résidente. Le plafond des buffers de visibilité est de32Mio, alloué à la demande. Ne pas attribuer une variation au patch à partir d’un seul instantané FPS. Les tests publics valident CPU/compilation/assemblage, pas le rendu ni la pression mémoire du M5.
+
+
+### Limite Metal4 identifiée au premier build privé
+
+Le manifeste v8 contient13variantes R de profondeur sans fragment (12tâches) que l’hôte prépare avec MTLDevice. Le rapport fullwarm doit distinguer cesdevice_render_rows desemitted_render archivées ; leur somme doit couvrir tous lesrender_rows. Toutes les164lignesM doivent être archivées. Les13variantes natives peuvent encore coûter du temps sur l’iPad ; ne pas présenter un compteur non nul de constructions natives comme une corruption de l’archive. Toute autre ligne manquante ou erreur reste à diagnostiquer. Le rendu et les shaders de ces passes restent inchangés.
