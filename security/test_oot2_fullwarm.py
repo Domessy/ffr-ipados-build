@@ -93,4 +93,16 @@ class FullwarmPackagingTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'host kit member'):unpack(str(tarpath)+'.zst',root/'unpacked')
             self.assertFalse((root/'escape').exists());self.assertFalse((root/'unpacked').exists())
 
+class FullwarmFailFastTests(unittest.TestCase):
+    def test_host_failure_never_starts_private_archive_compilation(self):
+        from unittest.mock import patch
+        from security import oot2_fullwarm_build as driver
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);(root/'base/inputs').mkdir(parents=True);(root/'output').mkdir()
+            with patch.object(driver,'export'),patch.object(driver,'rebuild',side_effect=RuntimeError('link failed')),patch.object(driver,'compile_lists') as compile_,patch.object(driver,'repack') as pack:
+                with self.assertRaisesRegex(RuntimeError,'link failed'):
+                    driver.build(root/'native',root/'input.ipa',root/'kit',root/'base',root/'output')
+                compile_.assert_not_called();pack.assert_not_called()
+
+
 if __name__ == '__main__': unittest.main()

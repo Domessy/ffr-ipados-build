@@ -1,0 +1,48 @@
+{
+  "base": "ccd834e06a3938834bb5579e2ccc6a0ad13d3970",
+  "chain": "d24f05cf9d78",
+  "patch_sha256": "07a68c2a2cad99ec2809e425e96d9a572968fd289cfde5f43b514361bc2de6b3",
+  "originals": {
+    "dm/gfx/nvn/hle_nvn.c": "65c51df1710812e86f7729c91b865e8c4ea0d523899ad0488618a5cadb3fa661",
+    "dm/gfx/nvn/nvn_mtl.m": "127a12fca465b8f4a69505c2df8896a56ceee1890cd97ef4be425640b8efc6a6",
+    "dm/gfx/tests/Makefile": "e6d603256e8939bb8bc852b617c7d851c30a12e960875342bdbf4c4304c18a39",
+    "dm/gfx/tests/t_pso_archive.m": "1f9990930ee0afde5be0561f799f4ac884ebc0ca2de8fb8bfcbf9f10c9faa7ba",
+    "dm/gfx/tests/t_pso_depth_stencil.m": "577c8bb664259c35ae4d20b4cbe9aa84f2da737e3ded62978daaf24d81154f91",
+    "dm/gfx/tests/t_pso_pending.m": "c411e4c86f01968ab22cf396ad1b489b399389c488ff6f452a2a5536148b9c35",
+    "dm/gfx/tests/t_wait_event.m": "c7662c71fa7c853d3ca1f7b96d97ee80f144884f3f866697282b77e053b3dd3b"
+  },
+  "new_files": [
+    "dm/gfx/tests/oot2_refresh_cpu.m",
+    "dm/gfx/tests/t_sparse_pool_cache.m",
+    "dm/gfx/tests/t_vc_ghost.m"
+  ],
+  "outputs": {
+    "dm/gfx/nvn/hle_nvn.c": "a0a8d7c22e539cc9ec32e6b1cbec66c0ec24c7c69eacb8d13ef82b47b8481906",
+    "dm/gfx/nvn/nvn_mtl.m": "4f615e10e46cfc509256d7e825af1bf37669fe002d1af09fcec288d71e814c54",
+    "dm/gfx/tests/Makefile": "c710949e9a98e6367a1fb53772c3e41decc48947d0cb0f6342d052e0b218cbf0",
+    "dm/gfx/tests/oot2_refresh_cpu.m": "7a299a9ae16930ec5b3f6ae47efde4e0ec0f35374b08f483643f2410be957530",
+    "dm/gfx/tests/t_pso_archive.m": "f9948372a988ba6047fea048e6ec66d6e8d585bcd930d819732a5c9fdf713475",
+    "dm/gfx/tests/t_pso_depth_stencil.m": "1118fc2be94c3744426b51d680777c77211ebd5310ef1fa53c8f289d83dbc808",
+    "dm/gfx/tests/t_pso_pending.m": "608e84270314ea3eb72d60cd858b2b0a621f2d54bad7dfc966b1a02d93233eaf",
+    "dm/gfx/tests/t_sparse_pool_cache.m": "e69a6f4b75a3639c4c04ff7934139eb5411fba21373154b4e3e0d12dfcb39a66",
+    "dm/gfx/tests/t_vc_ghost.m": "c2c3ecbb3dd112c9e31573c1ddc65b32dfc10061c0d5718fecf817aac5152a8c",
+    "dm/gfx/tests/t_wait_event.m": "c8a08e48d64a3a9a9464e6ff2cca068fa2c858ef68720cec8690d1a81d4bec91"
+  },
+  "upstream": [
+    "6e1f5068",
+    "b5150895",
+    "034e91a8",
+    "9339e554",
+    "53cbb993",
+    "df9ca262",
+    "054eea11",
+    "cc8f4490"
+  ],
+  "scope": "host-only backports after validated fullwarm preparation; no shader ABI or profile change",
+  "deferred": [
+    "shader translator shared-memory fences",
+    "M1/M2 shader threadgroup limits",
+    "unmerged 1440p/4K render scale"
+  ],
+  "device_runtime_validated": false
+}

@@ -120,7 +120,8 @@ def rebuild(root, kit, slim, output):
         raise ValueError('unsigned rebuilt host missing')
     target = output / 'rebuilt-host'; shutil.copyfile(executable, target)
     (output / 'host-result.json').write_text(json.dumps({'source': PIN, 'chain': CHAIN, 'sha256': digest(target),
-        'bytes': target.stat().st_size, 'real_kit_modules': True, 'unsigned': True}, indent=2) + '\n')
+        'bytes': target.stat().st_size, 'real_kit_modules': True, 'unsigned': True,
+        'host_refresh': json.loads((root/'.oot2-fullwarm-refresh.json').read_text()) if (root/'.oot2-fullwarm-refresh.json').exists() else None}, indent=2) + '\n')
     return target
 
 
