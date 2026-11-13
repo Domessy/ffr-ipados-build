@@ -85,7 +85,7 @@ jobs:
           import json,sys
           from pathlib import Path
           p=Path(sys.argv[1]);m=json.loads((p/'fullwarm.json').read_text());c=m['coverage']
-          assert c['render_rows']==3 and c['mesh_rows']==2 and c['failed_tasks']==0
+          assert c['render_rows']==5 and c['emitted_render']==3 and c['device_render_rows']==2 and c['mesh_rows']==2 and c['failed_tasks']==0
           print('Full native R/M export and iOS archive compilation passed:',c)
           PYCODE
           for a in "$RUNNER_TEMP/fullwarm-bundle/"*.mtl4a; do "$TOOL" --validate-archive "$a"; done

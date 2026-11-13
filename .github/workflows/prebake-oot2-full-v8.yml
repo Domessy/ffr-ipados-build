@@ -251,6 +251,24 @@ jobs:
           done
           wait "$FULL_PID"
           bsdtar -tf "$RUNNER_TEMP/oot2-fullwarm/output.ipa" > /dev/null
+      - name: Save private detailed diagnostics even if cache backup failed
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.mode == 'build'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          python3 - "$RUNNER_TEMP/oot2-aot" <<'PYCODE' | ssh ffr-cachyos oot2-aot-v8-write-log
+          import sys
+          from security.oot2_ipad_aot import private_diagnostic
+          sys.stdout.buffer.write(private_diagnostic(sys.argv[1]))
+          PYCODE
+      - name: Save full-list private diagnostics independently of cache
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.mode == 'build'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          if [ -f "$RUNNER_TEMP/oot2-fullwarm/private.log" ]; then
+            tail -c 25165824 "$RUNNER_TEMP/oot2-fullwarm/private.log" | ssh ffr-cachyos oot2-fullwarm-v8-write-log
+          fi
       - name: Save private compiler cache and diagnostics on CachyOS
         if: always() && github.event_name == 'workflow_dispatch' && inputs.mode == 'build'
         continue-on-error: true
@@ -263,16 +281,6 @@ jobs:
             ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 ffr-cachyos oot2-aot-v8-write-cache < "$RUNNER_TEMP/oot2-aot/saved-cache.tar.gz"
             echo 'Private incremental AOT cache saved to CachyOS.'
           fi
-      - name: Save private detailed diagnostics even if cache backup failed
-        if: always() && github.event_name == 'workflow_dispatch' && inputs.mode == 'build'
-        continue-on-error: true
-        run: |
-          set -euo pipefail
-          python3 - "$RUNNER_TEMP/oot2-aot" <<'PYCODE' | ssh ffr-cachyos oot2-aot-v8-write-log
-          import sys
-          from security.oot2_ipad_aot import private_diagnostic
-          sys.stdout.buffer.write(private_diagnostic(sys.argv[1]))
-          PYCODE
       - name: Save separate full-list cache and private host diagnostics
         if: always() && github.event_name == 'workflow_dispatch' && inputs.mode == 'build'
         continue-on-error: true
@@ -280,14 +288,6 @@ jobs:
           set -euo pipefail
           python3 security/oot2_ipad_aot.py save-cache "$RUNNER_TEMP/oot2-fullwarm/cache" "$RUNNER_TEMP/oot2-fullwarm/saved.tar.gz"
           ssh ffr-cachyos oot2-fullwarm-v8-write-cache < "$RUNNER_TEMP/oot2-fullwarm/saved.tar.gz"
-      - name: Save full-list private diagnostics independently of cache
-        if: always() && github.event_name == 'workflow_dispatch' && inputs.mode == 'build'
-        continue-on-error: true
-        run: |
-          set -euo pipefail
-          if [ -f "$RUNNER_TEMP/oot2-fullwarm/private.log" ]; then
-            tail -c 25165824 "$RUNNER_TEMP/oot2-fullwarm/private.log" | ssh ffr-cachyos oot2-fullwarm-v8-write-log
-          fi
       - name: Return full-prewarm slim - original RomFS added on CachyOS
         if: success() && github.event_name == 'workflow_dispatch' && inputs.mode == 'build'
         run: |

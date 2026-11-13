@@ -14,11 +14,11 @@
     },
     "oot2_fullwarm_export.inc": {
       "path": "dm/gfx/nvn/oot2_fullwarm_export.inc",
-      "sha256": "7da50da42862067011a5c3e688d2bd829396a4ca70a2a6d45b1aa2c315d8d239"
+      "sha256": "6b76a76d8c7b60318700f448d2d5e4d2c96d827562051844ed70054646f670f9"
     },
     "oot2_fullwarm_harness.m": {
       "path": "dm/gfx/tests/oot2_fullwarm_harness.m",
-      "sha256": "3083783f030b033f365411a609a1eb61ea110b7f24c3f9de7bd09e12b35765c7"
+      "sha256": "cabb58bf9fc6559ce3df4e042fda18e8a13cc779ea6bc78700faa8a8468892d4"
     }
   },
   "no_runtime_metal4_compiler_required": true,

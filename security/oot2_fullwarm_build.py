@@ -36,7 +36,7 @@ def build(native, slim, kit, base_work, output):
     result=repack(slim,base_work/'cache/bundle',output/'cache/bundle',executable,output/'output.ipa')
     (output/'result.json').write_text(json.dumps(result,indent=2)+'\n')
     phase('complete')
-    print('PASS: all recorded R/M lists compiled; rebuilt native loader; original shader bytes preserved.',flush=True)
+    print('PASS: recorded R/M coverage verified; Metal4-compatible lists archived, depth-only rows retain native device prewarm; rebuilt loader; original shader bytes preserved.',flush=True)
 
 
 if __name__=='__main__':build(*sys.argv[1:])

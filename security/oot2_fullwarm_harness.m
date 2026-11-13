@@ -18,6 +18,15 @@ static int fixture_rows(NSString *path) {
         pso_skey_hex(&sk, hex);
         [text appendFormat:@"R\t%s\n", hex];
     }
+    // Two depth-only variants share one task, just like the real manifest.
+    // Rasterization must remain enabled: these update depth through MTLDevice.
+    for (unsigned offset = 0; offset <= 4; offset += 4) {
+        pso_key k = {.samples = 1, .dfmt = MTLPixelFormatDepth32Float};
+        k.attr[0] = (va_st){.fmt = (uint32_t)fmt, .offset = offset};
+        k.stream[0] = (vs_st){.stride = 32};
+        pso_skey sk; char hex[sizeof sk * 2 + 1]; pso_skey_from(&k, v, nil, 0, NULL, &sk);
+        pso_skey_hex(&sk, hex); [text appendFormat:@"R\t%s\n", hex];
+    }
     v->stage = 4;
     for (int task = 0; task < 2; task++) {
         strcpy(v->key, task ? "m_b" : "n_b");
