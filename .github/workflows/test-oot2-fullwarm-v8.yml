@@ -35,6 +35,7 @@ jobs:
           git -C "$SRC" fetch -q --depth 1 origin ccd834e06a3938834bb5579e2ccc6a0ad13d3970
           git -C "$SRC" checkout -q --detach FETCH_HEAD
           python3 security/oot2_fullwarm_prepare.py "$SRC"
+          python3 security/oot2_fullwarm_refresh.py "$SRC"
           python3 -m unittest -v security.test_oot2_ipad_aot security.test_oot2_gateway security.test_oot2_transfer security.test_oot2_fullwarm
           python3 -m venv "$RUNNER_TEMP/aot-venv"
           "$RUNNER_TEMP/aot-venv/bin/python" -m pip install -q lz4
@@ -98,6 +99,15 @@ jobs:
           m=json.load(open(sys.argv[1]));assert m['reused_groups']==len(m['archives'])
           print('PASS: every full R/M group reused without recompilation.')
           PYCODE
+      - name: Validate host backports without a GPU compiler
+        run: |
+          set -euo pipefail
+          TESTS="$RUNNER_TEMP/nxnative/dm/gfx/tests"
+          make -C "$TESTS" GAME=0400486024DEC000 -j 3 oot2_refresh_cpu t_pso_pending t_pso_depth_stencil t_pso_archive t_wait_event t_vc_ghost t_sparse_pool_cache > "$RUNNER_TEMP/refresh-tests-build.log" 2>&1 || { tail -100 "$RUNNER_TEMP/refresh-tests-build.log"; exit 1; }
+          "$TESTS/oot2_refresh_cpu"
+          "$TESTS/t_pso_pending"
+          "$TESTS/t_pso_depth_stencil" --keys-only
+          echo 'GPU fixtures compiled; runtime GPU tests require a Metal4-capable device and are not claimed passed.'
       - name: Validate production iOS loader link and host-kit reconstruction
         run: |
           set -euo pipefail
