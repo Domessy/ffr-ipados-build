@@ -145,6 +145,7 @@ jobs:
 
 
       - name: Receive only validated v8 slim and optional pipeline cache
+        id: receive
         if: github.event_name == 'workflow_dispatch' && inputs.mode == 'build'
         run: |
           set -euo pipefail
@@ -273,7 +274,7 @@ jobs:
             tail -c 25165824 "$RUNNER_TEMP/oot2-fullwarm/private.log" | ssh ffr-cachyos oot2-fullwarm-v8-write-log
           fi
       - name: Save private compiler cache and diagnostics on CachyOS
-        if: always() && github.event_name == 'workflow_dispatch' && inputs.mode == 'build'
+        if: always() && steps.receive.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.mode == 'build'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -285,7 +286,7 @@ jobs:
             echo 'Private incremental AOT cache saved to CachyOS.'
           fi
       - name: Save separate full-list cache and private host diagnostics
-        if: always() && github.event_name == 'workflow_dispatch' && inputs.mode == 'build'
+        if: always() && steps.receive.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.mode == 'build'
         continue-on-error: true
         run: |
           set -euo pipefail

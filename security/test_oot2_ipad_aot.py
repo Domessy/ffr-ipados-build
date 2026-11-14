@@ -71,6 +71,22 @@ class AotTests(unittest.TestCase):
             self.assertEqual((root / 'restored/work/batch.mtl4a').read_bytes(), b'compiled')
             self.assertFalse((root / 'restored/work/libraries').exists())
 
+    def test_fullwarm_cache_roundtrip_excludes_progress_and_reads_legacy_progress(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d); cache=root/'cache'; work=cache/'work/00000'; work.mkdir(parents=True)
+            (work/'key').write_text('a'*64); (work/'applegpu_g17g.mtl4a').write_bytes(b'archive'*16)
+            (cache/'progress.json').write_text('{"completed": 12}')
+            snapshot=root/'cache.tar.gz'; aot.save_cache(cache,snapshot)
+            aot.restore_cache(snapshot,root/'roundtrip')
+            self.assertFalse((root/'roundtrip/progress.json').exists())
+            self.assertEqual((root/'roundtrip/work/00000/key').read_text(),'a'*64)
+            with tarfile.open(root/'legacy.tar.gz','w:gz') as z:
+                for name,raw in [('progress.json',b'{"completed":12}'),('work/00000/key',b'a'*64)]:
+                    item=tarfile.TarInfo(name);item.size=len(raw);z.addfile(item,io.BytesIO(raw))
+            aot.restore_cache(root/'legacy.tar.gz',root/'legacy')
+            self.assertFalse((root/'legacy/progress.json').exists())
+            self.assertTrue((root/'legacy/work/00000/key').exists())
+
     def test_cache_traversal_and_links_rejected_before_extraction(self):
         for name, kind in [('../escape', tarfile.REGTYPE), ('work/link', tarfile.SYMTYPE), ('/absolute', tarfile.REGTYPE), ('wrong/file', tarfile.REGTYPE)]:
             with self.subTest(name=name), tempfile.TemporaryDirectory() as d:
