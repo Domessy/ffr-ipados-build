@@ -1053,3 +1053,25 @@ Head testéa8a44b63cf6750fb8eee950475a734bc2826d17f ; fusion **ac93ebc84d72033c7
 Déploiement passerelle indépendante :oot2_pipeline_cache.py nouveau,oot2_ipad_aot.py etoot2_gateway.py mis à jour ; anciens scripts sauvegardésgateway-before-cache-fix-20261114. Test réel de l’entrée de commande forcée : upload tar vide refusé, aucun latest créé ; routefullwarm-info annonce0/- comme attendu. Aucun changement SSH/clés. Manifestgateway-cache-fix-deployment-20261114.json. AOT292groupes préservés avec version.previous SHA ; les12groupesR/M perdus seront recompilés, les shaders originaux restent réutilisés. Ne pas annoncer que les12groupes sont encore disponibles.
 
 Nouveau run **43540704592**, https://github.com/Domessy/ffr-ipados-build/actions/runs/43540704592 ; workflowprebake-oot2-full-v8.yml modebuild surmain ac93ebc8. Ledgerresultats/ipad-v8-fullwarm-run-43540704592.json. Pas de NUP ni de traduction shader, cache AOT réutilisable ; reconstruction hôte et compilationR/M à refaire. Les corrections disque restent actives et le retour des caches exige désormais validation avant publication, sans remplacer par un cache vide ou moins complet. Aucun succès du nouveau run ni comportement M5 encore établi.
+
+
+### 14/11/2026 — échec de pack zéro pipeline restant, PR88 et contrôle livraison complet
+
+Run43540704592 failure après reconstruction hôte et compilation des12groupesR/M. Budget disque passé :16,62Gio libres pour11,24Gio requis. Arrêt dans le pack surValueError pipeline resource type :rest_pairs.tsv absent. Le producteur natif pso_offline.py ne crée ce fichier QUE si rest>0 (source lignes552–554) ; le vrai bundle AOT contient seulementapplegpu_g17g.mtl4a,archive.tsv,prebuilt.tsv. Le pack exigeait à tort4fichiers ; les fixtures précédentes fabriquaient le fichier optionnel et masquaient le cas.
+
+Cache R/M actuel audité :12groupes complets, SHA validés, version.previous présente. Preuvefullwarm-zero-rest-preflight-20261114.json ; diagnostic privéfullwarm-failure-43540704592-private.log. Pas de perte de cache sur cette tentative grâce à la protection PR86.
+
+PR88 branchefix/oot2-zero-rest-pack-20261114, head87262241ee647d9c1f8a7ab623462bb2437bbd81. Prévalidation de tous les fichiers avant écriture ZIP :3ressources AOT obligatoires, rest_pairs.tsv optionnel uniquement si compteur natifrest=0 ; s’il est positif, fichier exigé. Rejet fichiers manquants/symlinks/extra inattendu avant recopie. Le pack conserve le jeu exact de ressources produit. Fixtures sans fichier artificiel, tests zéro-rest et rest>0.131tests locaux réussis.
+
+Fixture native étendue : vrais host/archives iOS→pack sansrest_pairs→vraie réception ffr_ssh_gate/oot2_gateway→ajout RomFS synthétique par le bundler production→CRC ZIP final et octetsRomFS vérifiés. Seuls les chemins privés et le flux d’entrée sont remplacés dans le test public. CI finale en cours43558548036/43558548295/43558548049/43558548039 (dernier relancé après annulation automatique de concurrence PR). L’ancien pilote de718ee est obsolète ; correction interne de la constanteTITLE du nouveau fixture en8726224.
+
+Préflight PC réel avant livraison : RomFS original toujours présent, taille et identité correspondent au manifeste et auromfs.id de l’IPA source ; plus de50Gio libres dansresultats. Preuvefullwarm-local-delivery-preflight-20261114.json. Pas de relance privée avant succès du chemin complet testé et fusion. Shaders, données privées et protections disque/cache conservés.
+
+
+### 14/11/2026 — chemin de livraison testé et nouveau run PR88
+
+Head testé **87262241ee647d9c1f8a7ab623462bb2437bbd81**, fusion **5e2f36b34af3d3931d6c2fa5fd4d3868d35a64bc**. Les6checks passent :43558548036 (host/archives réels iOS, cache sauvegardé/restauré/réutilisé, repack zéro-rest, réception par la passerelle de production puis RomFS synthétique ajouté et ZIP final vérifié),43558548039 (workflowfullwarm, tentative2 après concurrence),43558548295 (AOT),43558548049 (Linux/macOS/compile iOS).131tests locaux réussis. Logfullwarm-zero-rest-public-43558548036.log etchecksfullwarm-zero-rest-final-ci-20261114.json.
+
+Nouveau run privé **43558910868**, https://github.com/Domessy/ffr-ipados-build/actions/runs/43558910868, modebuild surmain5e2f36b3. Ledgerresultats/ipad-v8-fullwarm-run-43558910868.json. Cache R/M12groupes vérifiés conservé, source slim/caches/shaders existants réutilisables, aucun NUP ni régénération shader. Aucun redéploiement SSH nécessaire : la passerelle testée utilise déjà PR86 ; modification de pack côté runner uniquement. Le test complet représente les mêmes opérations de livraison, sans prétendre tester le transfert réseau privé ni la taille réelle dans le pilote synthétique.
+
+Reste : vérifier les hits de cache et le repack de taille réelle, le retour slim et l’assemblage RomFS sur CachyOS, puis l’ouverture/lookups d’archives et la mémoire/frame-time sur M5. Aucun succès de ce nouveau build ni IPA installable annoncé avant ces preuves. Protections disque et versions de caches PR84/86 maintenues.
