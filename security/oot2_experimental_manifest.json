@@ -1,0 +1,26 @@
+{
+  "base": "ccd834e06a3938834bb5579e2ccc6a0ad13d3970",
+  "chain": "d24f05cf9d78",
+  "patch_sha256": "4172818aa5bd779635ea992ec8598967812716262e77130e7005914c0339c1fd",
+  "originals": {
+    "dm/gfx/nvn/nvn_mtl.m": "4f615e10e46cfc509256d7e825af1bf37669fe002d1af09fcec288d71e814c54",
+    "dm/gfx/tests/Makefile": "c710949e9a98e6367a1fb53772c3e41decc48947d0cb0f6342d052e0b218cbf0"
+  },
+  "new_files": [
+    "dm/gfx/tests/oot2_experimental_cpu.m",
+    "dm/gfx/tests/t_zero_depth.m"
+  ],
+  "outputs": {
+    "dm/gfx/nvn/nvn_mtl.m": "ff814a1f3b592aa30ba9d1608befa723a082937fe0983078bf6aae0d0455f3ab",
+    "dm/gfx/tests/Makefile": "080c1ae3d2fee8cd0f214e9d2baa9b9544a8631879856fd3838ca524a172eab7",
+    "dm/gfx/tests/oot2_experimental_cpu.m": "f6d10a74ebd430dbeb1762bd3bbb970c02557980cc460877a653832be018d918",
+    "dm/gfx/tests/t_zero_depth.m": "2fe9ea6e4f27c9c586bb13c583910c0350d3e1ecdf453a95ac7370e79e083ce4"
+  },
+  "upstream": [
+    "f993848a",
+    "d8a865a2",
+    "f63ecbd4"
+  ],
+  "scope": "experimental depth zero-fill copies and storage-write commit indexing, after fullwarm refresh; no shader/profile change",
+  "device_runtime_validated": false
+}

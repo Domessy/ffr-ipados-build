@@ -1,0 +1,233 @@
+diff --git a/dm/gfx/nvn/nvn_mtl.m b/dm/gfx/nvn/nvn_mtl.m
+index d6911810..c5eca006 100644
+--- a/dm/gfx/nvn/nvn_mtl.m
++++ b/dm/gfx/nvn/nvn_mtl.m
+@@ -1318,11 +1318,12 @@ static int pend_room(int nodes) {
+ // A GPU write over more than SBW_WPAGES pages is kept as an interval instead (overlapping ones merge): a storage buffer bound with size 0 counts as the rest of its Metal buffer (sbw_len)
+ enum { SBW_N = 16384, SBW_WPAGES = 64, SBW_WN = 64 };
+ static struct { uint64_t page; uint32_t gen; uint8_t src; } g_sbwp[SBW_N]; static int g_nsbw, g_sbw_over;   // src: SBW_* bits; pages in the set this submission; over: a write could not be kept (set full, size not known)
++static uint16_t g_sbw_list[SBW_N];   // the slots this submission took, in order (g_nsbw of them): the commit reads these instead of all SBW_N slots (gw_commit), about 30 times a frame
+ static uint64_t g_sbw_wlo[SBW_WN], g_sbw_whi[SBW_WN]; static int g_nsbw_w;   // the wide writes of this submission
+ static int sbw_slot(uint64_t pg, int add) {   // open addressing; −1 = not there (or no room to add)
+     unsigned h = (unsigned)((pg * 0x9E3779B97F4A7C15ull) >> 50) & (SBW_N - 1);
+     for (int i = 0; i < 64; i++, h = (h + 1) & (SBW_N - 1)) {
+-        if (g_sbwp[h].gen != g_pend_gen) { if (!add) return -1; g_sbwp[h].page = pg; g_sbwp[h].gen = g_pend_gen; g_sbwp[h].src = 0; g_nsbw++; return (int)h; }
++        if (g_sbwp[h].gen != g_pend_gen) { if (!add) return -1; g_sbwp[h].page = pg; g_sbwp[h].gen = g_pend_gen; g_sbwp[h].src = 0; g_sbw_list[g_nsbw++] = (uint16_t)h; return (int)h; }
+         if (g_sbwp[h].page == pg) return (int)h; }
+     return -1;
+ }
+@@ -1986,7 +1987,7 @@ static void gw_commit(uint64_t fence) {
+         gw_put_in(g_gw, g_pend_lo[e], g_pend_hi[e], fence, done);
+         if (g_pend_kind[e] == 1 && g_pend_upd[e] && um_on()) { const upd_ent *u = &g_upd[g_pend_upd[e] - 1]; um_put(g_pend_lo[e], g_pend_hi[e], (const uint8_t *)u->buf.contents + u->off + (g_pend_lo[e] - u->lo), fence, done); }
+         else gw_put_in(g_gwx, g_pend_lo[e], g_pend_hi[e], fence, done); }
+-    if (g_nsbw) for (int i = 0; i < SBW_N; i++) if (g_sbwp[i].gen == g_pend_gen && (g_sbwp[i].src & SBW_GPU)) gw_put(g_sbwp[i].page << 12, (g_sbwp[i].page + 1) << 12, fence, done);   // reports: below
++    for (int i = 0; i < g_nsbw; i++) { unsigned h = g_sbw_list[i]; if (g_sbwp[h].src & SBW_GPU) gw_put(g_sbwp[h].page << 12, (g_sbwp[h].page + 1) << 12, fence, done); }   // reports: below
+     for (int i = 0; i < g_nsbw_w; i++) gw_put(g_sbw_wlo[i], g_sbw_whi[i], fence, done);
+     int ring = g_nhw_sub <= HW_N && (!g_nhw_sub || g_hwr[(g_nhwr + (uint64_t)g_nhw_sub - 1) % HW_N].fence <= done);   // the slots they take have finished (the farthest is the newest of them)
+     for (int i = 0; i < g_nhw_sub; i++) { uint64_t a = g_hw_sub[i];
+@@ -3977,6 +3978,12 @@ static id<MTLBuffer> zero_buf(size_t need) {
+     return zb;
+ }
+ static uint64_t g_tex_zeroed;
++// A depth texture of ZF_BLIT_MIN bytes a slice or more is zeroed by copies from the zero buffer, ZF_PIECE of it at a time, not by a clear pass: a clear pass on a large depth attachment ends in
++// kIOGPUCommandBufferCallbackErrorOutOfMemory with plenty of memory free (M3 Pro, standalone Metal 4 test: Depth32Float 4096x4096 and Depth16Unorm from about 5000x5000 up fail by size and by the
++// minute, a copy of the same texture up to 16384x16384 never), and from then on every command buffer of the queue fails the same way until the texture is freed. Ocarina of Time makes a 12288x12288
++// Depth16Unorm (296 MB, only sampled) and a 4096x4096 Depth32Float at each save load, where its first command buffers failed this way and the 32-failures stop (res_top_once) followed in three of five runs
++#define ZF_BLIT_MIN (16u << 20)
++#define ZF_PIECE (4u << 20)
+ static void tex_zero_fill(id<MTLTexture> mt) {
+     static int warned;
+     if (!atomic_load(&g_sub_thread_set) || !on_sub_thread()) return;   // the upload batch belongs to the submit thread only
+@@ -3986,6 +3993,22 @@ static void tex_zero_fill(id<MTLTexture> mt) {
+     int stencil = pf == MTLPixelFormatStencil8 || pf == MTLPixelFormatDepth32Float_Stencil8;
+     int multisample = tt == MTLTextureType2DMultisample || tt == MTLTextureType2DMultisampleArray;
+     if (multisample && !depth && !stencil && !(mt.usage & MTLTextureUsageRenderTarget)) return;   // no render pass can clear it (tex_desc gives every multisample texture the usage)
++    size_t dbpp = pf == MTLPixelFormatDepth16Unorm ? 2 : pf == MTLPixelFormatDepth32Float ? 4 : 0, row0 = (size_t)mt.width * dbpp;
++    static int depth_copy = -1; if (depth_copy < 0) { const char *e = getenv("DM_NVN_DEPTH_ZERO_COPY"); depth_copy = !(e && !strcmp(e, "0")); }
++    if (depth_copy && dbpp && mt.sampleCount == 1 && row0 * mt.height >= ZF_BLIT_MIN) {   // a buffer copy cannot fill a multisample texture: those keep the clear pass
++        id<MTLBuffer> zb = zero_buf(row0 * MAX((size_t)1, MIN((size_t)mt.height, ZF_PIECE / row0))); if (!zb) return;
++        NSUInteger layers = mt.arrayLength * (tt == MTLTextureTypeCube || tt == MTLTextureTypeCubeArray ? 6 : 1);
++        up_begin();
++        for (NSUInteger l = 0; l < mt.mipmapLevelCount; l++) {
++            NSUInteger w = MAX(mt.width >> l, 1u), h = MAX(mt.height >> l, 1u); size_t row = (size_t)w * dbpp, step = MAX((size_t)1, MIN((size_t)zb.length, (size_t)ZF_PIECE) / row);   // the colour path may have grown zero_buf to 64 MB
++            for (NSUInteger y = 0; y < layers; y++) for (NSUInteger y0 = 0; y0 < h; y0 += step) { NSUInteger n = MIN(step, h - y0);
++                up_blit_add_at(zb, 0, row, row * n, MTLSizeMake(w, n, 1), mt, y, l, MTLOriginMake(0, y0, 0)); }
++        }
++        [g_up_texs addObject:mt];
++        if (!g_cb) up_flush();
++        static int once; if (!once++) MLOG("new-texture zeroing: depth texture %lux%lu format %lu (%llu MB) zeroed by copies, not a clear pass", (unsigned long)mt.width, (unsigned long)mt.height, (unsigned long)pf, (unsigned long long)(mt.allocatedSize >> 20));
++        return;
++    }
+     if (depth || stencil || multisample) {
+         up_begin();
+         if (g_up_ce) { m4_end(g_up_ce); g_up_ce = nil; }
+diff --git a/dm/gfx/tests/Makefile b/dm/gfx/tests/Makefile
+index 21378725..632c1a8b 100644
+--- a/dm/gfx/tests/Makefile
++++ b/dm/gfx/tests/Makefile
+@@ -638,3 +638,9 @@ t_vc_ghost: t_vc_ghost.m $(MTL_T_DEP)
+ 	clang $(CFLAGS) -fobjc-arc -o $@ t_vc_ghost.m $(filter-out ../nvn/hle_nvn.c,$(MTL_T_SRC)) $(FW)
+ t_sparse_pool_cache: t_sparse_pool_cache.m $(MTL_T_DEP)
+ 	clang $(CFLAGS) -fobjc-arc -o $@ t_sparse_pool_cache.m $(filter-out ../nvn/hle_nvn.c,$(MTL_T_SRC)) $(FW)
++
++t_zero_depth: t_zero_depth.m $(MTL_T_DEP)
++	clang $(CFLAGS) -fobjc-arc -o $@ t_zero_depth.m $(MTL_T_SRC) $(FW)
++check_t_zero_depth: RUN_ENV = MTL_DEBUG_LAYER=1
++oot2_experimental_cpu: oot2_experimental_cpu.m $(MTL_T_DEP)
++	clang $(CFLAGS) -fobjc-arc -o $@ oot2_experimental_cpu.m $(MTL_T_SRC) $(FW)
+diff --git a/dm/gfx/tests/oot2_experimental_cpu.m b/dm/gfx/tests/oot2_experimental_cpu.m
+new file mode 100644
+index 00000000..c9460647
+--- /dev/null
++++ b/dm/gfx/tests/oot2_experimental_cpu.m
+@@ -0,0 +1,76 @@
++// CPU ownership/cache and serializer-ordering regressions. No Metal device,
++// pipelines, command queues, game files or saves are opened.
++#include "../nvn/nvn_mtl.m"
++void *front_metal_layer(void) { return NULL; }
++module_t *module_of(const void *p) { (void)p; return NULL; }
++module_t *g_mod; int g_nmod;
++void svc_thread_dump(void) {}
++uint64_t now_ns(void) { return bp_now(); }
++static int checks, failed;
++#define CHECK(c, why) do { checks++; if (!(c)) { failed++; fprintf(stderr,"FAIL: %s\n",why); } } while (0)
++@interface RefreshView : NSObject
++@property(nonatomic,strong) id parentTexture;
++@end
++@implementation RefreshView @end
++static void ownership(void) {
++    NSObject *base = [NSObject new];
++    for (uint64_t k=1;k<=900;k++) tex_put(k,base);
++    CHECK(g_ghost.n==900 && g_ghost_use.n==900,"more than 512 currently used textures survive");
++    for (uint64_t k=1;k<=900;k++) CHECK(tex_get(k)==base,"every finalized ID still resolves");
++    CHECK(g_ghost_lru->serial==1 && g_ghost_mru->serial==900,"reads update use order");
++    uint64_t held=17; RefreshView *view=[RefreshView new]; view.parentTexture=base;
++    vc_key key={.pf=MTLPixelFormatRGBA8Unorm,.nl=1,.ns=1};
++    os_unfair_lock_lock(&g_rmu);
++    vc_put(held,NULL,&key,(id)view); uint64_t made=g_vc_new;
++    CHECK(vc_get(held,&key,(id)base)==(id)view,"finalized texture's view is reused");
++    CHECK(vc_get(held,&key,(id)base)==(id)view && g_vc_new==made,"repeated reads make no view");
++    CHECK(vc_set_for(held,NULL,0)==NULL,"finalized 2D rows use their own memory owner");
++    os_unfair_lock_unlock(&g_rmu);
++    atomic_fetch_add(&g_cur_frame,GHOST_IDLE);
++    CHECK(tex_get(held)==base,"the actively read texture survives the trim");
++    unsigned before=g_ghost.n; own_ghost_trim();
++    CHECK(g_ghost.n==before-GHOST_TRIM && tex_get(held)==base,"only idle entries are trimmed with bounded work");
++    CHECK(own_ghost_has(held),"view presence check sees ghost without using it");
++    pthread_mutex_lock(&g_smu); ghost_use *u=nvn_hm_get(&g_ghost_use,&held); uint64_t stamp=u->frame;
++    pthread_mutex_unlock(&g_smu);
++    atomic_fetch_add(&g_cur_frame,1); own_ghost_has(held);
++    pthread_mutex_lock(&g_smu);CHECK(u->frame==stamp,"cached view does not refresh its texture's age");ghost_del_locked(held);pthread_mutex_unlock(&g_smu);
++    vc_ghost_commit(); os_unfair_lock_lock(&g_rmu);
++    CHECK(nvn_hm_get(&g_vc,&held)==NULL,"view is retired after ghost eviction");os_unfair_lock_unlock(&g_rmu);
++    CHECK(g_deferred.count>0,"retired resources wait behind a submission fence");
++}
++static int wait_sem(dispatch_semaphore_t s) { return !dispatch_semaphore_wait(s,dispatch_time(DISPATCH_TIME_NOW,3*NSEC_PER_SEC)); }
++static void serialization(void) {
++    dispatch_semaphore_t compiling=dispatch_semaphore_create(0), finish=dispatch_semaphore_create(0), writing=dispatch_semaphore_create(0), finish_write=dispatch_semaphore_create(0), done=dispatch_semaphore_create(0), second=dispatch_semaphore_create(0);
++    dispatch_queue_t q=dispatch_get_global_queue(QOS_CLASS_USER_INITIATED,0);
++    dispatch_async(q,^{ser_compile_begin();dispatch_semaphore_signal(compiling);dispatch_semaphore_wait(finish,DISPATCH_TIME_FOREVER);ser_compile_end();});
++    CHECK(wait_sem(compiling),"compiler entered");
++    dispatch_async(q,^{ser_begin();dispatch_semaphore_signal(writing);dispatch_semaphore_wait(finish_write,DISPATCH_TIME_FOREVER);ser_end();dispatch_semaphore_signal(done);});
++    int wanted=0;for(int i=0;i<1000&&!wanted;i++){pthread_mutex_lock(&g_ser_mu);wanted=g_ser_want;pthread_mutex_unlock(&g_ser_mu);if(!wanted)usleep(1000);}
++    CHECK(wanted,"serialization waits for the active compile");
++    CHECK(dispatch_semaphore_wait(writing,DISPATCH_TIME_NOW)!=0,"write cannot overlap the active compile");
++    dispatch_semaphore_signal(finish);CHECK(wait_sem(writing),"write starts after compile ends");
++    dispatch_async(q,^{ser_compile_begin();dispatch_semaphore_signal(second);ser_compile_end();});
++    CHECK(dispatch_semaphore_wait(second,dispatch_time(DISPATCH_TIME_NOW,20*NSEC_PER_MSEC))!=0,"new compile waits during serialization");
++    dispatch_semaphore_signal(finish_write);CHECK(wait_sem(done)&&wait_sem(second),"writer and held compile both complete");
++}
++static void storage_writes(void) {
++    // Exercise the actual commit/fence path: duplicate marks, report-only pages,
++    // completed fences, a new submission, and generation wrap must stay distinct.
++    pend_reset(); g_done=100;
++    sbw_note(0x100000,4096,SBW_GPU); sbw_note(0x100000,4096,SBW_GPU);
++    sbw_note(0x200000,16,SBW_REPORT);
++    CHECK(g_nsbw==2,"duplicate writes occupy one slot");
++    gw_commit(101);
++    CHECK(gw_live(0x100000,0x101000),"GPU write fence prevents unsafe shadow reuse");
++    CHECK(!gw_live(0x200000,0x201000),"report-only mark is not committed as a whole-page GPU write");
++    g_done=101; CHECK(!gw_live(0x100000,0x101000),"completed GPU fence releases the page");
++    pend_reset(); sbw_note(0x300000,4096,SBW_GPU); gw_commit(102);
++    CHECK(!gw_live(0x100000,0x101000),"new submission does not resurrect old write slots");
++    CHECK(gw_live(0x300000,0x301000),"new submission commits its own write");
++    g_done=102; g_pend_gen=UINT32_MAX; pend_reset();
++    sbw_note(0x100000,4096,SBW_GPU); gw_commit(103);
++    CHECK(g_pend_gen==1 && g_nsbw==1 && gw_live(0x100000,0x101000),"generation wrap clears stale slots and preserves new writes");
++    g_done=103;pend_reset();
++}
++int main(void) { @autoreleasepool {ownership();serialization();storage_writes();CHECK(SUB_FLIGHT_MAX==512 && VIS_RING==SUB_FLIGHT_MAX && POST_RING==SUB_FLIGHT_MAX,"rings match the allocator's actual in-flight bound");printf("OOT2 experimental CPU: %d checks, %d failed\n",checks,failed);return failed!=0;} }
+diff --git a/dm/gfx/tests/t_zero_depth.m b/dm/gfx/tests/t_zero_depth.m
+new file mode 100644
+index 00000000..a0bf3255
+--- /dev/null
++++ b/dm/gfx/tests/t_zero_depth.m
+@@ -0,0 +1,68 @@
++// A new depth texture is zeroed in the upload batch (tex_zero_fill): large ones by copies from the zero buffer, not a clear pass (which fails with a GPU out-of-memory error on big attachments).
++// Every texel of every level and layer reads 0 afterwards, from a texture first filled with a non-zero depth.
++#include "../nvn/nvn_mtl.m"
++void *front_metal_layer(void) { return NULL; }
++module_t *module_of(const void *p) { (void)p; return NULL; }
++module_t *g_mod; int g_nmod;
++void svc_thread_dump(void) {}
++uint64_t now_ns(void) { return bp_now(); }
++static int checks, failed;
++#define CHECK(c, label) do { checks++; if (!(c)) { failed++; fprintf(stderr, "FAIL: %s\n", label); } } while (0)
++
++int main(void) { @autoreleasepool {
++    mtl_init();
++    NSError *error = nil;
++    id<MTLLibrary> library = [g_dev newLibraryWithSource:@"#include <metal_stdlib>\nusing namespace metal;\n"
++        "kernel void count_nz(depth2d<float,access::read> d [[texture(0)]], device atomic_uint *o [[buffer(0)]], uint2 p [[thread_position_in_grid]]) { if (p.x < d.get_width() && p.y < d.get_height() && d.read(p) != 0.0f) atomic_fetch_add_explicit(o, 1u, memory_order_relaxed); }\n" options:nil error:&error];
++    id<MTLComputePipelineState> counter = [g_dev newComputePipelineStateWithFunction:[library newFunctionWithName:@"count_nz"] error:&error];
++    CHECK(counter != nil, "synthetic non-zero counter compiles");
++    if (!counter) return 1;
++    id<MTLCommandQueue> queue = [g_dev newCommandQueue];
++    struct { int target, format; unsigned w, h, depth, levels; const char *label; } cases[] = {
++        {NVN_TEXTURE_TARGET_2D, NVN_FORMAT_DEPTH16, 4096, 4096, 1, 1, "Depth16 4096x4096 (copies)"},
++        {NVN_TEXTURE_TARGET_2D, NVN_FORMAT_DEPTH32F, 2048, 2048, 1, 1, "Depth32F 2048x2048, the smallest size that is copied"},
++        {NVN_TEXTURE_TARGET_2D_ARRAY, NVN_FORMAT_DEPTH16, 3072, 3072, 2, 3, "Depth16 3072x3072 two layers, three levels (copies)"},
++        {NVN_TEXTURE_TARGET_2D, NVN_FORMAT_DEPTH32F, 16384, 257, 1, 1, "Depth32F 16384x257: the rows go in pieces and the last piece is one row"},
++        {NVN_TEXTURE_TARGET_2D, NVN_FORMAT_DEPTH16, 1024, 1024, 1, 1, "Depth16 1024x1024 (clear pass)"},
++    };
++    for (unsigned i = 0; i < sizeof cases / sizeof *cases; i++) {
++        tex_t t = {.magic = MAGIC('T', 'E', 'X', 0), .serial = 99601 + i};
++        t.d = (nvn_texdesc){.target = cases[i].target, .format = cases[i].format, .width = cases[i].w, .height = cases[i].h, .depth = cases[i].depth, .levels = cases[i].levels, .samples = 1};
++        MTLTextureDescriptor *descriptor = tex_desc(&t, 0);
++        id<MTLTexture> base = descriptor ? [g_dev newTextureWithDescriptor:descriptor] : nil;
++        CHECK(base != nil, "synthetic depth texture allocates");
++        if (!base) continue;
++        size_t bpp = base.pixelFormat == MTLPixelFormatDepth16Unorm ? 2 : 4, poison_bytes = (size_t)cases[i].w * cases[i].h * bpp;
++        id<MTLBuffer> poison = [g_dev newBufferWithLength:poison_bytes options:MTLResourceStorageModeShared];
++        if (bpp == 2) for (size_t k = 0; k < poison_bytes / 2; k++) ((uint16_t *)poison.contents)[k] = 0xbfff;   // 0.75
++        else for (size_t k = 0; k < poison_bytes / 4; k++) ((float *)poison.contents)[k] = .75f;
++        id<MTLCommandBuffer> cb = [queue commandBuffer]; id<MTLBlitCommandEncoder> blit = [cb blitCommandEncoder];
++        for (NSUInteger l = 0; l < base.mipmapLevelCount; l++) for (NSUInteger s = 0; s < base.arrayLength; s++) {
++            NSUInteger w = MAX(base.width >> l, 1u), h = MAX(base.height >> l, 1u);
++            [blit copyFromBuffer:poison sourceOffset:0 sourceBytesPerRow:w * bpp sourceBytesPerImage:w * h * bpp sourceSize:MTLSizeMake(w, h, 1) toTexture:base destinationSlice:s destinationLevel:l destinationOrigin:MTLOriginMake(0, 0, 0)];
++        }
++        [blit endEncoding]; [cb commit]; [cb waitUntilCompleted];
++        CHECK(cb.status == MTLCommandBufferStatusCompleted, "the texture takes its non-zero depth");
++        res_add(base);
++        state_reset(); memset(&R, 0, sizeof R); mtl_sub_begin();
++        tex_zero_fill(base);
++        mtl_sub_commit(); mtl_drain();
++        CHECK(!mtl_last_commit_error(), "zero fill completes without GPU error");
++        id<MTLBuffer> count = [g_dev newBufferWithLength:4 options:MTLResourceStorageModeShared];
++        int clean = 1;
++        for (NSUInteger l = 0; l < base.mipmapLevelCount; l++) for (NSUInteger s = 0; s < base.arrayLength; s++) {
++            id<MTLTexture> v = [base newTextureViewWithPixelFormat:base.pixelFormat textureType:MTLTextureType2D levels:NSMakeRange(l, 1) slices:NSMakeRange(s, 1)];
++            *(uint32_t *)count.contents = 0;
++            cb = [queue commandBuffer]; id<MTLComputeCommandEncoder> e = [cb computeCommandEncoder];
++            [e setComputePipelineState:counter]; [e setTexture:v atIndex:0]; [e setBuffer:count offset:0 atIndex:0];
++            [e dispatchThreads:MTLSizeMake(v.width, v.height, 1) threadsPerThreadgroup:MTLSizeMake(16, 16, 1)]; [e endEncoding]; [cb commit]; [cb waitUntilCompleted];
++            CHECK(cb.status == MTLCommandBufferStatusCompleted, "the texels are read on the GPU");
++            if (*(uint32_t *)count.contents) { clean = 0; fprintf(stderr, "  level %lu layer %lu: %u texels not zero\n", (unsigned long)l, (unsigned long)s, *(uint32_t *)count.contents); }
++        }
++        CHECK(clean, cases[i].label);
++        printf("case %u: %s %s\n", i, cases[i].label, clean ? "PASS" : "FAIL");
++        defer_obj_release(base);
++    }
++    printf("depth zero fill: %d checks, %d failed\n", checks, failed);
++    return failed != 0;
++} }
