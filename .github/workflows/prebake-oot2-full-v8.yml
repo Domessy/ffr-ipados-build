@@ -1,4 +1,4 @@
-name: OOT2 iPad v8 - full render mesh prewarm without NUP
+name: OOT2 iPad v8 - experimental host and full prewarm
 
 on:
   workflow_dispatch:
@@ -51,6 +51,7 @@ jobs:
           git -C "$SRC" checkout -q --detach FETCH_HEAD
           python3 security/oot2_fullwarm_prepare.py "$SRC"
           python3 security/oot2_fullwarm_refresh.py "$SRC"
+          python3 security/oot2_experimental_prepare.py "$SRC"
           python3 -m unittest -v security.test_oot2_ipad_aot security.test_oot2_gateway security.test_oot2_transfer security.test_oot2_fullwarm
           python3 -m venv "$RUNNER_TEMP/aot-venv"
           "$RUNNER_TEMP/aot-venv/bin/python" -m pip install -q lz4
@@ -271,7 +272,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ -f "$RUNNER_TEMP/oot2-fullwarm/private.log" ]; then
-            tail -c 25165824 "$RUNNER_TEMP/oot2-fullwarm/private.log" | ssh ffr-cachyos oot2-fullwarm-v8-write-log
+            tail -c 25165824 "$RUNNER_TEMP/oot2-fullwarm/private.log" | ssh ffr-cachyos oot2-fullwarm-v8-write-experimental-log
           fi
       - name: Save private compiler cache and diagnostics on CachyOS
         if: always() && steps.receive.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.mode == 'build'
@@ -296,7 +297,7 @@ jobs:
         if: success() && github.event_name == 'workflow_dispatch' && inputs.mode == 'build'
         run: |
           set -euo pipefail
-          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=12 ffr-cachyos oot2-fullwarm-v8-write-slim < "$RUNNER_TEMP/oot2-fullwarm/output.ipa"
+          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=12 ffr-cachyos oot2-fullwarm-v8-write-experimental-slim < "$RUNNER_TEMP/oot2-fullwarm/output.ipa"
           echo 'Complete R/M prewarm IPA assembled on CachyOS under its own filename.'
       - name: Fermer la connexion Tailscale ephemere
         if: always()

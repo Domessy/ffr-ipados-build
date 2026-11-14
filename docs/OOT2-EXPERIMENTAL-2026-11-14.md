@@ -1,6 +1,6 @@
 # OOT2 : audit et branche expérimentale du 14 novembre 2026
 
-Branche : `experimental/oot2-20261114-host-optimizations`. Aucun changement de main, de l’IPA livrée ou des données privées. Aucun build privé déclenché.
+Branche : `experimental/oot2-20261114-host-optimizations`. Aucun changement de main, de l’IPA livrée ou des données privées. Build privé autorisé ensuite par l’utilisateur ; suivi dans le handoff.
 
 ## Sources et comparaison
 
@@ -41,7 +41,7 @@ La recette expérimentale s’applique **après** `oot2_fullwarm_prepare.py` et 
 python3 security/oot2_experimental_prepare.py /chemin/vers/nxnative
 ```
 
-Le script exige le commit et les SHA256 exacts de ses sources d’entrée, vérifie le patch et les sorties, refuse les nouveaux fichiers préexistants et restaure les fichiers modifiés si une vérification finale échoue. La chaîne d24 est vérifiée. Les chemins de construction privés restent inchangés : ne pas lancer le workflow de production en pensant qu’il applique automatiquement cette recette.
+Le script exige le commit et les SHA256 exacts de ses sources d’entrée, vérifie le patch et les sorties, refuse les nouveaux fichiers préexistants et restaure les fichiers modifiés si une vérification finale échoue. La chaîne d24 est vérifiée. Sur cette branche uniquement, le workflow fullwarm appelle désormais cette recette explicitement et utilise la route de livraison expérimentale. Main conserve son workflow stable.
 
 Le switch expérimental `DM_NVN_DEPTH_ZERO_COPY=0` permet de retrouver l’initialisation précédente ; absent ou `1`, le nouveau chemin est actif. Ne pas l’utiliser comme réglage de performance général : il sert à isoler ce correctif.
 
@@ -52,7 +52,7 @@ Le workflow public `test-oot2-experimental.yml` compile les deux fixtures, exéc
 ## Protocole iPad avant toute promotion
 
 1. Conserver l’IPA v8 fullwarm livrée comme référence, sauvegarde et caches. Relever mêmes options (dont Metal4 pipelines, mode portable, scaler), charge batterie et état thermique.
-2. Construire/livrer ultérieurement un hôte expérimental dans un fichier distinct, seulement après CI verte. Aucune traduction de shaders ni nouveau NUP requis pour ces deux changements ; identité des ressources à revérifier lors du pack.
+2. Construire/livrer ultérieurement un hôte expérimental dans un fichier distinct, seulement après CI verte. Aucune traduction de shaders ni nouveau NUP requis pour ces deux changements ; identité des ressources à revérifier lors du pack. Sortie distincte : `ZeldaOcarinaOfTime-ipad-v8-fullwarm-experimental-livecontainer.ipa`.
 3. Avec le nouveau chemin actif : trois chargements de la même sauvegarde ; vérifier ligne `new-texture zeroing: depth texture ... zeroed by copies`, absence de GPU OOM, textures/ombres intactes, mémoire et éventuel Jetsam.
 4. Même trajet de 10 minutes depuis la zone de départ, mêmes mouvements/caméras ; journal des pauses et de leur durée, médiane/p95/p99 des frame-times si disponibles. Ensuite une transition de zone et session prolongée si stable.
 5. Comparer aux mêmes essais sur l’IPA de référence ; la désactivation du seul chemin profondeur permet un contrôle supplémentaire si nécessaire. Ne pas confondre caches froids/chauds, préchauffage et jeu. Aucun bénéfice FPS ou mémoire ne sera annoncé sans mesure comparable.
