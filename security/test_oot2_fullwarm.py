@@ -76,7 +76,6 @@ class FullwarmPackagingTests(unittest.TestCase):
         from security.oot2_fullwarm_pack import repack
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);slim,base,prefix=AotTests().fixture(root)
-            (base/'rest_pairs.tsv').write_text('# remaining pairs\n')
             full=root/'full';full.mkdir();name=fw.GPU+'-prewarm-00000.mtl4a'
             binary=full/name;binary.write_bytes(b'compiled mesh/render archive'*8)
             report={'chain':fw.CHAIN,'gpu':fw.GPU,'platform':'ios','coverage':{
@@ -101,6 +100,19 @@ class FullwarmPackagingTests(unittest.TestCase):
             binary.write_bytes(b'corruption'*32)
             with self.assertRaisesRegex(ValueError,'archive identity'):repack(slim,base,full,host,root/'bad.ipa')
             self.assertFalse((root/'bad.ipa').exists())
+
+    def test_base_resource_set_tracks_optional_rest_and_rejects_missing_required_inputs(self):
+        from security.oot2_fullwarm_pack import base_resources
+        from security.test_oot2_ipad_aot import AotTests
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d); _,base,_=AotTests().fixture(root)
+            self.assertEqual(len(base_resources(base)),3)
+            meta=base/'archive.tsv'; original=meta.read_text();meta.write_text(original.replace('rest\t0','rest\t1'))
+            with self.assertRaisesRegex(ValueError,'remaining pipeline pairs missing'): base_resources(base)
+            (base/'rest_pairs.tsv').write_text('v\tf\n')
+            self.assertEqual(len(base_resources(base)),4)
+            meta.write_text(original);(base/'prebuilt.tsv').unlink()
+            with self.assertRaisesRegex(ValueError,'resource set'): base_resources(base)
 
     def test_hostkit_rejects_path_escape_before_writing(self):
         import io,tarfile,subprocess

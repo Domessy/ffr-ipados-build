@@ -41,9 +41,32 @@ def check_full_bundle(bundle):
     return report
 
 
+def base_resources(base):
+    base = Path(base)
+    required = {GPU + '.mtl4a', 'prebuilt.tsv', 'archive.tsv'}
+    names = {path.name for path in base.iterdir()}
+    if not required <= names or names - required - {'rest_pairs.tsv'}:
+        raise ValueError('base pipeline resource set')
+    files = sorted(base / name for name in names)
+    for path in files:
+        if path.is_symlink() or not path.is_file():
+            raise ValueError('base pipeline resource type: ' + path.name)
+    check_bundle(base)
+    rest = re.search(r'^rest\t([0-9]+)$', (base/'archive.tsv').read_text(), re.M)
+    if not rest: raise ValueError('base pipeline rest count missing')
+    # pso_offline deliberately removes this file when there are no remaining
+    # pairs. Require it only when the producer reports actual remaining work.
+    if int(rest[1]) and 'rest_pairs.tsv' not in names:
+        raise ValueError('remaining pipeline pairs missing')
+    return files
+
+
 def repack(slim, base, full, host, output):
     slim, base, full, host, output = map(Path, (slim, base, full, host, output))
-    prefix = inspect_ipa(slim); check_bundle(base); report = check_full_bundle(full)
+    prefix = inspect_ipa(slim); files = base_resources(base); report = check_full_bundle(full)
+    files += sorted(full.iterdir())
+    for path in files:
+        if path.is_symlink() or not path.is_file(): raise ValueError("pipeline resource type: " + path.name)
     if report.get('host') and report['host']['sha256'] != digest(host): raise ValueError('full prewarm host identity')
     raw = host.read_bytes()
     if len(raw) < 32 or struct.unpack_from('<III', raw) != (0xfeedfacf, 0x100000c, 0):
@@ -80,8 +103,6 @@ def repack(slim, base, full, host, output):
                     while block := inp.read(8 << 20): out.write(block); h.update(block)
                 if not item.is_dir(): hashes[item.filename] = h.hexdigest()
                 if item.filename == executable: replaced.append(item.filename)
-            files = [base / name for name in (GPU+'.mtl4a', 'prebuilt.tsv', 'rest_pairs.tsv', 'archive.tsv')]
-            files += sorted(full.iterdir())
             for path in files:
                 if path.is_symlink() or not path.is_file(): raise ValueError('pipeline resource type')
                 item = zipfile.ZipInfo(prefix + 'pso/' + path.name)
