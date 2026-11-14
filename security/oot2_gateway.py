@@ -20,6 +20,7 @@ CONFLICTS = ROOT / "shader-cache-conflicts"
 OUTPUT = ROOT / "resultats"
 
 ROUTES = frozenset({
+    "oot2-fullwarm-v8-write-experimental-slim", "oot2-fullwarm-v8-write-experimental-log",
     "oot2-fullwarm-v8-info", "oot2-fullwarm-v8-read-kit", "oot2-fullwarm-v8-read-cache",
     "oot2-fullwarm-v8-write-cache", "oot2-fullwarm-v8-write-log", "oot2-fullwarm-v8-write-slim",
     "oot2-aot-v8-info", "oot2-aot-v8-read-input", "oot2-aot-v8-read-cache",
@@ -131,16 +132,23 @@ def dispatch(command, parent):
                 except ImportError:
                     from oot2_pipeline_cache import receive_cache
                 receive_cache(parent, cache, fullwarm=True)
+            elif command == 'oot2-fullwarm-v8-write-experimental-log': parent.receive_file('oot2-fullwarm-v8-experimental-private.log', 32 << 20)
             elif command == 'oot2-fullwarm-v8-write-log': parent.receive_file('oot2-fullwarm-v8-private.log', 32 << 20)
             else:
                 import zipfile, hashlib
-                name = 'ZeldaOcarinaOfTime-v8-fullwarm-slim.ipa'
+                experimental = command == 'oot2-fullwarm-v8-write-experimental-slim'
+                name = 'ZeldaOcarinaOfTime-v8-fullwarm-experimental-slim.ipa' if experimental else 'ZeldaOcarinaOfTime-v8-fullwarm-slim.ipa'
                 parent.receive_file(name, 16 << 30)
                 prefix = inspect_ipa(OUTPUT / name)
                 with zipfile.ZipFile(OUTPUT / name) as z:
                     report = json.loads(z.read(prefix + 'pso/fullwarm.json'))
                     if report['chain'] != CHAIN or report['gpu'] != GPU or report['platform'] != 'ios':
                         raise ValueError('full prewarm target')
+                    if experimental:
+                        recipe = json.loads(Path(__file__).with_name('oot2_experimental_manifest.json').read_text())
+                        marker = report.get('host', {}).get('host_experiment') or {}
+                        if marker.get('chain') != CHAIN or marker.get('patch_sha256') != recipe['patch_sha256']:
+                            raise ValueError('experimental host provenance')
                     coverage = report['coverage']
                     try:
                         from .oot2_fullwarm import validate_render_coverage
@@ -165,8 +173,8 @@ def dispatch(command, parent):
                     from oot2_local_bundle import bundle
                 stats = bundle(OUTPUT / name, ROOT / 'local-bundle-v6/extract/v131072/RomFS.img',
                     ROOT / 'local-bundle-v6/romfs-manifest.json',
-                    OUTPUT / 'ZeldaOcarinaOfTime-ipad-v8-fullwarm-livecontainer.ipa', expected_chain=CHAIN)
-                (OUTPUT / 'ipad-v8-fullwarm-local-bundle-result.json').write_text(json.dumps(stats, indent=2) + '\n')
+                    OUTPUT / ('ZeldaOcarinaOfTime-ipad-v8-fullwarm-experimental-livecontainer.ipa' if experimental else 'ZeldaOcarinaOfTime-ipad-v8-fullwarm-livecontainer.ipa'), expected_chain=CHAIN)
+                (OUTPUT / ('ipad-v8-fullwarm-experimental-local-bundle-result.json' if experimental else 'ipad-v8-fullwarm-local-bundle-result.json')).write_text(json.dumps(stats, indent=2) + '\n')
                 print('OOT2_FULLWARM_LOCAL_BUNDLE_OK', stats['ipa_bytes'])
         finally: parent.OUTPUT = previous
         return 0

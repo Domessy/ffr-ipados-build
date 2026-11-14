@@ -1,0 +1,53 @@
+name: OOT2 experimental host validation
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/test-oot2-experimental.yml'
+      - 'security/oot2_experimental*'
+permissions:
+  contents: read
+concurrency:
+  group: oot2-experimental-validation-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  public-host:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Prepare exact experimental host without private inputs
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/nxnative"
+          git init -q "$SRC"
+          git -C "$SRC" remote add origin https://github.com/seedds/nxnative.git
+          git -C "$SRC" fetch -q --depth 1 origin ccd834e06a3938834bb5579e2ccc6a0ad13d3970
+          git -C "$SRC" checkout -q --detach FETCH_HEAD
+          python3 security/oot2_fullwarm_prepare.py "$SRC"
+          python3 security/oot2_fullwarm_refresh.py "$SRC"
+          python3 security/oot2_experimental_prepare.py "$SRC"
+          python3 -m unittest -q security.test_oot2_ipad_aot security.test_oot2_gateway security.test_oot2_transfer security.test_oot2_fullwarm
+      - name: Run CPU ownership and GPU write fence regressions
+        run: |
+          set -euo pipefail
+          TESTS="$RUNNER_TEMP/nxnative/dm/gfx/tests"
+          make -C "$TESTS" GAME=0400486024DEC000 -j 3 oot2_experimental_cpu t_zero_depth > "$RUNNER_TEMP/experimental-build.log" 2>&1 || { tail -100 "$RUNNER_TEMP/experimental-build.log"; exit 1; }
+          "$TESTS/oot2_experimental_cpu"
+          echo 'Depth GPU fixture compiled only; executing it requires a Metal4 device.'
+      - name: Compile and link the production iOS host with public fixture
+        run: |
+          set -euo pipefail
+          brew install xcodegen
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install -q lz4
+          GAME=0400486024DEC000 "$RUNNER_TEMP/venv/bin/python" "$RUNNER_TEMP/nxnative/dm/ios/tools/build_smoke.py" --output "$RUNNER_TEMP/experimental-ios" > "$RUNNER_TEMP/experimental-ios.log" 2>&1 || { tail -100 "$RUNNER_TEMP/experimental-ios.log"; exit 1; }
+          tail -3 "$RUNNER_TEMP/experimental-ios.log"

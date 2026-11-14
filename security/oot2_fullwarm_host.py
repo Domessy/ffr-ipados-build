@@ -121,6 +121,7 @@ def rebuild(root, kit, slim, output):
     target = output / 'rebuilt-host'; shutil.copyfile(executable, target)
     (output / 'host-result.json').write_text(json.dumps({'source': PIN, 'chain': CHAIN, 'sha256': digest(target),
         'bytes': target.stat().st_size, 'real_kit_modules': True, 'unsigned': True,
+        'host_experiment': json.loads((root/'.oot2-experimental.json').read_text()) if (root/'.oot2-experimental.json').exists() else None,
         'host_refresh': json.loads((root/'.oot2-fullwarm-refresh.json').read_text()) if (root/'.oot2-fullwarm-refresh.json').exists() else None}, indent=2) + '\n')
     # The verified executable above is a separate file, not inside DerivedData.
     # Keep captured sources and host-result.json; discard only rebuild scratch.
