@@ -47,7 +47,7 @@ Le switch expérimental `DM_NVN_DEPTH_ZERO_COPY=0` permet de retrouver l’initi
 
 Vérifications locales : recette complète appliquée à un nouveau checkout ccd, hashes de sortie vérifiés, `git diff --check`, 131 tests Python du pipeline réussis. La fixture CPU exerce réellement `gw_commit` : doublons, marques report-only, fences terminées, soumission suivante et débordement de génération. `t_zero_depth` est le test GPU amont : poison non nul, lecture de tous les texels, niveaux/couches et dernière tranche partielle.
 
-Le workflow public `test-oot2-experimental.yml` compile les deux fixtures, exécute le test CPU et compile/lie l’hôte iOS sur données synthétiques. Il n’accède ni au NUP ni aux caches privés. Il **n’exécute pas** le test GPU : le runner ne dispose pas de Metal4. Statut final à reporter dans le handoff après CI. Les tests Metal et les routes cinq jeux sur Mac/M5 ne sont pas validés dans cet environnement.
+Le workflow public `test-oot2-experimental.yml` compile les deux fixtures, exécute le test CPU et compile/lie l’hôte iOS sur données synthétiques. Il n’accède ni au NUP ni aux caches privés. Il **n’exécute pas** le test GPU : le runner ne dispose pas de Metal4. CI **verte** sur le code `800591e5b7e281a92b0fdbba186f128355cb02a7` : [run43603314990](https://github.com/Domessy/ffr-ipados-build/actions/runs/43603314990), 925 vérifications CPU sans échec, test profondeur compilé, hôte iOS compilé et lié (`BUILD SUCCEEDED`). Contrôles synthétiques existants également verts : [run43603315123](https://github.com/Domessy/ffr-ipados-build/actions/runs/43603315123). Les tests Metal et les routes cinq jeux sur Mac/M5 ne sont pas validés dans cet environnement.
 
 ## Protocole iPad avant toute promotion
 
@@ -56,3 +56,5 @@ Le workflow public `test-oot2-experimental.yml` compile les deux fixtures, exéc
 3. Avec le nouveau chemin actif : trois chargements de la même sauvegarde ; vérifier ligne `new-texture zeroing: depth texture ... zeroed by copies`, absence de GPU OOM, textures/ombres intactes, mémoire et éventuel Jetsam.
 4. Même trajet de 10 minutes depuis la zone de départ, mêmes mouvements/caméras ; journal des pauses et de leur durée, médiane/p95/p99 des frame-times si disponibles. Ensuite une transition de zone et session prolongée si stable.
 5. Comparer aux mêmes essais sur l’IPA de référence ; la désactivation du seul chemin profondeur permet un contrôle supplémentaire si nécessaire. Ne pas confondre caches froids/chauds, préchauffage et jeu. Aucun bénéfice FPS ou mémoire ne sera annoncé sans mesure comparable.
+
+Contrôles négatifs locaux supplémentaires : une mauvaise empreinte de sortie provoque le rollback exact des originaux et la suppression des nouvelles fixtures ; la même recette réussit ensuite, et une deuxième application est refusée sans mutation. Preuve locale `resultats/oot2-experimental-validation-20261114.json`, log CI public `resultats/oot2-experimental-public-ci-43603314990.log`.
