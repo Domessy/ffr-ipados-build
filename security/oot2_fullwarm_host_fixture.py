@@ -46,6 +46,16 @@ def main(native, smoke, output, base_archive=None, full=None):
             if name.startswith('Gen/dm/'): z.write(path, prefix + name.removeprefix('Gen/'))
         for name in TABLES: z.writestr(prefix + 'dm/' + name, '# synthetic public fixture\n')
         z.writestr(prefix + f'msl/b-{CHAIN}.img', b'Synthetic marker; no game shaders')
+    import struct, hashlib
+    from oot2_local_bundle import identity
+    pc=output/'pc'; pc_results=pc/'resultats'; pc_results.mkdir(parents=True)
+    local=pc/'local-bundle-v6'; romfs=local/'extract/v131072/RomFS.img'; romfs.parent.mkdir(parents=True)
+    body=b'public synthetic RomFS body'; index=b'public synthetic index'
+    romfs.write_bytes(struct.pack('<8sQQQ',b'DMROMFS1',32+len(body),len(index),1)+body+index)
+    ident=identity(romfs)
+    (local/'romfs-manifest.json').write_text(json.dumps({'bytes':romfs.stat().st_size,'identity':ident,'sha256':hashlib.sha256(romfs.read_bytes()).hexdigest()}))
+    with zipfile.ZipFile(slim,'a') as z:
+        z.writestr(prefix+'romfs.id',f'DMROMFSID1 title={TITLE} size={ident[0]} index={ident[1]}')
     executable = rebuild(native, kit, slim, output / 'rebuilt')
     if executable.stat().st_size < 100000: raise ValueError('missing compiled host')
     if base_archive is not None:
@@ -53,15 +63,26 @@ def main(native, smoke, output, base_archive=None, full=None):
         from oot2_ipad_aot import GPU
         base=output/'base';base.mkdir()
         shutil.copyfile(base_archive,base/(GPU+'.mtl4a'))
-        (base/'archive.tsv').write_text(f'platform\tios\t27.0\narch\t{GPU}\nbases\t1\n')
+        (base/'archive.tsv').write_text(f'platform\tios\t27.0\narch\t{GPU}\nbases\t1\nrest\t0\n')
         (base/'prebuilt.tsv').write_text(f'chain\t{CHAIN}\n')
-        (base/'rest_pairs.tsv').write_text('# synthetic fixture\n')
         full=Path(full);report=json.loads((full/'fullwarm.json').read_text())
         report['host']=json.loads((output/'rebuilt/host-result.json').read_text())
         (full/'fullwarm.json').write_text(json.dumps(report))
         result=repack(slim,base,full,executable,output/'verified-output.ipa')
         assert result['original_resources_preserved_except_executable']
         assert report['host']['host_refresh']['upstream']
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        import oot2_gateway as gateway, ffr_ssh_gate as parent
+        with (output/'verified-output.ipa').open('rb') as stream:
+            with patch.object(gateway,'ROOT',pc), patch.object(gateway,'OUTPUT',pc_results), patch.object(sys,'stdin',SimpleNamespace(buffer=stream)):
+                assert gateway.dispatch('oot2-fullwarm-v8-write-slim',parent)==0
+        delivered=pc_results/'ZeldaOcarinaOfTime-ipad-v8-fullwarm-livecontainer.ipa'
+        with zipfile.ZipFile(delivered) as z:
+            assert z.testzip() is None
+            assert z.read(prefix+'romfs.img')==romfs.read_bytes()
+            assert prefix+'pso/rest_pairs.tsv' not in z.namelist()
+        print('PASS: production receive gateway and final RomFS assembly verified with zero remaining pairs.')
         print('PASS: complete synthetic IPA repacked with actual iOS archives and rebuilt host; original resources rehashed.')
     print('PASS: verified host-kit unpack, actual gen_embed, production unsigned iOS rebuild; no retail data.')
 

@@ -31,7 +31,7 @@ class AotTests(unittest.TestCase):
             for table in aot.TABLES: z.writestr(prefix + 'dm/' + table, b'# synthetic\n')
         bundle = root / 'bundle'; bundle.mkdir()
         (bundle / (aot.GPU + '.mtl4a')).write_bytes(b'archive fixture' * 8)
-        (bundle / 'archive.tsv').write_text(f'platform\tios\t27.0\narch\t{aot.GPU}\nbases\t1\n')
+        (bundle / 'archive.tsv').write_text(f'platform\tios\t27.0\narch\t{aot.GPU}\nbases\t1\nrest\t0\n')
         (bundle / 'prebuilt.tsv').write_text(f'chain\t{aot.CHAIN}\n')
         return slim, bundle, prefix
 
