@@ -125,7 +125,12 @@ def dispatch(command, parent):
             return 0
         previous = parent.OUTPUT; parent.OUTPUT = OUTPUT
         try:
-            if command == 'oot2-fullwarm-v8-write-cache': parent.receive_file(cache.name, 12 << 30)
+            if command == 'oot2-fullwarm-v8-write-cache':
+                try:
+                    from .oot2_pipeline_cache import receive_cache
+                except ImportError:
+                    from oot2_pipeline_cache import receive_cache
+                receive_cache(parent, cache, fullwarm=True)
             elif command == 'oot2-fullwarm-v8-write-log': parent.receive_file('oot2-fullwarm-v8-private.log', 32 << 20)
             else:
                 import zipfile, hashlib
@@ -185,7 +190,12 @@ def dispatch(command, parent):
         previous = parent.OUTPUT
         parent.OUTPUT = OUTPUT
         try:
-            if command == 'oot2-aot-v8-write-cache': parent.receive_file(cache.name, 12 << 30)
+            if command == 'oot2-aot-v8-write-cache':
+                try:
+                    from .oot2_pipeline_cache import receive_cache
+                except ImportError:
+                    from oot2_pipeline_cache import receive_cache
+                receive_cache(parent, cache)
             elif command == 'oot2-aot-v8-write-log': parent.receive_file('oot2-aot-v8-private.log', 32 << 20)
             else:
                 name = 'ZeldaOcarinaOfTime-v8-aot-slim.ipa'

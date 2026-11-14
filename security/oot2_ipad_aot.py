@@ -176,6 +176,7 @@ def save_cache(folder, archive):
             rel = p.relative_to(folder)
             # Compiler scratch libraries are large, reproducible and often left
             # after interruption. Save compiled groups and their exact keys only.
+            if not rel.parts or rel.parts[0] not in ('work', 'bundle'): continue
             if 'libraries' in rel.parts or p.suffix in ('.log', '.partial', '.mtl4-json'): continue
             if p.is_symlink(): raise ValueError('AOT cache symlink')
             if p.is_file(): out.add(p, arcname=rel.as_posix(), recursive=False)
@@ -189,11 +190,12 @@ def restore_cache(archive, folder):
             p = Path(m.name); total += m.size
             if not m.isfile() or p.is_absolute() or '..' in p.parts or '\\' in m.name or total > MAX_CACHE:
                 raise ValueError('invalid AOT cache member')
-            if p.parts[0] not in ('work', 'bundle'): raise ValueError('invalid AOT cache root')
+            if p.parts[0] not in ('work', 'bundle') and m.name != 'progress.json': raise ValueError('invalid AOT cache root')
             if m.name in seen: raise ValueError('duplicate AOT cache member')
             seen.add(m.name)
         if len(members) > 20000: raise ValueError('too many AOT cache members')
         for m in members:
+            if m.name == 'progress.json': continue
             dest = folder / m.name; dest.parent.mkdir(parents=True, exist_ok=True)
             with src.extractfile(m) as inp, dest.open('wb') as out: shutil.copyfileobj(inp, out)
 
