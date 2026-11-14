@@ -1075,3 +1075,14 @@ Head testé **87262241ee647d9c1f8a7ab623462bb2437bbd81**, fusion **5e2f36b34af3d
 Nouveau run privé **43558910868**, https://github.com/Domessy/ffr-ipados-build/actions/runs/43558910868, modebuild surmain5e2f36b3. Ledgerresultats/ipad-v8-fullwarm-run-43558910868.json. Cache R/M12groupes vérifiés conservé, source slim/caches/shaders existants réutilisables, aucun NUP ni régénération shader. Aucun redéploiement SSH nécessaire : la passerelle testée utilise déjà PR86 ; modification de pack côté runner uniquement. Le test complet représente les mêmes opérations de livraison, sans prétendre tester le transfert réseau privé ni la taille réelle dans le pilote synthétique.
 
 Reste : vérifier les hits de cache et le repack de taille réelle, le retour slim et l’assemblage RomFS sur CachyOS, puis l’ouverture/lookups d’archives et la mémoire/frame-time sur M5. Aucun succès de ce nouveau build ni IPA installable annoncé avant ces preuves. Protections disque et versions de caches PR84/86 maintenues.
+
+
+### 14/11/2026 — livraison fullwarm complète vérifiée, run43558910868 SUCCESS
+
+Le run43558910868 a terminé success ; livraison et assemblage RomFS sur CachyOS réussis. IPA à installer : **resultats/ZeldaOcarinaOfTime-ipad-v8-fullwarm-livecontainer.ipa**, **34537183974octets (34,54Go ;32,17Gio)**. Source slim distincteZeldaOcarinaOfTime-v8-fullwarm-slim.ipa conservée ; ancienne livraison v8-aot non écrasée. Aucun appareil lancé, installé ni signé par l’agent.
+
+Vérification indépendante complète : en-têtesZIP64 valides, cataloguelibarchive lisible, tous les membres relus avecCRC,26ressources originales inchangées parSHA256 (seul exécutable remplacé comme prévu), nouvel hôtearm64Mach-O correspondant auSHA du rapport,12archives R/M correspondant à leursSHA, RomFS relu et identique auSHA872de47b913bb97890880e9f17dccedc4144953a258e9a6aecf04c379427a669. Preuve **resultats/ipad-v8-fullwarm-delivery-verified-20261114.json** ; log publicfullwarm-run-43558910868-public.log.
+
+Contenu :33365bases+4125compute,rest=0 (rest_pairs.tsv absent légalement),2678R archivées+164M archivées ;13R sans fragment restent au préchauffage natifMTLDevice, couverture totale2691R+164M,0erreur/0clé stale. Les12groupesR/M ont tous été réutilisés depuis le cache (reused_groups=12), aucune régénération shader. Chaîned24f05cf9d78 conservée, loader complet et8correctifs hôtePR80 présents dans la provenance.
+
+La livraison peut être testée dans LiveContainer par l’utilisateur, Metal4 pipelines activé, sauvegardes/caches conservés. Relever préparation1er/2elancement, archives ouvertes ET pipelines trouvés dans les archives, même trajet10min puis session prolongée si stable, pauses et mémoire/Jetsam. Protocolelivrables/PROTOCOLE-TEST-IPAD-V8-FULLWARM-2026-11-12.md /docs/OOT2-IPAD-FULL-PREWARM-TEST.md. Aucun gainFPS/RAM/préparation ni stabilitéM5 établi avant test réel.

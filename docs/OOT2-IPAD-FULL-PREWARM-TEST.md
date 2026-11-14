@@ -1,6 +1,6 @@
 # Validation iPad — archives complètes des listes R/M
 
-Build futur distinct v8-fullwarm, même chaîne d24f05cf9d78. Ne pas confondre avec v8-aot (bases/compute seulement).
+Livraison vérifiée du14/11/2026 : ZeldaOcarinaOfTime-ipad-v8-fullwarm-livecontainer.ipa (run43558910868), même chaîne d24f05cf9d78. Ne pas confondre avec v8-aot (bases/compute seulement).
 
 1. Conserver sauvegardes et caches existants. Relever le nom exact de l’IPA, l’espace disponible, la version iPadOS et les réglages. Activer Metal 4 pipelines avant lancement ; conserver les mêmes options, résolution et mode console que la comparaison.
 2. Après installation par l’utilisateur, relever le délai Play→fin de préparation→personnage contrôlable. Faire un deuxième lancement dans les mêmes conditions. Avec les caches existants, le premier essai n’est pas une mesure à froid ; le noter. Ne pas effacer les données pour obtenir artificiellement un essai froid.
