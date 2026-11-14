@@ -47,7 +47,7 @@ def main(native, smoke, output, base_archive=None, full=None):
         for name in TABLES: z.writestr(prefix + 'dm/' + name, '# synthetic public fixture\n')
         z.writestr(prefix + f'msl/b-{CHAIN}.img', b'Synthetic marker; no game shaders')
     import struct, hashlib
-    from oot2_local_bundle import identity, TITLE
+    from oot2_local_bundle import identity
     pc=output/'pc'; pc_results=pc/'resultats'; pc_results.mkdir(parents=True)
     local=pc/'local-bundle-v6'; romfs=local/'extract/v131072/RomFS.img'; romfs.parent.mkdir(parents=True)
     body=b'public synthetic RomFS body'; index=b'public synthetic index'
