@@ -58,3 +58,7 @@ Le workflow public `test-oot2-experimental.yml` compile les deux fixtures, exéc
 5. Comparer aux mêmes essais sur l’IPA de référence ; la désactivation du seul chemin profondeur permet un contrôle supplémentaire si nécessaire. Ne pas confondre caches froids/chauds, préchauffage et jeu. Aucun bénéfice FPS ou mémoire ne sera annoncé sans mesure comparable.
 
 Contrôles négatifs locaux supplémentaires : une mauvaise empreinte de sortie provoque le rollback exact des originaux et la suppression des nouvelles fixtures ; la même recette réussit ensuite, et une deuxième application est refusée sans mutation. Preuve locale `resultats/oot2-experimental-validation-20261114.json`, log CI public `resultats/oot2-experimental-public-ci-43603314990.log`.
+
+## Livraison du build expérimental
+
+[Run43604382594](https://github.com/Domessy/ffr-ipados-build/actions/runs/43604382594) SUCCESS. IPA complète : `ZeldaOcarinaOfTime-ipad-v8-fullwarm-experimental-livecontainer.ipa`, 34537184828octets. ZIP64/CRC de tous les membres,26ressources originales/RomFS, hôte arm64 et marqueur de recette,12archives et leurs SHA vérifiés indépendamment.12/12groupes R/M réutilisés sans régénération shader. Preuve locale `resultats/ipad-v8-fullwarm-experimental-delivery-verified-20261114.json`. Reste à tester le comportement réel sur M5 selon le protocole ci-dessus ; aucune fusion.
