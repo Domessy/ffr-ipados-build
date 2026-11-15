@@ -1644,9 +1644,20 @@ index 5d6cc32f..82f19ee0 100644
      case RO_COMMIT: case RO_COMMIT_REAL: {
          if (r->op == RO_COMMIT) ubc_wait(a[2]);   // the uniform shadows this command buffer reads
 diff --git a/dm/gfx/tests/Makefile b/dm/gfx/tests/Makefile
-index 632c1a8b..f2603e44 100644
+index 632c1a8b..58e244e2 100644
 --- a/dm/gfx/tests/Makefile
 +++ b/dm/gfx/tests/Makefile
+@@ -363,8 +363,8 @@ check_t_pull: RUN_ENV = MTL_DEBUG_LAYER=1
+ t_pull_inv: t_pull_inv.m ../tools/dmsh_pull.py ../tools/dmsh_pull.metal
+ 	clang -O1 -g -Wall -fobjc-arc -o $@ t_pull_inv.m -framework Metal -framework Foundation
+ check_t_pull_inv: RUN_ENV = MTL_DEBUG_LAYER=1
+-t_pso_archive: t_pso_archive.m $(MTL_T_DEP)
+-	clang $(CFLAGS) -fobjc-arc -o $@ t_pso_archive.m $(MTL_T_SRC) $(FW)
++t_pso_archive: t_pso_archive.m $(MTL_T_DEP) ../../host/hle_lifecycle.c
++	clang $(CFLAGS) -fobjc-arc -o $@ t_pso_archive.m $(MTL_T_SRC) ../../host/hle_lifecycle.c $(FW)
+ .PHONY: check_t_pso_archive
+ check_t_pso_archive: t_pso_archive
+ 	MTL_DEBUG_LAYER=1 ./t_pso_archive
 @@ -644,3 +644,8 @@ t_zero_depth: t_zero_depth.m $(MTL_T_DEP)
  check_t_zero_depth: RUN_ENV = MTL_DEBUG_LAYER=1
  oot2_experimental_cpu: oot2_experimental_cpu.m $(MTL_T_DEP)
