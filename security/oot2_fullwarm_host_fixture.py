@@ -2,6 +2,7 @@
 """Exercise host-kit reconstruction using ONLY public synthetic smoke modules."""
 import io
 import json
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -24,17 +25,17 @@ def main(native, smoke, output, base_archive=None, full=None):
     for path in (native / 'dm/games' / TITLE).iterdir():
         if path.suffix == '.tsv' or path.name == 'patches.py': files['profile/' + TITLE + '/' + path.name] = path
     if (native / '.oot2-next.json').exists():
-        # Smoke modules contain no shader map. Supply public synthetic NDSR rows
+        # Smoke resources contain no shader map. Supply synthetic NDSR rows
         # and the matching old captured profile to exercise the real 1 -> 2 guard.
         table = output / 'synthetic-shader-map.tsv'
         table.write_text('a\tb\tcompute\t1111111111111111\t/x/agl_ndsr.pck#NDSR@0x10\n'
                          'a\tb\tcompute\t2222222222222222\t/x/agl_ndsr_vr.pck#NDSR@0x20\n')
         profile = output / 'captured-game-profile.h'
         text = files['generated/game_profile.h'].read_text()
-        assert '#define DM_GAME_UPSCALER_KEYS ""' in text
-        assert '#define DM_GAME_UPSCALER_N 0' in text
-        profile.write_text(text.replace('#define DM_GAME_UPSCALER_KEYS ""', '#define DM_GAME_UPSCALER_KEYS "1111111111111111"')
-                              .replace('#define DM_GAME_UPSCALER_N 0', '#define DM_GAME_UPSCALER_N 1'))
+        text, keys = re.subn(r'^#define DM_GAME_UPSCALER_KEYS .*$', '#define DM_GAME_UPSCALER_KEYS "1111111111111111"', text, flags=re.M)
+        text, count = re.subn(r'^#define DM_GAME_UPSCALER_N .*$', '#define DM_GAME_UPSCALER_N 1', text, flags=re.M)
+        assert keys == count == 1
+        profile.write_text(text)
         files['generated/game_profile.h'] = profile
         files['Gen/dm/shader_map.tsv'] = table
         files['profile/' + TITLE + '/shader_map.tsv'] = table
