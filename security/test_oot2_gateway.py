@@ -37,6 +37,33 @@ class Oot2GatewayTests(unittest.TestCase):
                     self.assertEqual(stable.read_bytes(),b'stable delivery')
                     self.assertEqual(gw.dispatch('oot2-fullwarm-v8-write-experimental-slim /arbitrary',parent),126)
 
+    def test_next_fullwarm_delivery_is_separate_and_requires_recipe(self):
+        import zipfile, hashlib
+        from security.oot2_ipad_aot import CHAIN, GPU
+        recipe=json.loads(Path(gw.__file__).with_name('oot2_experimental_manifest.json').read_text())
+        next_recipe=json.loads(Path(gw.__file__).with_name('oot2_next_manifest.json').read_text())
+        for valid in (True, False):
+            with self.subTest(valid=valid), tempfile.TemporaryDirectory() as d:
+                root=Path(d);out=root/'out';out.mkdir();prefix='Payload/Game.app/'
+                stable=out/'ZeldaOcarinaOfTime-ipad-v8-fullwarm-livecontainer.ipa';stable.write_bytes(b'stable delivery')
+                name='ZeldaOcarinaOfTime-v8-next-host-slim.ipa'
+                archive=GPU+'-prewarm-00000.mtl4a';data=b'public archive fixture'*4
+                report={'chain':CHAIN,'gpu':GPU,'platform':'ios','host':{'host_experiment':{'chain':CHAIN,'patch_sha256':recipe['patch_sha256']},'host_next':{'chain':CHAIN,'patch_sha256':next_recipe['patch_sha256'] if valid else '0'*64},'profile_delta':{'kind':'ndsr-network-detection'}},
+                    'coverage':{'render_rows':1,'emitted_render':1,'mesh_rows':1,'emitted_mesh':1,'periods':1,'failed_tasks':0,'stale_keys':0},
+                    'archives':{archive:{'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()}}}
+                with zipfile.ZipFile(out/name,'w') as z:
+                    z.writestr(prefix+'pso/fullwarm.json',json.dumps(report));z.writestr(prefix+'pso/'+GPU+'.mtl4a',data);z.writestr(prefix+'pso/'+archive,data)
+                with patch.object(gw,'ROOT',root),patch.object(gw,'OUTPUT',out),patch.object(parent,'receive_file') as receive,patch('security.oot2_ipad_aot.inspect_ipa',return_value=prefix),patch('security.oot2_local_bundle.bundle',return_value={'ipa_bytes':123}) as bundle:
+                    if valid:
+                        self.assertEqual(gw.dispatch('oot2-fullwarm-v8-write-next-slim',parent),0)
+                        receive.assert_called_once_with(name,16<<30)
+                        self.assertEqual(bundle.call_args.args[3],out/'ZeldaOcarinaOfTime-ipad-v8-next-host-livecontainer.ipa')
+                    else:
+                        with self.assertRaisesRegex(ValueError,'next host provenance'):gw.dispatch('oot2-fullwarm-v8-write-next-slim',parent)
+                        bundle.assert_not_called()
+                    self.assertEqual(stable.read_bytes(),b'stable delivery')
+                    self.assertEqual(gw.dispatch('oot2-fullwarm-v8-write-next-slim /arbitrary',parent),126)
+
     def test_release_preflight_is_a_fixed_numeric_identity_route(self):
         with tempfile.TemporaryDirectory() as d:
             home = Path(d)
