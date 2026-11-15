@@ -82,6 +82,15 @@ def main(native, smoke, output, base_archive=None, full=None):
             assert z.testzip() is None
             assert z.read(prefix+'romfs.img')==romfs.read_bytes()
             assert prefix+'pso/rest_pairs.tsv' not in z.namelist()
+        if report['host'].get('host_next'):
+            stable_sha=digest(delivered)
+            with (output/'verified-output.ipa').open('rb') as stream:
+                with patch.object(gateway,'ROOT',pc), patch.object(gateway,'OUTPUT',pc_results), patch.object(sys,'stdin',SimpleNamespace(buffer=stream)):
+                    assert gateway.dispatch('oot2-fullwarm-v8-write-next-slim',parent)==0
+            assert digest(delivered)==stable_sha
+            with zipfile.ZipFile(pc_results/'ZeldaOcarinaOfTime-ipad-v8-next-host-livecontainer.ipa') as z:
+                assert z.testzip() is None and z.read(prefix+'romfs.img')==romfs.read_bytes()
+            print('PASS: next-host provenance, profile delta and isolated delivery validated.')
         print('PASS: production receive gateway and final RomFS assembly verified with zero remaining pairs.')
         print('PASS: complete synthetic IPA repacked with actual iOS archives and rebuilt host; original resources rehashed.')
     print('PASS: verified host-kit unpack, actual gen_embed, production unsigned iOS rebuild; no retail data.')

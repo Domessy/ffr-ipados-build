@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/test-oot2-experimental.yml'
       - 'security/oot2_experimental*'
+      - 'security/oot2_next*'
 permissions:
   contents: read
 concurrency:
@@ -35,13 +36,16 @@ jobs:
           python3 security/oot2_fullwarm_prepare.py "$SRC"
           python3 security/oot2_fullwarm_refresh.py "$SRC"
           python3 security/oot2_experimental_prepare.py "$SRC"
+          python3 security/oot2_next_prepare.py "$SRC"
           python3 -m unittest -q security.test_oot2_ipad_aot security.test_oot2_gateway security.test_oot2_transfer security.test_oot2_fullwarm
       - name: Run CPU ownership and GPU write fence regressions
         run: |
           set -euo pipefail
           TESTS="$RUNNER_TEMP/nxnative/dm/gfx/tests"
-          make -C "$TESTS" GAME=0400486024DEC000 -j 3 oot2_experimental_cpu t_zero_depth > "$RUNNER_TEMP/experimental-build.log" 2>&1 || { tail -100 "$RUNNER_TEMP/experimental-build.log"; exit 1; }
+          make -C "$TESTS" GAME=0400486024DEC000 -j 3 oot2_experimental_cpu t_zero_depth t_res_cb t_dead_targets t_upscaler_mfx t_pso_pending t_fstep > "$RUNNER_TEMP/experimental-build.log" 2>&1 || { tail -100 "$RUNNER_TEMP/experimental-build.log"; exit 1; }
           "$TESTS/oot2_experimental_cpu"
+          "$TESTS/t_pso_pending"
+          "$TESTS/t_fstep"
           echo 'Depth GPU fixture compiled only; executing it requires a Metal4 device.'
       - name: Compile and link the production iOS host with public fixture
         run: |
