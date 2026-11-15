@@ -60,7 +60,9 @@ def main(native, smoke, output, base_archive=None, full=None):
         z.write(app / info['CFBundleExecutable'], prefix + info['CFBundleExecutable'])
         for name, path in files.items():
             if name.startswith('Gen/dm/'): z.write(path, prefix + name.removeprefix('Gen/'))
-        for name in TABLES: z.writestr(prefix + 'dm/' + name, '# synthetic public fixture\n')
+        for name in TABLES:
+            if 'Gen/dm/' + name not in files:
+                z.writestr(prefix + 'dm/' + name, '# synthetic public fixture\n')
         z.writestr(prefix + f'msl/b-{CHAIN}.img', b'Synthetic marker; no game shaders')
     import struct, hashlib
     from oot2_local_bundle import identity
