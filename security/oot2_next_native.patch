@@ -438,13 +438,14 @@ index fb9fb002..ead5923d 100644
  // External producers (the Vulkan layer, dm/gfx/vk): the shared Metal device; a serial for one of their textures; present it once their event reaches ev_val (ticket for mtl_present_wait)
  void *mtl_device(void);
 diff --git a/dm/gfx/nvn/nvn_mtl.m b/dm/gfx/nvn/nvn_mtl.m
-index c5eca006..bcd4654d 100644
+index c5eca006..8dd13388 100644
 --- a/dm/gfx/nvn/nvn_mtl.m
 +++ b/dm/gfx/nvn/nvn_mtl.m
-@@ -137,6 +137,20 @@ static uint64_t g_pq_done;
+@@ -137,6 +137,21 @@ static uint64_t g_pq_done;
  static uint64_t g_pq_read;
  static id<MTLResidencySet> g_res;
  static int g_res_dirty;
++static pthread_mutex_t g_res_mu = PTHREAD_MUTEX_INITIALIZER;   // Dedicated lock for the residency set: res_add is called on paths that hold g_mu (arena_new), so it cannot share g_mu
 +// DM_RES_CB=1 (off by default): g_res stays off both queues and every command buffer names it instead (useResidencySet just before each endCommandBuffer, as a begin
 +// drops a command buffer's sets and the set's commit for that buffer comes before its end; a classic command buffer names it when it is made), under g_res_mu, apart
 +// from the set's commit, as the queue commits are made. Another thread can hold the lock for a whole set commit, a wait this adds on the encode and present threads, so each
@@ -462,6 +463,14 @@ index c5eca006..bcd4654d 100644
  static id<MTLSharedEvent> g_ev;
  static _Atomic uint64_t g_fence;                // Highest committed fence value (incremented exclusively by the submit thread)
  static _Atomic int g_sub_on;                    // a submission is open: from mtl_sub_begin until its commit has taken its fence and encoded everything (mtl_pool_del reads it)
+@@ -235,7 +250,6 @@ static NSError *gpu_lost_test_error(void) {
+     return [NSError errorWithDomain:MTL4CommandQueueErrorDomain code:MTL4CommandQueueErrorTimeout userInfo:@{NSUnderlyingErrorKey: revoked, NSMultipleUnderlyingErrorsKey: @[revoked]}];
+ }
+ 
+-static pthread_mutex_t g_res_mu = PTHREAD_MUTEX_INITIALIZER;   // Dedicated lock for the residency set: res_add is called on paths that hold g_mu (arena_new), so it cannot share g_mu
+ // Wait ledger (DM_NVN_WAITS=1): every place a thread of the host or the game waits on the CPU for the GPU or for the encode thread, counted per frame (calls, calls that blocked,
+ // the time they blocked) and logged every 300 frames with the frame's GPU idle. The game's own SyncWait is split by how far its fence is behind the newest one (0: the last submission)
+ enum { WS_SYNC, WS_SYNC_NEWEST, WS_SYNC_POLL, WS_ACQ, WS_FINISH, WS_ALLOC, WS_VIS, WS_PG, WS_MDI, WS_READTEX, WS_T2T, WS_DIAG, WS_SNAP, WS_UPZERO, WS_UPALLOC, WS_DRAIN, WS_UBC, WS_OLDQ, WS_N };
 @@ -392,10 +406,44 @@ static id<MTLTexture> rh_place(MTLTextureDescriptor *d) {
  // A shared texture in a GPU-only pool (tex_mtl_) that the GPU can render or write to, in recycled memory: the CPU never writes its storage, and the new texture is filled from what
  // the host holds of it (tex_init_fill) or zeroed, as a new allocation is. NVN asks no flag of a render target (Mario Kart World's resized targets include some without COMPRESSIBLE),
