@@ -438,7 +438,7 @@ index fb9fb002..ead5923d 100644
  // External producers (the Vulkan layer, dm/gfx/vk): the shared Metal device; a serial for one of their textures; present it once their event reaches ev_val (ticket for mtl_present_wait)
  void *mtl_device(void);
 diff --git a/dm/gfx/nvn/nvn_mtl.m b/dm/gfx/nvn/nvn_mtl.m
-index c5eca006..f5a5a3d3 100644
+index c5eca006..bcd4654d 100644
 --- a/dm/gfx/nvn/nvn_mtl.m
 +++ b/dm/gfx/nvn/nvn_mtl.m
 @@ -137,6 +137,20 @@ static uint64_t g_pq_done;
@@ -446,7 +446,7 @@ index c5eca006..f5a5a3d3 100644
  static id<MTLResidencySet> g_res;
  static int g_res_dirty;
 +// DM_RES_CB=1 (off by default): g_res stays off both queues and every command buffer names it instead (useResidencySet just before each endCommandBuffer, as a begin
-+// drops a command buffer's sets and the set's commit for that buffer comes before its end; a classic command buffer names it when it is made), under g_res_commit_mu, apart
++// drops a command buffer's sets and the set's commit for that buffer comes before its end; a classic command buffer names it when it is made), under g_res_mu, apart
 +// from the set's commit, as the queue commits are made. Another thread can hold the lock for a whole set commit, a wait this adds on the encode and present threads, so each
 +// naming is timed with its wait for the residency line. What the set holds does not change; the layer's set and the present snapshots' set stay on the Metal 4 queue. A sparse
 +// mapping update (updateTextureMappings) names no set. With the set on the queues, Ocarina of Time on a 16 GB M4 with guest files fell in about half its runs into a state where
@@ -454,7 +454,7 @@ index c5eca006..f5a5a3d3 100644
 +static int g_res_cb; static _Atomic uint64_t g_res_cb_uses, g_res_cb_ns, g_res_cb_max;   // namings since the last residency line, their time with the wait for the lock, the longest one
 +static void res_use(id cb) {
 +    uint64_t t0 = clock_gettime_nsec_np(CLOCK_UPTIME_RAW);
-+    pthread_mutex_lock(&g_res_commit_mu); [cb useResidencySet:g_res]; pthread_mutex_unlock(&g_res_commit_mu);
++    pthread_mutex_lock(&g_res_mu); [cb useResidencySet:g_res]; pthread_mutex_unlock(&g_res_mu);
 +    uint64_t d = clock_gettime_nsec_np(CLOCK_UPTIME_RAW) - t0, m = atomic_load(&g_res_cb_max);   // count, time and max are reset apart: a naming can land in one line's time and the next line's count
 +    atomic_fetch_add(&g_res_cb_ns, d); atomic_fetch_add(&g_res_cb_uses, 1);
 +    while (d > m && !atomic_compare_exchange_weak(&g_res_cb_max, &m, d)) {}

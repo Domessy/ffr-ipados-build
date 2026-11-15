@@ -1,7 +1,7 @@
 {
   "base": "ccd834e06a3938834bb5579e2ccc6a0ad13d3970",
   "chain": "d24f05cf9d78",
-  "patch_sha256": "19ad8c14378dcc9f96384f2574a2259dbf50dd0860c3342f23dafba5cd343a1d",
+  "patch_sha256": "08ca27017ec34c348879524e451055079d306b58de31aefd1cdab18aa9dc8772",
   "originals": {
     "dm/games/game.py": "c73cebfef24b0c87677c22fc39bbeb30112d7b84584f2a17fd6ba4956ceee429",
     "dm/gfx/msl/copy.metal": "569e39d77ebef4689abfda405a97c90d410f559e3a0c1babcde87d7155f8bad5",
@@ -39,7 +39,7 @@
     "dm/gfx/nvn/hle_nvn.c": "28a48595681eb84d985db199d07c0584914c3bd8b2d19639416f889c7f7a025c",
     "dm/gfx/nvn/nvn_fstep.h": "4b5a956b36b097c8f9f9a85f33286a4d633479931151922500cfa2710b79776b",
     "dm/gfx/nvn/nvn_mtl.h": "82d6a92c35dfb59c4b28c883f21c621156e5f4320f208559a18fd218b37e69b3",
-    "dm/gfx/nvn/nvn_mtl.m": "6a0640d4dffcfa9d7916238f56f8731738cb46ca3390b2cb51b0c39a67db6bf5",
+    "dm/gfx/nvn/nvn_mtl.m": "815c091589f87d42c0e552b06397d777458dc663be8773d568d9ace045c80413",
     "dm/gfx/nvn/nvn_rec.h": "db8bd7af1c50cfa664f310cee9e4ad212280d283da4ffd503bf94ddec7ae2e90",
     "dm/gfx/tests/Makefile": "ef7b59f1bf86c3131d0fde9710e79d504b31ae4c19d27c84d51df07c16f317d9",
     "dm/gfx/tests/oot2_experimental_cpu.m": "381879558ebd26e9bdc01b9266141c17cc774dcfc3f7598bac2838e5b8ec7604",
