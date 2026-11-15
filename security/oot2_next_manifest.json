@@ -1,7 +1,7 @@
 {
   "base": "ccd834e06a3938834bb5579e2ccc6a0ad13d3970",
   "chain": "d24f05cf9d78",
-  "patch_sha256": "96fc7d14bdb65a8a462e50493ae9ab366e4947af192fb06b8a0fc73ba2cb9ef5",
+  "patch_sha256": "fed80b237571978c69d38b236f9117a9db71ae0af3b15ed0b49ec45ec88cd2ed",
   "originals": {
     "dm/games/game.py": "c73cebfef24b0c87677c22fc39bbeb30112d7b84584f2a17fd6ba4956ceee429",
     "dm/gfx/msl/copy.metal": "569e39d77ebef4689abfda405a97c90d410f559e3a0c1babcde87d7155f8bad5",
@@ -27,7 +27,9 @@
     "dm/host/tests/t_codec_video.c": "ea03c4f7cbdccb1dda1f4afcbf4e9dc954f4d61d5f8302dfec322b839d8a8c87",
     "dm/host/tests/t_movie_vpx.c": "2235eba603ccbb7b4e293c294497448ccaae664f9f7a2ade96a357175136f464",
     "dm/host/tests/t_svc_memory.c": "0fa60de8594cc33f8c3cf7e4169ab34081339763a24c638bd3a26ed09ff7e18a",
-    "dm/ios/Sources/main.m": "afadafdff0aab2eaa88d84678627388494c8f393de876b338c95ca21ce1e8a2b"
+    "dm/ios/Sources/main.m": "afadafdff0aab2eaa88d84678627388494c8f393de876b338c95ca21ce1e8a2b",
+    "dm/gfx/tests/t_pso_archive.m": "f9948372a988ba6047fea048e6ec66d6e8d585bcd930d819732a5c9fdf713475",
+    "dm/gfx/tests/test_pso_archive.py": "6fcc6d66722c01ec51c67732e8523b043de90583c40133e17633fc02f6f14e3f"
   },
   "new_files": [
     "dm/gfx/tests/t_dead_targets.m",
@@ -60,6 +62,8 @@
     "dm/host/tests/t_movie_vpx.c": "523a7afdb2fb1d146aaed85b13baefcc22b6815ed77bd334270f103c5ff43b08",
     "dm/host/tests/t_svc_memory.c": "3c053eae5024b9f8aeea034521899a35f51e0fea51c4425be1d41112aeac6bdb",
     "dm/ios/Sources/main.m": "3a886fe7746ebe3fb9565cc903816bd33b7375eb771efd23481ae8560f697408",
+    "dm/gfx/tests/t_pso_archive.m": "a68915fa7bd85378e28853e97764e1642989c61695b0c957d2d4e510377ad420",
+    "dm/gfx/tests/test_pso_archive.py": "0902a244adf5757ac32e5afa29d943c52531594c054232ab2ae45dd4a6656658",
     "dm/gfx/tests/t_dead_targets.m": "71847bd1d112eeeb3b4a3b009fbea51f5dbe3c1708f367f1d3de26d1e4fd9993",
     "dm/gfx/tests/t_res_cb.m": "172ef900ffd805d831f933d7c2dd13abc365406e847549ccd72279946a0d4d0e",
     "dm/gfx/tests/t_mfx_passes.h": "b26dafdf18d4be46262e26ea9a381fa995c3ef833ba3f7bd1122722ee9a02672"

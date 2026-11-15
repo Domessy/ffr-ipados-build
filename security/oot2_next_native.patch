@@ -2131,6 +2131,88 @@ index 8376a243..865d79e2 100644
      }
      printf("== %d checks, %d failed ==\n", checks, fail);
      return fail != 0;
+diff --git a/dm/gfx/tests/t_pso_archive.m b/dm/gfx/tests/t_pso_archive.m
+index d14abdbd..96142612 100644
+--- a/dm/gfx/tests/t_pso_archive.m
++++ b/dm/gfx/tests/t_pso_archive.m
+@@ -4,7 +4,8 @@
+ // Metal 4 descriptor keeps the MTLDevice path; pso_key_norm drops what no pipeline depends on; compaction merges the files the prewarm took bases from into one per full period despite a
+ // mid-prewarm timer flush, removing them only after its last period, counting them for the prepare line, and a compaction that did not finish is not tried again on the same system build; a timer flush waits for any prewarm, so a cold start writes a file per full period; depth-only draws write depth; concurrent colour variants compile
+ // one base; archive flushes preserve unrelated compiler state; a function with function constants is specialized by its pipeline's descriptor, not through its library,
+-// and an MTLDevice pipeline gets it specialized; the descriptor for a specialization is the caller's whether the driver returns it retained or autoreleased; a compute pipeline is captured into a plain file and taken from it later, one without a Metal 4 descriptor never looked up; a native mesh pipeline is captured into a p file and taken from it later, with or without a task shader or a pixel shader, captured again by a compaction, and one without a Metal 4 descriptor built through the MTLDevice; a capture that fails builds the pipeline all the same and hands a full period over, or stops capturing after a failure in a period that captured nothing; run files are compacted by size tier from the pipeline count in their names (a tier of more than PSO_ARCH_COMPACT files and every smaller one, never a full period's, old and malformed names as the largest tier, the same across fresh processes), and a compute or task / mesh pipeline in a file left out is not captured again
++// and an MTLDevice pipeline gets it specialized; the descriptor for a specialization is the caller's whether the driver returns it retained or autoreleased; a compute pipeline is captured into a plain file and taken from it later, one without a Metal 4 descriptor never looked up; a native mesh pipeline is captured into a p file and taken from it later, with or without a task shader or a pixel shader, captured again by a compaction, and one without a Metal 4 descriptor built through the MTLDevice; a capture that fails builds the pipeline all the same and hands a full period over, or stops capturing after a failure in a period that captured nothing; run files are compacted by size tier from the pipeline count in their names (a tier of more than PSO_ARCH_COMPACT files and every smaller one, never a full period's, old and malformed names as the largest tier, the same across fresh processes), and a compute or task / mesh pipeline in a file left out is not captured again; a run that ends in its prewarm keeps what it compiled, through the prewarm's timer flush or through SIGTERM's graceful exit while a draw holds the graphics layer
++#include <signal.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include <unistd.h>
+@@ -30,7 +31,13 @@ module_t *module_of(const void *p) { (void)p; return NULL; }
+ module_t *g_mod; int g_nmod;
+ void svc_thread_dump(void) {}
+ uint64_t now_ns(void) { return bp_now(); }
++void hlecount_flush(void) {} void dm_rec_finish(void) {} void dm_cheats_exit(void) {} void dm_audio_suspend(int on) { (void)on; }   // what the graceful exit (hle_lifecycle.c) calls besides graphics
+ static int checks, failed;
++// The next program of a test hand-over (--exec-seed): it starts only after the archive's write, so the folder holds the file; it says so in exec.txt (the test reads it)
++static void exec_then(void *dir) {
++    int files = 0; for (NSString *f in [NSFileManager.defaultManager contentsOfDirectoryAtPath:@((const char *)dir) error:nil]) files += [f hasSuffix:@".mtl4a"];
++    [[NSString stringWithFormat:@"%d\n", files] writeToFile:[@((const char *)dir) stringByAppendingPathComponent:@"exec.txt"] atomically:YES encoding:NSUTF8StringEncoding error:nil];
++}
+ #define EXPECT(name, want, got) do { uint64_t w = (want), g = (got); checks++; if (w != g) { fprintf(stderr, "%s: expected %llu, got %llu\n", name, (unsigned long long)w, (unsigned long long)g); failed++; } } while (0)
+ 
+ static id<MTLLibrary> g_lib, g_lib2;   // g_lib2: the same source again, for functions with no Metal 4 descriptor (a library hands out one function object per name)
+@@ -195,7 +202,7 @@ static void compute_pipelines(void) {
+         NSUInteger files = archive_files(@(kdir)).count; built = g_cps_built;
+         dispatch_async(arch_harvest_q(), ^{ usleep(300000); });
+         EXPECT(quit ? "queued capture, quit: a pipeline" : "queued capture, flush: a pipeline", 1, cps_new(f2, &err) != nil && g_cps_built == built + 1);
+-        if (quit) mtl_arch_save(ARCH_QUIT_WAIT_MS, 0); else arch_flush_wait();
++        if (quit) mtl_arch_save(MTL_QUIT_ARCH_MS, 0); else arch_flush_wait();
+         EXPECT(quit ? "queued capture, quit: written" : "queued capture, flush: written", files + 1, archive_files(@(kdir)).count);
+         EXPECT(quit ? "queued capture, quit: nothing left" : "queued capture, flush: nothing left", 0, g_arch_new);
+     }
+@@ -629,6 +636,44 @@ int main(int argc, char **argv) { @autoreleasepool {
+         printf("t_pso_archive %s: %d checks, %d failed\n", argv[1], checks, failed);
+         return failed != 0;
+     }
++    // Across fresh processes: a run ends in its prewarm, before any full period (Ocarina of Time's warm-up runs of 2026-11-10 without a window: 400-500 bases held, none written).
++    // --warmflush-: the timer's flush in a prewarm the game plays through hands the period over once it is DM_PSO_ARCH_WARM_FLUSH_MS old, so a run killed after it (no exit write)
++    // keeps them. --warmprep-: the same in the prepare step, which ends before the first frame, hands nothing over: the next start compiles them. --term-: SIGTERM while a draw is
++    // still in the graphics layer (DM_TEST_STUCK_DRAW: it never leaves, as one compiling its pipeline did), so the drain never returns; the archive is written all the same.
++    // --exec-: oe::ExecuteProgram's hand-over (dm_host_shutdown_then) with that draw: the next program (exec_then) starts after the write, and finds the file there. Then the
++    // next start takes every base from the archive and compiles none
++    if (argc == 3 && (!strncmp(argv[1], "--warmflush-", 12) || !strncmp(argv[1], "--warmprep-", 11) || !strncmp(argv[1], "--term-", 7) || !strncmp(argv[1], "--exec-", 7))) {
++        int term = !strncmp(argv[1], "--term-", 7), exec = !strncmp(argv[1], "--exec-", 7), prep = !strncmp(argv[1], "--warmprep-", 11), seed = strstr(argv[1], "-seed") != NULL;
++        enum { K = 5 };
++        if (seed && term) { void dm_term_install(void); dm_term_install(); }
++        pso4_init();
++        uint64_t arch0 = g_pb_archived, built0 = g_pb_built;
++        atomic_store(&g_warm_running, 1); atomic_store(&g_warm_bg, !prep);
++        for (int i = 0; i < K; i++) {
++            MTLRenderPipelineDescriptor *cd = desc(MTLPixelFormatRGBA8Unorm, 0, MTLPixelFormatRGBA8Unorm, MTLColorWriteMaskAll, 1);
++            cd.vertexDescriptor.layouts[16].stride = 16 * (i + 120);
++            EXPECT("end in the prewarm: pipeline", 1, pso_build(cd, 0, &err) != nil);
++        }
++        if (seed) {
++            EXPECT("end in the prewarm: compiled", K, (int)(g_pb_built - built0));
++            if (!term && !exec) {   // the timer's flush, once the period is old enough; then the run is killed (no exit write)
++                usleep(400 * 1000); dispatch_sync(g_arch_q, ^{ arch_flush(); }); dispatch_group_wait(g_arch_pending, DISPATCH_TIME_FOREVER);
++                printf("t_pso_archive %s: %d checks, %d failed\n", argv[1], checks, failed); fflush(stdout);
++                _exit(failed != 0);
++            }
++            if (getenv("DM_TEST_STUCK_DRAW")) { void dm_gfx_enter(void); dm_gfx_enter(); }   // a draw under way that does not return
++            printf("t_pso_archive %s: %d checks, %d failed\n", argv[1], checks, failed); fflush(stdout);
++            if (failed) _exit(1);
++            if (exec) { void dm_host_shutdown_then(const char *, void (*)(void *), void *); dm_host_shutdown_then("test hand-over", exec_then, argv[2]); }
++            kill(getpid(), SIGTERM);   // to the process, as a harness sends it: raise() aims it at this thread, where the ignored signal never reaches the GCD signal source
++            for (;;) pause();
++        }
++        atomic_store(&g_warm_running, 0); arch_flush_wait();
++        EXPECT("after an end in the prewarm: bases from the archive", prep ? 0 : K, (int)(g_pb_archived - arch0));
++        EXPECT("after an end in the prewarm: bases compiled", prep ? K : 0, (int)(g_pb_built - built0));
++        printf("t_pso_archive %s: %d checks, %d failed\n", argv[1], checks, failed);
++        return failed != 0;
++    }
+     // A fresh process is essential: a compiler that built the source archives still has their online binaries.
+     if (argc == 3 && !strncmp(argv[1], "--oldname-", 10)) {   // across fresh processes: nine run files named before the count (the test renames them) are compacted once, then not again
+         int seed = !strcmp(argv[1], "--oldname-seed"), replay = !strcmp(argv[1], "--oldname-replay");
 diff --git a/dm/gfx/tests/t_pso_pending.m b/dm/gfx/tests/t_pso_pending.m
 index d45b1f7f..f7f46460 100644
 --- a/dm/gfx/tests/t_pso_pending.m
@@ -2325,6 +2407,74 @@ index f7875d36..dd040a92 100644
          NvShader *encoded_out = upscaler(key); encoded_out->up_color = UP_COLOR_KEEP;
          CHECK(!up_mfx_wanted(encoded_out), "a named shader whose output stays encoded is left to its shader");
          S.tex[5][0] = 701;
+diff --git a/dm/gfx/tests/test_pso_archive.py b/dm/gfx/tests/test_pso_archive.py
+index 6cc2f4ff..6e8fa134 100644
+--- a/dm/gfx/tests/test_pso_archive.py
++++ b/dm/gfx/tests/test_pso_archive.py
+@@ -47,6 +47,63 @@ class ArchiveRestartTests(unittest.TestCase):
+                 self.assertEqual(len(list(Path(folder).glob('*.mtl4a'))), files, phase)
+                 self.assertTrue((Path(folder) / 'compacting').exists(), phase)
+ 
++    def _end_in_prewarm(self, mode, extra, seed_files, after_files=None):
++        with tempfile.TemporaryDirectory(prefix='pso-' + mode + '-') as folder:
++            env = dict(os.environ, DM_PSO_MTL4='1', MTL_DEBUG_LAYER='1', **extra)
++            for name in ('DM_GPU_CAPTURE', 'MTL_CAPTURE_ENABLED', 'DM_TEST_ARCHIVE_CONSTANTS', 'DM_TEST_ARCHIVE_MIXED'):
++                env.pop(name, None)
++            if 'DM_TEST_STUCK_DRAW' not in extra:
++                env.pop('DM_TEST_STUCK_DRAW', None)
++            for phase, files in (('seed', seed_files), ('after', seed_files if after_files is None else after_files)):
++                result = subprocess.run([executable, '--' + mode + '-' + phase, folder],
++                                        env=env, capture_output=True, text=True, timeout=60)
++                self.assertEqual(result.returncode, 0, phase + '\n' + result.stdout + result.stderr)
++                self.assertEqual(len(list(Path(folder).glob('*.mtl4a'))), files, phase + '\n' + result.stderr)
++                self.assertEqual(list(Path(folder).glob('*.tmp')), [], phase)
++                if phase == 'seed' and mode == 'exec':
++                    # the next program started after the write: the file was there when it did
++                    self.assertEqual((Path(folder) / 'exec.txt').read_text().strip(), '1', result.stdout + result.stderr)
++
++    def test_prewarm_timer_flush_then_killed(self):
++        # five new bases in a prewarm, the timer's flush after DM_PSO_ARCH_WARM_FLUSH_MS, then _exit: one file, and the next start compiles none
++        self._end_in_prewarm('warmflush', {'DM_PSO_ARCH_WARM_FLUSH_MS': '300'}, 1)
++
++    def test_prepare_step_timer_flush_waits(self):
++        # the same in the prepare step (before the first frame): the timer's flush hands nothing over, and the run killed meanwhile left no file
++        self._end_in_prewarm('warmprep', {'DM_PSO_ARCH_WARM_FLUSH_MS': '300'}, 0, 1)
++
++    def test_sigterm_in_prewarm(self):
++        # SIGTERM in the prewarm: the graceful exit writes the five bases
++        self._end_in_prewarm('term', {'DM_PSO_ARCH_WARM_FLUSH_MS': '0'}, 1)
++
++    def test_sigterm_with_a_draw_under_way(self):
++        # SIGTERM while a draw holds the graphics layer (its suspend never returns): the five bases are written all the same
++        self._end_in_prewarm('term', {'DM_PSO_ARCH_WARM_FLUSH_MS': '0', 'DM_TEST_STUCK_DRAW': '1'}, 1)
++
++    def test_hand_over_with_a_draw_under_way(self):
++        # oe::ExecuteProgram's hand-over while a draw holds the graphics layer: the next program starts after the five bases are written
++        self._end_in_prewarm('exec', {'DM_PSO_ARCH_WARM_FLUSH_MS': '0', 'DM_TEST_STUCK_DRAW': '1'}, 1)
++
++    def test_write_cut_short_keeps_the_archive(self):
++        # a write a killed run left (its .tmp, its index without the file) and a file that is not an archive: the next start removes the leftovers, skips the bad file and
++        # takes every base from the good one
++        with tempfile.TemporaryDirectory(prefix='pso-torn-') as folder:
++            env = dict(os.environ, DM_PSO_MTL4='1', MTL_DEBUG_LAYER='1', DM_PSO_ARCH_WARM_FLUSH_MS='0')
++            for name in ('DM_GPU_CAPTURE', 'MTL_CAPTURE_ENABLED', 'DM_TEST_ARCHIVE_CONSTANTS', 'DM_TEST_ARCHIVE_MIXED', 'DM_TEST_STUCK_DRAW'):
++                env.pop(name, None)
++            result = subprocess.run([executable, '--term-seed', folder], env=env, capture_output=True, text=True, timeout=60)
++            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
++            good = list(Path(folder).glob('*.mtl4a'))
++            self.assertEqual(len(good), 1)
++            data = good[0].read_bytes()
++            (Path(folder) / '00090-5.mtl4a.tmp').write_bytes(data[:len(data) // 2])
++            (Path(folder) / '00091-5.keys').write_bytes(b'\0' * 64)
++            (Path(folder) / '00092-5.mtl4a').write_bytes(data[:len(data) // 3])
++            result = subprocess.run([executable, '--term-after', folder], env=env, capture_output=True, text=True, timeout=60)
++            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
++            self.assertFalse((Path(folder) / '00090-5.mtl4a.tmp').exists())
++            self.assertFalse((Path(folder) / '00091-5.keys').exists())
++
+     def test_compaction_with_fresh_bases_and_restart(self):
+         for constants in (False, True):
+             with self.subTest(constants=constants), tempfile.TemporaryDirectory(prefix='pso-restart-') as folder:
 diff --git a/dm/host/dm.h b/dm/host/dm.h
 index 03e6405a..aee5fd6a 100644
 --- a/dm/host/dm.h
