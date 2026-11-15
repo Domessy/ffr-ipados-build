@@ -39,3 +39,7 @@ Non réalisable dans cet environnement : exécution GPU Metal4 et routes réelle
 ## Essai iPad
 
 Conserver sauvegarde et caches ; mêmes options, même trajet et état thermique que référence. Metal4 pipelines activé ; MetalFX au choix du joueur, mais noter sa valeur et vérifier une ligne de remplacement effectif de dispatch si activé. Relever3chargements de sauvegarde puis trajet10min et transition de zone ; mémoire/Metal, pauses, textures/ombres, vitesse du jeu, préparation1er/2elancement. Les switches0permettent d’isoler ensuite résidence et RTdead si un problème apparaît. Une amélioration ou régression de ce lot complet n’attribue pas à elle seule un résultat à un correctif individuel.
+
+## État vérifié du lancement
+
+CI moteur 43745313604 et reconstruction/livraison synthétique complète 43747064343 réussies. Build privé lancé : [43747472766](https://github.com/Domessy/ffr-ipados-build/actions/runs/43747472766), code d90b4950. Les résultats réels du build et les essais M5 restent à vérifier.
