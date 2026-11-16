@@ -51,3 +51,11 @@ The first public wrapper issue and a macOS /var temporary-path test alias were c
 Run failed in public synthetic preflight, before Tailscale, NUP/cache transfer or game shader compilation. The official runtime now tags MTLLibrary by content digest; the custom metadata exporter incorrectly consumed that tag as a resolvable metallib filename. Strict path validation rejected the resulting digest.
 
 The v9 overlay now records an independent tool-only relative library source path for both loose and packed-image loads. Runtime digest identity and normal application behavior are preserved. No validator was loosened. Public regression exercises identical library bytes under several shader names, export from loose files and a packed image, resolving every emitted filename to the original bytes, and complete offline archive reuse. Local 143 tests pass; overlay applies to fresh upstream 87422462 and chain remains 9eecb8412308. macOS validation pending; no iPad behavior claim.
+
+## Validated fix and full build relaunch
+
+Public macOS validation **43938199620** succeeded on commit **314b8363212eebf878c561f30097b2defa98d2f9**: 143 pipeline tests, 47 locked-translator/Metal tests, production iOS compile/link, native CPU checks, real iOS/g17g render/mesh and specialized compute archive compilation/reuse. Loose and packed-image content-alias fixtures resolve real metallib paths; R=5, M=2, classified device-depth=2, failed=0. No GPU execution or M5 outcome claimed.
+
+Corrected overlay SHA-256: `7ad87e9bafbcc4f85e2fdba6fdc1a02ecea7f3f67582e7b9e8318cd6c583c24f`. Operational independent CachyOS gateway manifest updated atomically; fixed v9 readiness route succeeds. Existing NUP, shaders and v8 IPAs preserved.
+
+Full run **43939145417** dispatched with this validated code, build/ipad-v9/local-bundle/metal-snapshot: https://github.com/Domessy/ffr-ipados-build/actions/runs/43939145417 . The workflow retains the same mandatory public gates before private transfer. Full game build and iPad test remain pending. PR92 remains draft. Public validation proof: https://github.com/Domessy/ffr-ipados-build/actions/runs/43938199620 ; public log saved privately in resultats/oot2-v9-public-43938199620.log.
