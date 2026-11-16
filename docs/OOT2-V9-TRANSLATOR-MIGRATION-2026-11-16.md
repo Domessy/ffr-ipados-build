@@ -45,3 +45,9 @@ Run **43930899728** launched on code **8197d48d349f0b19e8d6f0e00b3579c34cf4a644*
 Local total is now 143 tests, including complete v9 reception/RomFS assembly and clean CRCs. 33 additional static source tests pass (one Metal-dependent case skipped); impact via dm/tools/usage.py records 4 affected games and 180 unknown, including OOT's missing manifest. The regress.py wrapper itself imports libproc.dylib even for impact, so the same static usage function was invoked directly on Linux; no GPU regression was run.
 
 The first public wrapper issue and a macOS /var temporary-path test alias were corrected before this dispatch. Separate public run 43928774631 remained queued without a job; cancel and force-cancel were refused by GitHub with inconsistent queue state. It is a duplicate public-only validation, not another private build.
+
+## Failed run 43930899728: exporter identity adaptation
+
+Run failed in public synthetic preflight, before Tailscale, NUP/cache transfer or game shader compilation. The official runtime now tags MTLLibrary by content digest; the custom metadata exporter incorrectly consumed that tag as a resolvable metallib filename. Strict path validation rejected the resulting digest.
+
+The v9 overlay now records an independent tool-only relative library source path for both loose and packed-image loads. Runtime digest identity and normal application behavior are preserved. No validator was loosened. Public regression exercises identical library bytes under several shader names, export from loose files and a packed image, resolving every emitted filename to the original bytes, and complete offline archive reuse. Local 143 tests pass; overlay applies to fresh upstream 87422462 and chain remains 9eecb8412308. macOS validation pending; no iPad behavior claim.

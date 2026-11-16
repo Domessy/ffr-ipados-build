@@ -1,14 +1,26 @@
 diff --git a/dm/gfx/nvn/nvn_mtl.m b/dm/gfx/nvn/nvn_mtl.m
-index f34ba0c5..b36f8e01 100644
+index f34ba0c5..e33b064d 100644
 --- a/dm/gfx/nvn/nvn_mtl.m
 +++ b/dm/gfx/nvn/nvn_mtl.m
-@@ -6433,6 +6433,13 @@ static void pso_user_record(const char *fmt, ...) {
+@@ -6433,6 +6433,25 @@ static void pso_user_record(const char *fmt, ...) {
  // index missed bases the archive held: Cuphead compiled 8 or 9 of its 28 prewarm bases again at every start. By content, any of them gives the same key, and the pipeline is the same:
  // one compile serves them all. A library with no name (one made from source: the diagnostic overrides, embedded kernels) has no key and is looked up in the files without an index
  static char g_lib_tag;
 +#ifdef OOT2_FULLWARM_TOOL
 +#include "oot2_fullwarm_constants.inc"
++// Offline descriptor scripts need a resolvable source path, independently of
++// the runtime archive key, which must remain the upstream content digest.
++static char g_full_lib_path;
++static id<MTLLibrary> full_lib_path(id<MTLLibrary> lib, NSString *path) {
++    NSString *prefix = [g_msl_dir stringByAppendingString:@"/"];
++    NSString *relative = [path hasPrefix:prefix] ? [path substringFromIndex:prefix.length] : nil;
++    if (lib && relative.length && [relative hasSuffix:@".metallib"] &&
++        ![relative containsString:@"/"] && ![relative containsString:@"\\"] && ![relative containsString:@".."])
++        objc_setAssociatedObject(lib, &g_full_lib_path, relative, OBJC_ASSOCIATION_COPY_NONATOMIC);
++    return lib;
++}
 +#else
++#define full_lib_path(lib,path) (lib)
 +#define full_cv_set(v,p,t,i) [(v) setConstantValue:(p) type:(t) atIndex:(i)]
 +#define full_cv_bind(d,v) ((d).constantValues = (v))
 +#define full_cv_copy_from(d) [(d).constantValues copy]
@@ -16,7 +28,25 @@ index f34ba0c5..b36f8e01 100644
  static id<MTLLibrary> lib_tag(id<MTLLibrary> lib, NSString *name) { if (lib && name) objc_setAssociatedObject(lib, &g_lib_tag, name, OBJC_ASSOCIATION_COPY_NONATOMIC); return lib; }
  static NSString *lib_digest(const void *p, size_t n) {
      uint8_t h[CC_SHA256_DIGEST_LENGTH]; CC_SHA256(p, (CC_LONG)n, h);
-@@ -6477,7 +6484,7 @@ static id<MTLFunction> fn4_note(id<MTLFunction> f, id<MTLLibrary> lib, NSString
+@@ -6449,7 +6468,7 @@ static id<MTLLibrary> lib_from_file(NSString *path, NSError **err) {
+         if (x && msl_image_map(img, x, &f)) {
+             void *base = f.base; size_t base_len = f.base_len;
+             dispatch_data_t d = dispatch_data_create(f.data, f.size, dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{ munmap(base, base_len); });
+-            return lib_tag([g_dev newLibraryWithData:d error:err], lib_digest(f.data, f.size));
++            return full_lib_path(lib_tag([g_dev newLibraryWithData:d error:err], lib_digest(f.data, f.size)), path);
+         }
+         if (!x) errno = open_errno;
+     }
+@@ -6457,7 +6476,7 @@ static id<MTLLibrary> lib_from_file(NSString *path, NSError **err) {
+     size_t len = (size_t)st.st_size; void *m = mmap(NULL, len, PROT_READ, MAP_PRIVATE, fd, 0); close(fd);
+     if (m == MAP_FAILED) { if (err) *err = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"mmap failed %@", path]}]; return nil; }
+     dispatch_data_t d = dispatch_data_create(m, len, dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{ munmap(m, len); });
+-    return lib_tag([g_dev newLibraryWithData:d error:err], lib_digest(m, len));
++    return full_lib_path(lib_tag([g_dev newLibraryWithData:d error:err], lib_digest(m, len)), path);
+ }
+ // NVN depth mode (nvnDeviceSetDepthMode): every vertex library has two entry points (dmsh_entry.py vs_depth): main0 rewrites z for the GL convention (near = -w, NVN's default),
+ // main0_z leaves z as is (near = 0, which Link's Awakening, 13 Sentinels and Engage set). Loading picks by the mode the game set, so no game needs a setting for it
+@@ -6477,7 +6496,7 @@ static id<MTLFunction> fn4_note(id<MTLFunction> f, id<MTLLibrary> lib, NSString
      if (!f || !lib || !name) return f;
      MTL4LibraryFunctionDescriptor *ld = [MTL4LibraryFunctionDescriptor new]; ld.library = lib; ld.name = name;
      MTL4FunctionDescriptor *d = ld;
@@ -25,7 +55,7 @@ index f34ba0c5..b36f8e01 100644
      os_unfair_lock_lock(&g_fn4_lock);
      if (!g_fn4) g_fn4 = [[NSMapTable alloc] initWithKeyOptions:NSPointerFunctionsStrongMemory | NSPointerFunctionsObjectPointerPersonality valueOptions:NSPointerFunctionsStrongMemory capacity:0];   // by identity: a function made again from the same library and name (other constants: bf_fn) is another function
      [g_fn4 setObject:d forKey:f];
-@@ -6554,14 +6561,14 @@ static FnOff *fn_off(id<MTLFunction> f) {
+@@ -6554,14 +6573,14 @@ static FnOff *fn_off(id<MTLFunction> f) {
          MTLFunctionConstantValues *cv = nil;
          if ([fd isKindOfClass:MTL4SpecializedFunctionDescriptor.class]) {
              MTL4SpecializedFunctionDescriptor *sd = (MTL4SpecializedFunctionDescriptor *)fd;
@@ -43,7 +73,7 @@ index f34ba0c5..b36f8e01 100644
          o->cv = cv; o->d4 = sd;
          return o;
      }
-@@ -8652,8 +8659,8 @@ static int pso_cls(const pso_key *k, NvShader *fs, uint32_t *cls) {
+@@ -8652,8 +8671,8 @@ static int pso_cls(const pso_key *k, NvShader *fs, uint32_t *cls) {
  static id<MTLFunction> side_spec(id<MTLLibrary> lib, NSString *name, uint32_t cls, int at, int lo, uint32_t targets, NSError **e) {
      MTLFunctionConstantValues *cv = [MTLFunctionConstantValues new]; bool a = at, l = lo;
      for (int n = 0; n < 8; n++) { bool u = cls >> n & 1, si = cls >> (8 + n) & 1, on = targets >> n & 1;
@@ -54,7 +84,7 @@ index f34ba0c5..b36f8e01 100644
      return fn_lib_spec(lib, name, cv, e);
  }
  // The side library <key>_bx (dmsh_side.py: the alpha test and logic operation entry points and the typed-output one), loaded once on first need; nil when it is not there or failed
-@@ -9849,7 +9856,12 @@ static void pso4_init(void) {
+@@ -9849,7 +9868,12 @@ static void pso4_init(void) {
          }
      });
  }
@@ -68,7 +98,7 @@ index f34ba0c5..b36f8e01 100644
  // Compute pipelines from the archive bundled with the app: it holds one per compute shader of the shader map and of the prewarm list's C rows (pso_offline.py), made from <key>_b's
  // function alone. A compute pipeline depends on nothing else here: the MTLDevice builds it from the function (newComputePipelineStateWithFunction, no threadgroup size or other
  // option; the dispatch gives the threadgroup size), so the lookup names the function alone too, by the descriptor shader_load noted (fn4_note). One the bundle does not hold
-@@ -10487,8 +10499,8 @@ static MTL4FunctionDescriptor *pre_fn(id<MTLLibrary> lib, NSString *name) {   //
+@@ -10487,8 +10511,8 @@ static MTL4FunctionDescriptor *pre_fn(id<MTLLibrary> lib, NSString *name) {   //
      MTL4LibraryFunctionDescriptor *ld = [MTL4LibraryFunctionDescriptor new]; ld.library = lib; ld.name = name;
      if (!f.functionConstantsDictionary.count) return ld;
      MTLFunctionConstantValues *cv = [MTLFunctionConstantValues new];
@@ -79,7 +109,7 @@ index f34ba0c5..b36f8e01 100644
  }
  static NSDictionary *pre_json(NSString *key) { NSData *d = msl_data([NSString stringWithFormat:@"%@/%@_b.json", g_msl_dir, key]); return d ? [NSJSONSerialization JSONObjectWithData:d options:0 error:nil] : nil; }
  // The base of one pair as the draws make it (pso_desc_pull / pso_desc), or nil when the pair is left to the draws. Call inside an autorelease pool
-@@ -13319,9 +13331,9 @@ static id<MTLFunction> bf_fn(NvShader *fs, const int *fx, uint8_t fbmask, const
+@@ -13319,9 +13343,9 @@ static id<MTLFunction> bf_fn(NvShader *fs, const int *fx, uint8_t fbmask, const
      id<MTLLibrary> lib = fs->bflib;
      if (!lib) { os_unfair_lock_unlock(&g_bf_fn_lock); return nil; }
      MTLFunctionConstantValues *cv = [MTLFunctionConstantValues new];
@@ -92,7 +122,7 @@ index f34ba0c5..b36f8e01 100644
      NSError *e = nil; id<MTLFunction> f = fn4_note([lib newFunctionWithName:@"main0_f" constantValues:cv error:&e], lib, @"main0_f", cv);
      if (!f) MLOG("[RED] readable-tile version specialization failed %s (mask %02x): %s", fs->key, fbmask, e.localizedDescription.UTF8String);
      NvBfFn *s = [NvBfFn new]; s->k = k; s->fn = f;
-@@ -18224,3 +18236,7 @@ void mem_census(const char *why) { @autoreleasepool {
+@@ -18224,3 +18248,7 @@ void mem_census(const char *why) { @autoreleasepool {
  #include "nvn_capture.inc"   // DM_NVN_CAPTURE (one frame for dm/gfx/tests/nvn_replay)
  #include "nvn_ndve.inc"      // DM_NDVE_ENGINE (nn::ndve's movie network)
  #pragma clang attribute pop
@@ -171,7 +201,7 @@ index 00000000..2b929cc5
 +}
 diff --git a/dm/gfx/nvn/oot2_fullwarm_export.inc b/dm/gfx/nvn/oot2_fullwarm_export.inc
 new file mode 100644
-index 00000000..26af1bec
+index 00000000..6de14d95
 --- /dev/null
 +++ b/dm/gfx/nvn/oot2_fullwarm_export.inc
 @@ -0,0 +1,196 @@
@@ -214,7 +244,7 @@ index 00000000..26af1bec
 +    }
 +    if (![descriptor isKindOfClass:MTL4LibraryFunctionDescriptor.class]) return nil;
 +    MTL4LibraryFunctionDescriptor *fn = (id)descriptor;
-+    NSString *path = fn.library ? objc_getAssociatedObject(fn.library, &g_lib_tag) : nil;
++    NSString *path = fn.library ? objc_getAssociatedObject(fn.library, &g_full_lib_path) : nil;
 +    if (!path || !fn.name || [path hasPrefix:@"/"] || [path containsString:@".."] || [path containsString:@"\\"]) return nil;
 +    NSString *library = full_library_names[path];
 +    if (!library) {

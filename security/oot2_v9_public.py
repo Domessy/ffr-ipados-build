@@ -3,6 +3,7 @@
 from pathlib import Path
 import subprocess
 import os
+import json
 import sys
 from oot2_v9_archives import configure
 
@@ -30,6 +31,28 @@ def main(root,work):
     result=full.compile_lists(root,image,work/'scripts',work/'cache',work/'bundle')
     again=full.compile_lists(root,image,work/'scripts',work/'cache',work/'bundle')
     assert again['reused_groups']==result['coverage']['periods']
+    # Identical library bytes under different shader keys must retain real paths,
+    # while the native runtime continues indexing archives by content digest.
+    def library_bytes(scripts, source):
+        found=[]
+        for script in sorted(scripts.glob('prewarm-*.mtl4-json')):
+            for lib in json.loads(script.read_text())['libraries']:
+                name=lib['path']
+                assert name.endswith('.metallib'), name
+                found.append((source/name).read_bytes())
+        assert found and len(set(found))==1, 'fixture must exercise content aliases'
+        return found
+    loose=library_bytes(work/'scripts',image)
+    import shader_lib
+    assert shader_lib.pack(str(image)), 'synthetic shader image packing failed'
+    assert not image.exists() and Path(str(image)+'.img').is_file()
+    packed_report=full.export(root,work/'fixture',work/'scripts-packed')
+    assert packed_report==report
+    import romfs
+    assert library_bytes(work/'scripts-packed',romfs.Path(shader_lib.view(str(image))))==loose
+    packed=full.compile_lists(root,image,work/'scripts-packed',work/'cache',work/'bundle-packed')
+    assert packed['reused_groups']==result['coverage']['periods']
+    print('PASS: real metallib paths with content aliases, loose and packed-image export, archive reuse.')
     from oot2_aot_pilot import pilot
     pilot(root,work/'aot-pilot')
     print('PASS: v9 native CPU checks, graphical fixture compilation, real iOS R/M archives and complete reuse. GPU execution not performed.')
