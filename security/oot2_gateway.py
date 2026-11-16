@@ -20,6 +20,7 @@ CONFLICTS = ROOT / "shader-cache-conflicts"
 OUTPUT = ROOT / "resultats"
 
 ROUTES = frozenset({
+    "oot2-write-slim-v9", "oot2-write-host-kit-v9", "oot2-local-bundle-v9-ready", "oot2-write-log-v9",
     "oot2-fullwarm-v8-write-next-slim", "oot2-fullwarm-v8-write-next-log",
     "oot2-fullwarm-v8-write-experimental-slim", "oot2-fullwarm-v8-write-experimental-log",
     "oot2-fullwarm-v8-info", "oot2-fullwarm-v8-read-kit", "oot2-fullwarm-v8-read-cache",
@@ -110,6 +111,12 @@ def diagnose():
 def dispatch(command, parent):
     if command not in ROUTES:
         return 126
+    if command in {"oot2-write-slim-v9", "oot2-write-host-kit-v9", "oot2-local-bundle-v9-ready", "oot2-write-log-v9"}:
+        try:
+            from .oot2_v9_gateway import dispatch as v9_dispatch
+        except ImportError:
+            from oot2_v9_gateway import dispatch as v9_dispatch
+        return v9_dispatch(command, parent, ROOT, OUTPUT, lambda: release_identity(nup_file()))
     if command.startswith('oot2-fullwarm-v8-'):
         try:
             from .oot2_ipad_aot import digest, inspect_ipa, CHAIN, GPU
