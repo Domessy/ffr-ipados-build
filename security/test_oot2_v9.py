@@ -36,6 +36,24 @@ class V9ReceiptTests(unittest.TestCase):
             p=Path(d).resolve()/'v9.ipa';p.write_bytes(b'previous');g.preserve(p)
             self.assertFalse(p.exists());self.assertEqual(len(list(Path(d).glob('*.previous'))),1)
             p.write_bytes(b'previous');g.preserve(p);self.assertEqual(len(list(Path(d).glob('*.previous'))),1)
+    def test_complete_receipt_and_romfs_assembly(self):
+        import struct, shutil
+        from types import SimpleNamespace
+        from security.oot2_local_bundle import identity
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp).resolve();out=root/'resultats';out.mkdir();source=root/'source';source.mkdir()
+            image=root/'local-bundle-v6/extract/v131072/RomFS.img';image.parent.mkdir(parents=True)
+            body=b'body';index=b'index';image.write_bytes(struct.pack('<8sQQQ',b'DMROMFS1',32+len(body),len(index),1)+body+index)
+            ident=identity(image);meta=root/'local-bundle-v6/romfs-manifest.json'
+            meta.write_text(json.dumps({'bytes':image.stat().st_size,'identity':ident,'sha256':hashlib.sha256(image.read_bytes()).hexdigest(),'source_identity':'test'}))
+            ipa=self.fixture(source)
+            with zipfile.ZipFile(ipa,'a') as z:z.writestr('Payload/Game.app/romfs.id',f'DMROMFSID1 title=0400486024DEC000 size={ident[0]} index={ident[1]}')
+            parent=SimpleNamespace(OUTPUT=root/'unused')
+            parent.receive_file=lambda name,limit:shutil.copyfile(ipa,parent.OUTPUT/name)
+            self.assertEqual(g.dispatch('oot2-write-slim-v9',parent,root,out,lambda:'test'),0)
+            self.assertEqual(parent.OUTPUT,root/'unused')
+            with zipfile.ZipFile(out/'ZeldaOcarinaOfTime-ipad-v9-fullwarm-livecontainer.ipa') as z:
+                self.assertIsNone(z.testzip());self.assertEqual(z.read('Payload/Game.app/romfs.img'),image.read_bytes())
     def test_unknown_command_rejected(self):
         self.assertEqual(g.dispatch('oot2-write-slim-v8',None,None,None,None),126)
 
