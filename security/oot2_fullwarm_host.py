@@ -98,7 +98,15 @@ def rebuild(root, kit, slim, output):
     # The generated comment names its source path, which changes on relocation.
     def definitions(path):
         return [line for line in path.read_text().splitlines() if not line.startswith('//')]
-    if definitions(header) != definitions(captured / 'generated/game_profile.h'):
+    profile_delta = None
+    if (root/'.oot2-next.json').exists():
+        try:
+            from .oot2_next_profile import validate as validate_profile
+        except ImportError:
+            from oot2_next_profile import validate as validate_profile
+        profile_delta = validate_profile(definitions(captured/'generated/game_profile.h'), definitions(header),
+            (captured/'Gen/dm/shader_map.tsv').read_text())
+    elif definitions(header) != definitions(captured / 'generated/game_profile.h'):
         raise ValueError('regenerated host profile differs')
     sys.path.insert(0, str(root / 'dm/games')); import game
     modules = game.load(captured / 'profile' / TITLE).modules_in(captured / 'patched')
@@ -121,6 +129,9 @@ def rebuild(root, kit, slim, output):
     target = output / 'rebuilt-host'; shutil.copyfile(executable, target)
     (output / 'host-result.json').write_text(json.dumps({'source': PIN, 'chain': CHAIN, 'sha256': digest(target),
         'bytes': target.stat().st_size, 'real_kit_modules': True, 'unsigned': True,
+        'host_next': json.loads((root/'.oot2-next.json').read_text()) if (root/'.oot2-next.json').exists() else None,
+        'profile_delta': profile_delta,
+        'host_experiment': json.loads((root/'.oot2-experimental.json').read_text()) if (root/'.oot2-experimental.json').exists() else None,
         'host_refresh': json.loads((root/'.oot2-fullwarm-refresh.json').read_text()) if (root/'.oot2-fullwarm-refresh.json').exists() else None}, indent=2) + '\n')
     # The verified executable above is a separate file, not inside DerivedData.
     # Keep captured sources and host-result.json; discard only rebuild scratch.

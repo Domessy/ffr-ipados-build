@@ -36,6 +36,8 @@ jobs:
           git -C "$SRC" checkout -q --detach FETCH_HEAD
           python3 security/oot2_fullwarm_prepare.py "$SRC"
           python3 security/oot2_fullwarm_refresh.py "$SRC"
+          python3 security/oot2_experimental_prepare.py "$SRC"
+          python3 security/oot2_next_prepare.py "$SRC"
           python3 -m unittest -v security.test_oot2_ipad_aot security.test_oot2_gateway security.test_oot2_transfer security.test_oot2_fullwarm
           python3 -m venv "$RUNNER_TEMP/aot-venv"
           "$RUNNER_TEMP/aot-venv/bin/python" -m pip install -q lz4
@@ -116,7 +118,7 @@ jobs:
         run: |
           set -euo pipefail
           TESTS="$RUNNER_TEMP/nxnative/dm/gfx/tests"
-          make -C "$TESTS" GAME=0400486024DEC000 -j 3 oot2_refresh_cpu t_pso_pending t_pso_depth_stencil t_pso_archive t_wait_event t_vc_ghost t_sparse_pool_cache > "$RUNNER_TEMP/refresh-tests-build.log" 2>&1 || { tail -100 "$RUNNER_TEMP/refresh-tests-build.log"; exit 1; }
+          make -C "$TESTS" GAME=0400486024DEC000 -j 3 oot2_refresh_cpu t_pso_pending t_pso_depth_stencil t_pso_archive t_wait_event t_vc_ghost t_sparse_pool_cache > "$RUNNER_TEMP/refresh-tests-build.log" 2>&1 || { sed -n '/error:/p;/Undefined symbols/,+18p' "$RUNNER_TEMP/refresh-tests-build.log"; tail -100 "$RUNNER_TEMP/refresh-tests-build.log"; exit 1; }
           "$TESTS/oot2_refresh_cpu"
           "$TESTS/t_pso_pending"
           "$TESTS/t_pso_depth_stencil" --keys-only

@@ -2,6 +2,7 @@
 """Exercise host-kit reconstruction using ONLY public synthetic smoke modules."""
 import io
 import json
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -23,6 +24,21 @@ def main(native, smoke, output, base_archive=None, full=None):
     files['generated/game_profile.h'] = native / 'dm/host/gen' / TITLE / 'game_profile.h'
     for path in (native / 'dm/games' / TITLE).iterdir():
         if path.suffix == '.tsv' or path.name == 'patches.py': files['profile/' + TITLE + '/' + path.name] = path
+    if (native / '.oot2-next.json').exists():
+        # Smoke resources contain no shader map. Supply synthetic NDSR rows
+        # and the matching old captured profile to exercise the real 1 -> 2 guard.
+        table = output / 'synthetic-shader-map.tsv'
+        table.write_text('a\tb\tcompute\t1111111111111111\t/x/agl_ndsr.pck#NDSR@0x10\n'
+                         'a\tb\tcompute\t2222222222222222\t/x/agl_ndsr_vr.pck#NDSR@0x20\n')
+        profile = output / 'captured-game-profile.h'
+        text = files['generated/game_profile.h'].read_text()
+        text, keys = re.subn(r'^#define DM_GAME_UPSCALER_KEYS .*$', '#define DM_GAME_UPSCALER_KEYS "1111111111111111"', text, flags=re.M)
+        text, count = re.subn(r'^#define DM_GAME_UPSCALER_N .*$', '#define DM_GAME_UPSCALER_N 1', text, flags=re.M)
+        assert keys == count == 1
+        profile.write_text(text)
+        files['generated/game_profile.h'] = profile
+        files['Gen/dm/shader_map.tsv'] = table
+        files['profile/' + TITLE + '/shader_map.tsv'] = table
     manifest = {'format': 1, 'title': TITLE, 'package': 'v131072', 'source_revision': PIN, 'shader_chain': CHAIN,
                 'optimization_recipe_sha256': digest(Path(__file__).with_name('oot2_ipad_v8_manifest.json')),
                 'host_only_rebuild_validated': False,
@@ -44,7 +60,9 @@ def main(native, smoke, output, base_archive=None, full=None):
         z.write(app / info['CFBundleExecutable'], prefix + info['CFBundleExecutable'])
         for name, path in files.items():
             if name.startswith('Gen/dm/'): z.write(path, prefix + name.removeprefix('Gen/'))
-        for name in TABLES: z.writestr(prefix + 'dm/' + name, '# synthetic public fixture\n')
+        for name in TABLES:
+            if 'Gen/dm/' + name not in files:
+                z.writestr(prefix + 'dm/' + name, '# synthetic public fixture\n')
         z.writestr(prefix + f'msl/b-{CHAIN}.img', b'Synthetic marker; no game shaders')
     import struct, hashlib
     from oot2_local_bundle import identity
@@ -82,6 +100,15 @@ def main(native, smoke, output, base_archive=None, full=None):
             assert z.testzip() is None
             assert z.read(prefix+'romfs.img')==romfs.read_bytes()
             assert prefix+'pso/rest_pairs.tsv' not in z.namelist()
+        if report['host'].get('host_next'):
+            stable_sha=digest(delivered)
+            with (output/'verified-output.ipa').open('rb') as stream:
+                with patch.object(gateway,'ROOT',pc), patch.object(gateway,'OUTPUT',pc_results), patch.object(sys,'stdin',SimpleNamespace(buffer=stream)):
+                    assert gateway.dispatch('oot2-fullwarm-v8-write-next-slim',parent)==0
+            assert digest(delivered)==stable_sha
+            with zipfile.ZipFile(pc_results/'ZeldaOcarinaOfTime-ipad-v8-next-host-livecontainer.ipa') as z:
+                assert z.testzip() is None and z.read(prefix+'romfs.img')==romfs.read_bytes()
+            print('PASS: next-host provenance, profile delta and isolated delivery validated.')
         print('PASS: production receive gateway and final RomFS assembly verified with zero remaining pairs.')
         print('PASS: complete synthetic IPA repacked with actual iOS archives and rebuilt host; original resources rehashed.')
     print('PASS: verified host-kit unpack, actual gen_embed, production unsigned iOS rebuild; no retail data.')
