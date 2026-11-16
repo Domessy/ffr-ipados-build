@@ -53,7 +53,10 @@ def validate_slim(path):
 def preserve(path):
     if path.exists():
         regular(path);backup=path.with_name(path.name+'.'+digest(path)+'.previous')
-        if backup.exists():path.unlink()
+        if backup.exists():
+            regular(backup)
+            if digest(backup)!=digest(path):raise ValueError('v9 previous output corrupted')
+            path.unlink()
         else:path.rename(backup)
 
 def dispatch(command,parent,root,output,nup_identity):

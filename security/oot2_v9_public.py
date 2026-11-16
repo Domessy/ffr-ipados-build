@@ -2,12 +2,19 @@
 """Real iOS offline archives and native CPU checks from synthetic inputs only."""
 from pathlib import Path
 import subprocess
+import os
 import sys
 from oot2_v9_archives import configure
 
 def main(root,work):
     root,work=map(lambda p:Path(p).resolve(),(root,work));work.mkdir(exist_ok=False)
     aot,full,pack=configure()
+    env=dict(os.environ,DMSH_TEST_XLATE=str(root/'dm/gfx/tools/dmsh_xlate_bin/dmsh_xlate'),DMSH_TEST_METAL='1')
+    subprocess.run([sys.executable,'-m','unittest','-q',
+        'dm/gfx/tests/test_dmsh_raw_noinline.py','dm/gfx/tests/test_dmsh_membar_fence.py',
+        'dm/gfx/tests/test_dmsh_ldc_offset.py','dm/gfx/tests/test_dmsh_typed.py',
+        'dm/tools/tests/test_nsp_chain.py','dm/tools/tests/test_residency_naming.py'],cwd=root,env=env,check=True)
+    subprocess.run([sys.executable,'-m','unittest','-q','security.test_oot2_v9'],cwd=Path(__file__).resolve().parents[1],check=True)
     tests=root/'dm/gfx/tests'
     targets=['t_serial_owner','t_pend_index','t_fstep','t_res_cb','t_pso_stall','t_rt_recycle','t_lazy_clear_order','t_vis_need']
     subprocess.run(['make','-C',str(tests),'GAME=0400486024DEC000','-j','3',*targets],check=True)
