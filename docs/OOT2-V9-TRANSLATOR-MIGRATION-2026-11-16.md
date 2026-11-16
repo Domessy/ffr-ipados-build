@@ -37,3 +37,11 @@ Public gates: actual locked translator/Metal tests (raw search, MEMBAR/BAR.SYNC,
 ## iPad protocol
 
 Keep the previous IPA and saves. Compare the same save/route and options, with similar temperature. Three save loads, 10-minute Kokiri route and an area transition; then a longer route through the shadow-pool transitions if stable. Record memory/Jetsam, global/foliage flicker, missing surfaces, frame p95/p99, time at 30/60 and preparation first/second launch. Confirm archives are opened **and used**; opening a file alone does not prove coverage. Compare Handheld + MetalFX with hold on/off separately; no universal M5 gain follows from the M2 Max report.
+
+## Dispatch with mandatory public gates
+
+Run **43930899728** launched on code **8197d48d349f0b19e8d6f0e00b3579c34cf4a644**, branch experimental/oot2-v9-chain-20261116, mode build/local-bundle/metal-snapshot. The job is in progress. The same job runs locked-translator tests, production iOS compile/link, CPU ownership/write-index tests and genuine synthetic archive compilation/reuse before Tailscale or any private cache/NUP transfer. No claim of completed macOS validation at dispatch.
+
+Local total is now 143 tests, including complete v9 reception/RomFS assembly and clean CRCs. 33 additional static source tests pass (one Metal-dependent case skipped); impact via dm/tools/usage.py records 4 affected games and 180 unknown, including OOT's missing manifest. The regress.py wrapper itself imports libproc.dylib even for impact, so the same static usage function was invoked directly on Linux; no GPU regression was run.
+
+The first public wrapper issue and a macOS /var temporary-path test alias were corrected before this dispatch. Separate public run 43928774631 remained queued without a job; cancel and force-cancel were refused by GitHub with inconsistent queue state. It is a duplicate public-only validation, not another private build.
