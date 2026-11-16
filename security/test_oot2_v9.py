@@ -33,7 +33,7 @@ class V9ReceiptTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'host hash'):g.validate_slim(self.fixture(d,tamper_host=True))
     def test_previous_output_preserved(self):
         with tempfile.TemporaryDirectory() as d:
-            p=Path(d)/'v9.ipa';p.write_bytes(b'previous');g.preserve(p)
+            p=Path(d).resolve()/'v9.ipa';p.write_bytes(b'previous');g.preserve(p)
             self.assertFalse(p.exists());self.assertEqual(len(list(Path(d).glob('*.previous'))),1)
             p.write_bytes(b'previous');g.preserve(p);self.assertEqual(len(list(Path(d).glob('*.previous'))),1)
     def test_unknown_command_rejected(self):
