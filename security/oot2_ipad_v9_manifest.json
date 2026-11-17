@@ -1,0 +1,18 @@
+{
+  "base_revision": "87422462a4c020def29cc39d3042b08cc9eab02a",
+  "shader_chain": "9eecb8412308",
+  "patch_sha256": "7ad87e9bafbcc4f85e2fdba6fdc1a02ecea7f3f67582e7b9e8318cd6c583c24f",
+  "originals": {
+    "dm/gfx/nvn/nvn_mtl.m": "e7f60946aa9caabdce7f980b8860470e3a29f7a1457d0d3b438af80d7dce0922",
+    "dm/gfx/tests/Makefile": "fa9ac9e0b46fddbe4a3c6753ef96478c22dc709ea4485deef547d2f2687435f8",
+    "scripts/build_ipa_from_nsp.py": "28c246a83e333713fa9097b995bdc726a9d135fba3ce4439a0455a05dca3b7d9",
+    "dm/gfx/nvn/dmsh_chain.h": "6c92e5defb117b0b7f93a1bf7df941b74db6a2d058b1a3996b790bde6d3b74a4"
+  },
+  "new_files": [
+    "dm/gfx/nvn/oot2_fullwarm_constants.inc",
+    "dm/gfx/nvn/oot2_fullwarm_export.inc",
+    "dm/gfx/tests/oot2_fullwarm_harness.m"
+  ],
+  "scope": "official host and genuine new translation; no old shader library or archive relabeling",
+  "gpu_runtime_validated": false
+}

@@ -12,9 +12,9 @@ import subprocess
 import tempfile
 import time
 
-ROUTES = {"resume-v8": "oot2-read-resume-v8", "resume-v6": "oot2-read-resume-v6", "resume-v5": "oot2-read-resume-v5", "nup": "oot2-read-nup", "metal-snapshot": "oot2-read-metal-snapshot-v1"}
+ROUTES = {"v9-checkpoint": "oot2-read-checkpoint-v9", "resume-v9": "oot2-read-resume-v9", "resume-v8": "oot2-read-resume-v8", "resume-v6": "oot2-read-resume-v6", "resume-v5": "oot2-read-resume-v5", "nup": "oot2-read-nup", "metal-snapshot": "oot2-read-metal-snapshot-v1"}
 ROUTES.update({'aot-input': 'oot2-aot-v8-read-input', 'aot-cache': 'oot2-aot-v8-read-cache'})
-DESTINATIONS = {"resume-v8": ("oot2-shader-cas", "metal-snapshot.zst"), "resume-v6": ("oot2-shader-cas", "metal-snapshot.zst"), "resume-v5": ("oot2-shader-cas", "metal-snapshot.zst"), "nup": ("oot2-nup", "OcarinaOfTime.nup"),
+DESTINATIONS = {"v9-checkpoint": ("oot2-v9", "input.ipa"), "resume-v9": ("oot2-shader-cas", "metal-snapshot.zst"), "resume-v8": ("oot2-shader-cas", "metal-snapshot.zst"), "resume-v6": ("oot2-shader-cas", "metal-snapshot.zst"), "resume-v5": ("oot2-shader-cas", "metal-snapshot.zst"), "nup": ("oot2-nup", "OcarinaOfTime.nup"),
                 "metal-snapshot": ("oot2-shader-cas", "metal-snapshot.zst")}
 MiB = 1024 ** 2
 DESTINATIONS.update({'aot-input': ('oot2-aot', 'input.ipa'), 'aot-cache': ('oot2-aot', 'cache.tar.gz')})

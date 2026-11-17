@@ -1,21 +1,18 @@
-name: OOT2 experimental host validation
+name: OOT2 v9 public translator and complete prewarm validation
 on:
   workflow_dispatch:
   pull_request:
     branches: [main]
-    paths:
-      - '.github/workflows/test-oot2-experimental.yml'
-      - 'security/oot2_experimental*'
-      - 'security/oot2_next*'
+    paths: ['security/oot2*v9*', '.github/workflows/*oot2-v9.yml']
 permissions:
   contents: read
 concurrency:
-  group: oot2-experimental-validation-${{ github.ref }}
+  group: oot2-v9-validation-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  public-host:
+  public:
     runs-on: xcode-27
-    timeout-minutes: 20
+    timeout-minutes: 35
     env:
       DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
     defaults:
@@ -25,33 +22,36 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
-      - name: Prepare exact experimental host without private inputs
+      - name: Prepare immutable official host and genuine translator
         run: |
           set -euo pipefail
           SRC="$RUNNER_TEMP/nxnative"
           git init -q "$SRC"
           git -C "$SRC" remote add origin https://github.com/seedds/nxnative.git
-          git -C "$SRC" fetch -q --depth 1 origin ccd834e06a3938834bb5579e2ccc6a0ad13d3970
+          git -C "$SRC" fetch -q --depth 1 origin 87422462a4c020def29cc39d3042b08cc9eab02a
           git -C "$SRC" checkout -q --detach FETCH_HEAD
-          python3 security/oot2_fullwarm_prepare.py "$SRC"
-          python3 security/oot2_fullwarm_refresh.py "$SRC"
-          python3 security/oot2_experimental_prepare.py "$SRC"
-          python3 security/oot2_next_prepare.py "$SRC"
-          python3 -m unittest -q security.test_oot2_ipad_aot security.test_oot2_gateway security.test_oot2_transfer security.test_oot2_fullwarm security.test_oot2_next_profile
-      - name: Run CPU ownership and GPU write fence regressions
+          python3 security/oot2_prepare_ipad_v9.py "$SRC"
+          brew install python@3.15 xcodegen zstd
+          "$(brew --prefix python@3.15)/bin/python3.15" -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install -q lz4 capstone fonttools
+          xcodebuild -downloadComponent MetalToolchain
+          "$RUNNER_TEMP/venv/bin/python" security/oot2_v9_validate.py "$SRC"
+          "$RUNNER_TEMP/venv/bin/python" security/oot2_shader_identity.py "$SRC" --expected da13969b5e94fb5c63625b3deadc1ce5ddf41adffc521b588dfe2d8747e9fd38
+          python3 -m unittest discover -s security -p 'test_oot2*.py' -q
+      - name: Exercise translator fixes with the locked translator and Metal compilers
         run: |
           set -euo pipefail
-          TESTS="$RUNNER_TEMP/nxnative/dm/gfx/tests"
-          make -C "$TESTS" GAME=0400486024DEC000 -j 3 oot2_experimental_cpu t_zero_depth t_res_cb t_dead_targets t_upscaler_mfx t_pso_pending t_fstep > "$RUNNER_TEMP/experimental-build.log" 2>&1 || { sed -n '/error:/p' "$RUNNER_TEMP/experimental-build.log"; tail -100 "$RUNNER_TEMP/experimental-build.log"; exit 1; }
-          "$TESTS/oot2_experimental_cpu"
-          "$TESTS/t_pso_pending"
-          "$TESTS/t_fstep"
-          echo 'Depth GPU fixture compiled only; executing it requires a Metal4 device.'
-      - name: Compile and link the production iOS host with public fixture
+          cd "$RUNNER_TEMP/nxnative"
+          export DMSH_TEST_XLATE="$PWD/dm/gfx/tools/dmsh_xlate_bin/dmsh_xlate"
+          export DMSH_TEST_METAL=1
+          "$RUNNER_TEMP/venv/bin/python" -m unittest -q dm/gfx/tests/test_dmsh_raw_noinline.py dm/gfx/tests/test_dmsh_membar_fence.py dm/gfx/tests/test_dmsh_ldc_offset.py dm/gfx/tests/test_dmsh_typed.py dm/tools/tests/test_nsp_chain.py dm/tools/tests/test_residency_naming.py
+      - name: Compile production iOS host with synthetic guest modules
         run: |
           set -euo pipefail
-          brew install xcodegen
-          python3 -m venv "$RUNNER_TEMP/venv"
-          "$RUNNER_TEMP/venv/bin/python" -m pip install -q lz4
-          GAME=0400486024DEC000 "$RUNNER_TEMP/venv/bin/python" "$RUNNER_TEMP/nxnative/dm/ios/tools/build_smoke.py" --output "$RUNNER_TEMP/experimental-ios" > "$RUNNER_TEMP/experimental-ios.log" 2>&1 || { tail -100 "$RUNNER_TEMP/experimental-ios.log"; exit 1; }
-          tail -3 "$RUNNER_TEMP/experimental-ios.log"
+          GAME=0400486024DEC000 "$RUNNER_TEMP/venv/bin/python" "$RUNNER_TEMP/nxnative/dm/ios/tools/build_smoke.py" --output "$RUNNER_TEMP/public-ios" > "$RUNNER_TEMP/ios.log" 2>&1 || { sed -n '/error:/p;/Undefined symbols/,+18p' "$RUNNER_TEMP/ios.log"; tail -100 "$RUNNER_TEMP/ios.log"; exit 1; }
+          tail -4 "$RUNNER_TEMP/ios.log"
+      - name: Execute CPU owner and write-index checks and compile actual iOS R/M archives
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/venv/bin/python" security/oot2_v9_public.py "$RUNNER_TEMP/nxnative" "$RUNNER_TEMP/public-archives" > "$RUNNER_TEMP/public-archives.log" 2>&1 || { sed -n '/error:/p;/Undefined symbols/,+18p' "$RUNNER_TEMP/public-archives.log"; tail -130 "$RUNNER_TEMP/public-archives.log"; exit 1; }
+          tail -15 "$RUNNER_TEMP/public-archives.log"
