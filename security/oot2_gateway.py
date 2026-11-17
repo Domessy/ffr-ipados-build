@@ -12,6 +12,11 @@ try:
 except ImportError:  # forced-command gateway runs as a standalone script
     from oot2_nup_info import TITLE, VERSION, SUPER, inspect, selected_romfs_bytes, release_identity, NupInvalid
 
+try:
+    from .oot2_v9_gateway import ROUTES as V9_ROUTES
+except ImportError:
+    from oot2_v9_gateway import ROUTES as V9_ROUTES
+
 HOME = Path.home()
 ROOT = HOME / "portage-ipados" / "oot-switch2"
 SOURCE_LINK = ROOT / "source"
@@ -20,7 +25,6 @@ CONFLICTS = ROOT / "shader-cache-conflicts"
 OUTPUT = ROOT / "resultats"
 
 ROUTES = frozenset({
-    "oot2-write-checkpoint-v9", "oot2-write-slim-v9", "oot2-write-host-kit-v9", "oot2-local-bundle-v9-ready", "oot2-write-log-v9",
     "oot2-fullwarm-v8-write-next-slim", "oot2-fullwarm-v8-write-next-log",
     "oot2-fullwarm-v8-write-experimental-slim", "oot2-fullwarm-v8-write-experimental-log",
     "oot2-fullwarm-v8-info", "oot2-fullwarm-v8-read-kit", "oot2-fullwarm-v8-read-cache",
@@ -41,7 +45,7 @@ ROUTES = frozenset({
     "oot2-write-host-kit-v8", "oot2-write-slim-v8", "oot2-local-bundle-v8-ready",
     "oot2-write-host-kit-v1",
     "oot2-write-host-kit-v5", "oot2-write-host-kit-v6", "oot2-write-slim-v6", "oot2-local-bundle-v6-ready",
-})
+}) | V9_ROUTES
 
 
 def nup_file():
@@ -112,7 +116,7 @@ def diagnose():
 def dispatch(command, parent):
     if command not in ROUTES:
         return 126
-    if command in {"oot2-write-slim-v9", "oot2-write-host-kit-v9", "oot2-local-bundle-v9-ready", "oot2-write-log-v9"}:
+    if command in V9_ROUTES:
         try:
             from .oot2_v9_gateway import dispatch as v9_dispatch
         except ImportError:
@@ -324,6 +328,8 @@ def dispatch(command, parent):
         elif command in ("oot2-write-host-kit-v1", "oot2-write-host-kit-v5", "oot2-write-host-kit-v6", "oot2-write-host-kit-v7", "oot2-write-host-kit-v8"):
             filename = ("OOT2HostKit-v8.tar.zst" if command.endswith("-v8") else "OOT2HostKit-v7.tar.zst" if command.endswith("-v7") else "OOT2HostKit-v6.tar.zst" if command.endswith("-v6") else "OOT2HostKit-v5.tar.zst" if command.endswith("-v5") else "OOT2HostKit-v4.tar.zst")
             parent.receive_file(filename, 1 * 1024**3)
+        else:
+            return 126
         return 0
     finally:
         parent.CACHE, parent.CONFLICTS, parent.OUTPUT = previous

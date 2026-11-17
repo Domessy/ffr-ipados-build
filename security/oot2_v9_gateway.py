@@ -14,7 +14,7 @@ except ImportError:
     from oot2_local_bundle import bundle, identity, regular, validate_zip_headers
     from oot2_fullwarm import validate_render_coverage
 GPU='applegpu_g17g'
-ROUTES={'oot2-write-slim-v9','oot2-write-host-kit-v9','oot2-local-bundle-v9-ready','oot2-write-log-v9','oot2-write-checkpoint-v9'}
+ROUTES={'oot2-write-slim-v9','oot2-write-host-kit-v9','oot2-local-bundle-v9-ready','oot2-write-log-v9','oot2-write-checkpoint-v9','oot2-checkpoint-v9-info','oot2-read-checkpoint-v9'}
 
 def digest(path):
     h=hashlib.sha256()
@@ -67,6 +67,14 @@ def dispatch(command,parent,root,output,nup_identity):
             image=root/'local-bundle-v6/extract/v131072/RomFS.img';meta=root/'local-bundle-v6/romfs-manifest.json';regular(image);regular(meta);m=json.loads(meta.read_text())
             if m['source_identity']!=nup_identity() or list(identity(image))!=m['identity']:raise ValueError('v9 local RomFS identity')
             print('OOT2_LOCAL_BUNDLE_READY_V9',image.stat().st_size)
+        elif command in ('oot2-checkpoint-v9-info','oot2-read-checkpoint-v9'):
+            checkpoint=output/'ZeldaOcarinaOfTime-v9-unwarmed-checkpoint.ipa'
+            regular(checkpoint);meta=output/'v9-checkpoint.json';regular(meta)
+            record=json.loads(meta.read_text())
+            if record.get('chain')!=CHAIN or record.get('bytes')!=checkpoint.stat().st_size or record.get('sha256')!=digest(checkpoint) or record.get('fullwarm_validated') is not False:
+                raise ValueError('v9 checkpoint identity')
+            if command=='oot2-checkpoint-v9-info':print('OOT2_V9_CHECKPOINT_V1',record['bytes'],record['sha256'])
+            else:parent.send_file(checkpoint)
         elif command=='oot2-write-checkpoint-v9':
             try:
                 from .oot2_ipad_aot import inspect_ipa

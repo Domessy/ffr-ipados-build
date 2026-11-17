@@ -26,6 +26,23 @@ class RecoveryTests(unittest.TestCase):
         parent=SimpleNamespace(OUTPUT=out)
         parent.receive_file=lambda name,limit:shutil.copyfile(source,parent.OUTPUT/name)
         return parent,out
+    def test_checkpoint_works_through_the_actual_top_level_gateway(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d).resolve();parent,out=self.receive(root,self.checkpoint(root))
+            parent.CACHE=root/'cache';parent.CONFLICTS=root/'conflicts'
+            with patch.object(gateway,'ROOT',root),patch.object(gateway,'OUTPUT',out):
+                self.assertEqual(gateway.dispatch('oot2-write-checkpoint-v9',parent),0)
+                self.assertTrue((out/'ZeldaOcarinaOfTime-v9-unwarmed-checkpoint.ipa').is_file())
+                self.assertEqual(gateway.dispatch('oot2-checkpoint-v9-info',parent),0)
+                parent.send_file=lambda p:self.assertEqual(p,out/'ZeldaOcarinaOfTime-v9-unwarmed-checkpoint.ipa')
+                self.assertEqual(gateway.dispatch('oot2-read-checkpoint-v9',parent),0)
+                (out/'ZeldaOcarinaOfTime-v9-unwarmed-checkpoint.ipa').write_bytes(b'tampered')
+                with self.assertRaisesRegex(ValueError,'identity'):gateway.dispatch('oot2-read-checkpoint-v9',parent)
+    def test_declared_but_unimplemented_route_fails_closed(self):
+        parent=SimpleNamespace(CACHE=Path('/cache'),CONFLICTS=Path('/conflicts'),OUTPUT=Path('/output'))
+        with patch.object(gateway,'ROUTES',gateway.ROUTES|{'oot2-unhandled-fixture'}):
+            self.assertEqual(gateway.dispatch('oot2-unhandled-fixture',parent),126)
+        self.assertEqual(parent.OUTPUT,Path('/output'))
     def test_raw_checkpoint_is_preserved_separately_without_claiming_prewarm(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d).resolve();parent,out=self.receive(root,self.checkpoint(root))

@@ -11,6 +11,7 @@ on:
         options:
           - preflight
           - build
+          - finish
 
       runtime_variant:
         description: iPad optimization candidate or preserved earlier experiments
@@ -355,6 +356,7 @@ jobs:
           ssh -o ConnectTimeout=15 ffr-cachyos oot2-diagnose-v1
 
       - name: Verifier le NUP et la capacite disque avant transfert
+        if: ${{ inputs.mode != 'finish' }}
         run: |
           set -euo pipefail
           read -r TITLE VERSION NUP_BYTES BASE PATCHES PKGS <<< "$(ssh -o ConnectTimeout=20 ffr-cachyos oot2-manifest-v1)"
@@ -524,12 +526,31 @@ jobs:
         run: |
           set -euo pipefail
           test -s "$RUNNER_TEMP/ZeldaOcarinaOfTime.ipa"
-          ssh -o ConnectTimeout=20 -o ServerAliveInterval=30 -o ServerAliveCountMax=6 \
-            ffr-cachyos oot2-write-checkpoint-v9 < "$RUNNER_TEMP/ZeldaOcarinaOfTime.ipa"
+          read -r MARK BYTES <<< "$(ssh -o ConnectTimeout=20 -o ServerAliveInterval=30 -o ServerAliveCountMax=6 \
+            ffr-cachyos oot2-write-checkpoint-v9 < "$RUNNER_TEMP/ZeldaOcarinaOfTime.ipa")"
+          EXPECTED_BYTES=$(wc -c < "$RUNNER_TEMP/ZeldaOcarinaOfTime.ipa" | tr -d ' ')
+          [[ "$MARK" == OOT2_V9_CHECKPOINT_SAVED && "$BYTES" == "$EXPECTED_BYTES" ]]
           echo 'Compiled v9 checkpoint saved privately; full prewarm and final IPA still pending.'
 
+      - name: Restore verified compiled v9 checkpoint without NUP or shader cache
+        if: ${{ inputs.mode == 'finish' }}
+        run: |
+          set -euo pipefail
+          umask 077
+          read -r MARK BYTES SHA <<< "$(ssh -o ConnectTimeout=20 ffr-cachyos oot2-checkpoint-v9-info)"
+          [[ "$MARK" == OOT2_V9_CHECKPOINT_V1 && "$BYTES" =~ ^[1-9][0-9]*$ && "$SHA" =~ ^[0-9a-f]{64}$ ]]
+          FREE=$(( $(df -Pk "$RUNNER_TEMP" | awk 'NR==2 {print $4}') * 1024 ))
+          (( FREE >= BYTES + 50 * 1024**3 )) || { echo 'Insufficient disk for v9 archives.' >&2; exit 1; }
+          mkdir -p "$RUNNER_TEMP/oot2-v9"
+          python3 security/oot2_transfer.py v9-checkpoint "$BYTES" "$RUNNER_TEMP/oot2-v9/input.ipa"
+          RECEIVED_SHA=$(shasum -a 256 "$RUNNER_TEMP/oot2-v9/input.ipa" | awk '{print $1}')
+          [[ "$RECEIVED_SHA" == "$SHA" ]]
+          mv "$RUNNER_TEMP/oot2-v9/input.ipa" "$RUNNER_TEMP/ZeldaOcarinaOfTime.ipa"
+          ssh -o ConnectTimeout=20 ffr-cachyos oot2-local-bundle-v9-ready
+          echo 'Exact compiled v9 app restored; no NUP, shader translation or game executable compilation.'
+
       - name: Rebuild complete iPad pipeline archives for the genuine v9 chain
-        if: ${{ inputs.mode == 'build' }}
+        if: ${{ inputs.mode == 'build' || inputs.mode == 'finish' }}
         run: |
           set -euo pipefail
           "$RUNNER_TEMP/oot2-venv/bin/python" security/oot2_v9_archives.py "$RUNNER_TEMP/nxnative" "$RUNNER_TEMP/ZeldaOcarinaOfTime.ipa" "$RUNNER_TEMP/v9-archives"
@@ -540,7 +561,7 @@ jobs:
         env:
           OOT2_IPA_LAYOUT: ${{ inputs.ipa_layout }}
           OOT2_RUNTIME_VARIANT: ${{ inputs.runtime_variant }}
-        if: ${{ inputs.mode == 'build' }}
+        if: ${{ inputs.mode == 'build' || inputs.mode == 'finish' }}
         run: |
           set -euo pipefail
           test -s "$RUNNER_TEMP/ZeldaOcarinaOfTime.ipa"
