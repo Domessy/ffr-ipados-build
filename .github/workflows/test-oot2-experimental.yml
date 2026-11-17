@@ -5,6 +5,9 @@ permissions:
   contents: read
 jobs:
   public:
+    env:
+      OOT2_RUNTIME_VARIANT: ipad-v10
+      OOT2_IPA_LAYOUT: local-bundle
     runs-on: xcode-27
     timeout-minutes: 40
     steps:
