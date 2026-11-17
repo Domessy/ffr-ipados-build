@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Complete immutable official tree; no local renderer or translator overlay."""
+"""Complete immutable runtime/translator, plus isolated runner metadata exporter."""
 import hashlib,json,subprocess
 from pathlib import Path
 try:
@@ -18,6 +18,10 @@ def prepare(root):
         if p.is_symlink() or hashlib.sha256(p.read_bytes()).hexdigest()!=h:raise ValueError('v10 input identity')
     chain=subprocess.check_output(['python3',str(root/'dm/gfx/tools/dmsh_chain.py')],text=True).strip()
     if chain!=CHAIN:raise ValueError('v10 actual translation chain')
+    patch=Path(__file__).with_name('oot2_ipad_v10_native.patch')
+    if hashlib.sha256(patch.read_bytes()).hexdigest()!=m['patch_sha256']:raise ValueError('v10 tool patch identity')
+    subprocess.run(['git','-C',str(root),'apply','--check',str(patch.resolve())],check=True)
+    subprocess.run(['git','-C',str(root),'apply',str(patch.resolve())],check=True)
     script=root/'scripts/build_ipa_from_nsp.py';code=script.read_text()
     if code.count(ANCHOR)!=1 or "if fam['nup'].siblings:" not in code:raise ValueError('v10 NUP lifecycle contract')
     injection=INJECTION.replace('and not g.get("programs", "")','and not g.get("programs", "")\n            and not fam["nup"].siblings')

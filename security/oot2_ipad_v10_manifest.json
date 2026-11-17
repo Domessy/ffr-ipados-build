@@ -3,7 +3,9 @@
   "shader_chain": "a9bfaeb9fa8c",
   "originals": {
     "scripts/build_ipa_from_nsp.py": "3302c0da97a3b8585510d2af20c9f221c6d4be4fc4ae5bdf0e3c8d13509ca03d",
-    "dm/gfx/nvn/dmsh_chain.h": "6d4833cec46d22453123395949c573eb0ab590f0dd440e5348012688928ee638"
+    "dm/gfx/nvn/dmsh_chain.h": "6d4833cec46d22453123395949c573eb0ab590f0dd440e5348012688928ee638",
+    "dm/gfx/nvn/nvn_mtl.m": "79f84b1726cceebb82c0ddba466065af713b84f18d0acba932b559d67e3096ea",
+    "dm/gfx/tests/Makefile": "ee8a023b17cb4d5bfe61d654d9a23be038024c8c291c25f766e8359b7240f08f"
   },
   "seed_counts": {
     "S": 16818,
@@ -11,6 +13,12 @@
     "R": 7138,
     "M": 164
   },
-  "scope": "complete audited official tree; only verified runner NUP release patch",
-  "gpu_runtime_validated": false
+  "scope": "complete audited official runtime and translator; metadata-only runner exporter under OOT2_FULLWARM_TOOL, verified NUP release",
+  "gpu_runtime_validated": false,
+  "patch_sha256": "b40a0a052c6047681cb088fb2d5f4e170296011ff322463ad67d7c5a9e204e9c",
+  "new_files": [
+    "dm/gfx/nvn/oot2_fullwarm_constants.inc",
+    "dm/gfx/nvn/oot2_fullwarm_export.inc",
+    "dm/gfx/tests/oot2_fullwarm_harness.m"
+  ]
 }

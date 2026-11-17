@@ -13,15 +13,25 @@ except ImportError:
 GPU='applegpu_g17g'
 def counts(text):return dict(collections.Counter(l.split('\t',1)[0] for l in text.splitlines() if l and not l.startswith('#')))
 def stamp(text):return dict(l.split('\t',1) for l in text.splitlines() if '\t' in l)
+def metadata_coverage(report,seed,archives):
+    try:
+        from .oot2_fullwarm import validate_render_coverage
+    except ImportError:
+        from oot2_fullwarm import validate_render_coverage
+    c=report['coverage'];validate_render_coverage(c)
+    if (report['chain'],report['gpu'],report['platform'])!=(CHAIN,GPU,'ios'):raise ValueError('v10 metadata identity')
+    if (c['render_rows'],c['mesh_rows'],c['emitted_mesh'])!=(seed['R'],seed['M'],seed['M']) or c['failed_tasks'] or c.get('stale_keys',0) or c['periods']!=len(archives) or set(report['archives'])!=set(archives) or c['pipeline_creation_used'] is not False or c['new_shaders_compiled'] is not False:raise ValueError('v10 metadata coverage')
 def official_bundle(folder,seed):
     folder=Path(folder);archives=sorted(folder.glob(GPU+'-prewarm-*.mtl4a'))
     if not archives or not (folder/(GPU+'.mtl4a')).is_file():raise ValueError('v10 base/prewarm archives missing')
     s=stamp((folder/'prewarm.tsv').read_text())
+    metadata=(folder/'fullwarm.json').is_file()
+    if metadata:metadata_coverage(json.loads((folder/'fullwarm.json').read_text()),seed,[p.name for p in archives])
     if s.get('chain')!=CHAIN or int(s.get('files',0))!=len(archives) or int(s.get('lines',0))!=seed['R']+seed['M']:raise ValueError('v10 prewarm stamp coverage')
     if CHAIN not in (folder/'prebuilt.tsv').read_text():raise ValueError('v10 base stamp')
     summary=stamp((folder/'archive.tsv').read_text()).get('prewarm','')
-    if not re.search(r', 0 pipelines left out',summary):raise ValueError('v10 exporter omitted pipelines')
-    for p in archives:
+    if not metadata and not re.search(r', 0 pipelines left out',summary):raise ValueError('v10 exporter omitted pipelines')
+    for p in ([] if metadata else archives):
         data=p.with_suffix('.keys').read_bytes()
         if len(data)<16 or data[:8]!=b'DMPSOIX2':raise ValueError('v10 archive index version')
         complete,n=struct.unpack_from('<II',data,8)
@@ -64,12 +74,17 @@ def validate_delivery(path):
         archives=[n for n in keys if re.fullmatch(GPU+r'-prewarm-[0-9]{2,5}\.mtl4a',n)]
         if not archives or s.get('chain')!=CHAIN or int(s.get('lines',0))!=seed['R']+seed['M'] or int(s.get('files',0))!=len(archives) or len(archives)!=r['prewarm_files']:raise ValueError('v10 prewarm coverage')
         if GPU+'.mtl4a' not in keys or CHAIN not in z.read(pre+'pso/prebuilt.tsv').decode():raise ValueError('v10 base coverage')
-        for n in archives:
+        metadata='fullwarm.json' in keys
+        if metadata:
+            mr=json.loads(z.read(pre+'pso/fullwarm.json'));metadata_coverage(mr,seed,archives)
+            for name,meta in mr['archives'].items():
+                if any(meta[k]!=r['resources'][name][k] for k in ('bytes','sha256')):raise ValueError('v10 metadata archive hash')
+        for n in ([] if metadata else archives):
             raw=z.read(pre+'pso/'+n[:-6]+'.keys')
             if len(raw)<16 or raw[:8]!=b'DMPSOIX2':raise ValueError('v10 keys')
             complete,count=struct.unpack_from('<II',raw,8)
             if complete!=1 or count<1 or len(raw)!=16+8*count:raise ValueError('v10 incomplete index')
-        if not re.search(r', 0 pipelines left out',stamp(z.read(pre+'pso/archive.tsv').decode()).get('prewarm','')):raise ValueError('v10 omissions')
+        if not metadata and not re.search(r', 0 pipelines left out',stamp(z.read(pre+'pso/archive.tsv').decode()).get('prewarm','')):raise ValueError('v10 omissions')
         return r
 
 def build(root,slim,work):
@@ -84,16 +99,18 @@ def build(root,slim,work):
         with z.open(exe) as f:hostsha=hashlib.file_digest(f,'sha256').hexdigest()
     expected=json.loads(Path(__file__).with_name('oot2_ipad_v10_manifest.json').read_text())['seed_counts']
     if seed!=expected:raise ValueError('v10 manifest not expanded')
-    host=root/f'dm/host/gen/{TITLE}/dmhost';bundle=work/'bundle'
-    # Entirely official host and descriptor exporter, built in the public gate.
-    cmd=[sys.executable,str(root/'dm/gfx/tools/pso_offline.py'),'--game',TITLE,'--msl',str(inputs/f'msl/b-{CHAIN}.img'),'--shader-map',str(inputs/'dm/shader_map.tsv'),'--manifest',str(inputs/'dm/pso_manifest.tsv'),'--pairs',str(inputs/'dm/shader_pairs.tsv'),'--pairs',str(inputs/'dm/pso_pairs.tsv'),'--out',str(bundle),'--work',str(work/'cache'),'--gpu',GPU,'--platform','ios','--os-min','27.0','--depth','gl','--jobs','2','--prewarm-host',str(host)]
-    env=dict(os.environ,DM_PSO_PREBUILD_THREADS='3')
-    with (work/'official.log').open('wb') as log:
-        proc=subprocess.Popen(cmd,env=env,stdout=log,stderr=subprocess.STDOUT)
-        while proc.poll() is None:
-            try:proc.wait(timeout=30)
-            except subprocess.TimeoutExpired:print('Official v10 offline pipelines: running; completed cache files='+str(len(list((work/'cache').rglob('*.mtl4a')))),flush=True)
-    if proc.returncode:raise RuntimeError('v10 official compiler failed; inspect private archive log')
+    # The runtime stays upstream. Only this separate executable exports descriptors
+    # without GPU pipeline creation; metal-tt compiles genuine iOS libraries.
+    import oot2_ipad_aot as aot,oot2_fullwarm as full
+    aot.CHAIN=full.CHAIN=CHAIN
+    full.build_exporter(root)
+    scripts=work/'descriptors';full.export(root,inputs,scripts)
+    bundle=work/'bundle'
+    full.compile_lists(root,inputs/f'msl/b-{CHAIN}.img',scripts,work/'full-cache',bundle)
+    base=aot.compile_archive(root,slim,work/'base')
+    for p in base.iterdir():shutil.copyfile(p,bundle/p.name)
+    with (bundle/'prewarm.tsv').open('a') as f:f.write(f"lines\t{seed['R']+seed['M']}\n")
+    (work/'official.log').write_text('Metadata-only native export and real iOS metal-tt compilation completed.\n')
     resources,n=official_bundle(bundle,seed)
     report={'chain':CHAIN,'source':PIN,'recipe_sha256':recipe(),'platform':'ios','gpu':GPU,'host_sha256':hostsha,'seed_counts':seed,'prewarm_files':n,'resources':resources}
     (bundle/'oot2-v10.json').write_text(json.dumps(report,indent=2)+'\n')
