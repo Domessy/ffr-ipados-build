@@ -150,7 +150,14 @@ def monitored(args):
         while True:
             try:rc=proc.wait(timeout=30);break
             except subprocess.TimeoutExpired:
-                print(f'V10 offline pipelines: elapsed={int(time.monotonic()-started)}s; private log={log.stat().st_size} bytes; completed archives={len(list(work.rglob("*.mtl4a")))}',flush=True)
+                phase='base/compute' if (work/'base').exists() else 'render/mesh'
+                detail=''
+                try:
+                    progress=json.loads((work/'progress.json').read_text())
+                    if all(type(progress[k]) in (int,float) for k in ('completed','total','percent','gib')):
+                        detail=f"; R/M={progress['completed']}/{progress['total']} ({progress['percent']}%); R/M output={progress['gib']} GiB"
+                except (OSError,ValueError,KeyError):pass
+                print(f'V10 offline pipelines: phase={phase}; elapsed={int(time.monotonic()-started)}s; private log={log.stat().st_size} bytes; completed archives={len(list(work.rglob("*.mtl4a")))}'+detail,flush=True)
     if rc:raise RuntimeError('v10 offline build failed; detailed diagnostic remains private on CachyOS')
     print('PASS: v10 offline archives and final packed resources validated.',flush=True)
 if __name__=='__main__':
