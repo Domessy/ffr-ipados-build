@@ -1,0 +1,16 @@
+{
+  "base_revision": "e4b0d9b75d39c41c10fdcfec2f0b070df496d7e5",
+  "shader_chain": "a9bfaeb9fa8c",
+  "originals": {
+    "scripts/build_ipa_from_nsp.py": "3302c0da97a3b8585510d2af20c9f221c6d4be4fc4ae5bdf0e3c8d13509ca03d",
+    "dm/gfx/nvn/dmsh_chain.h": "6d4833cec46d22453123395949c573eb0ab590f0dd440e5348012688928ee638"
+  },
+  "seed_counts": {
+    "S": 16818,
+    "C": 1043,
+    "R": 7138,
+    "M": 164
+  },
+  "scope": "complete audited official tree; only verified runner NUP release patch",
+  "gpu_runtime_validated": false
+}
