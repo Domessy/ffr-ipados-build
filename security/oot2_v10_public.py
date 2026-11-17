@@ -17,9 +17,10 @@ def main(root,work):
     names=['t_pso_prewarm','t_pool_replay','t_arena_trim','t_pso_demand_record']
     subprocess.run(['make','-C',str(root/'dm/gfx/tests'),'GAME='+TITLE,'-j3',*names],check=True)
     for name in names:
-        result=subprocess.run([str(root/'dm/gfx/tests'/name)],text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,check=True,timeout=300)
-        if 'not run' in result.stdout or 'no Metal' in result.stdout:raise RuntimeError('v10 Metal gate skipped: '+name)
+        result=subprocess.run([str(root/'dm/gfx/tests'/name)],text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,check=False,timeout=300)
         print(result.stdout,flush=True)
+        result.check_returncode()
+        if 'not run' in result.stdout or 'no Metal' in result.stdout:raise RuntimeError('v10 Metal gate skipped: '+name)
     from oot2_aot_pilot import pilot
     pilot(root,work/'ios-pilot')
     subprocess.run([sys.executable,str(root/'dm/ios/tools/build_smoke.py'),'--output',str(work/'ios-smoke')],env=env,check=True)

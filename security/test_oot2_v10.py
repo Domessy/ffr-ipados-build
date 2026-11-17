@@ -39,6 +39,26 @@ class V10Tests(unittest.TestCase):
                 self.assertEqual(gate.dispatch('oot2-checkpoint-v10-info',parent),0)
             self.assertEqual(stable.read_bytes(),b'preserve v9')
             self.assertFalse((out/'ZeldaOcarinaOfTime-ipad-v10-fullwarm-livecontainer.ipa').exists())
+    def test_complete_top_level_delivery_assembles_original_romfs(self):
+        import shutil
+        from security.oot2_local_bundle import identity
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d).resolve();out=root/'out';out.mkdir();source=self.fixture(root)
+            image=root/'local-bundle-v6/extract/v131072/RomFS.img';image.parent.mkdir(parents=True)
+            image.write_bytes(struct.pack('<8sQQQ',b'DMROMFS1',36,5,1)+b'body'+b'index')
+            ident=identity(image);meta=root/'local-bundle-v6/romfs-manifest.json'
+            meta.write_text(json.dumps({'bytes':image.stat().st_size,'identity':ident,'sha256':hashlib.sha256(image.read_bytes()).hexdigest(),'source_identity':'fixture'}))
+            with zipfile.ZipFile(source,'a') as z:z.writestr('Payload/Game.app/romfs.id',f'DMROMFSID1 title={o.TITLE} size={ident[0]} index={ident[1]}')
+            stable=out/'ZeldaOcarinaOfTime-ipad-v9-fullwarm-livecontainer.ipa';stable.write_bytes(b'v9 retained')
+            parent=SimpleNamespace(CACHE=root/'cache',CONFLICTS=root/'conflicts',OUTPUT=out)
+            parent.receive_file=lambda name,limit:shutil.copyfile(source,parent.OUTPUT/name)
+            with patch.object(gate,'ROOT',root),patch.object(gate,'OUTPUT',out):
+                self.assertEqual(gate.dispatch('oot2-write-slim-v10',parent),0)
+            final=out/'ZeldaOcarinaOfTime-ipad-v10-fullwarm-livecontainer.ipa'
+            with zipfile.ZipFile(final) as z:
+                self.assertIsNone(z.testzip());self.assertEqual(z.read('Payload/Game.app/romfs.img'),image.read_bytes())
+            self.assertEqual(o.validate_delivery(final)['chain'],CHAIN)
+            self.assertEqual(stable.read_bytes(),b'v9 retained')
     def test_wrong_resource_hash_is_rejected(self):
         with tempfile.TemporaryDirectory() as d:
             source=self.fixture(Path(d));target=Path(d)/'corrupt.ipa'
