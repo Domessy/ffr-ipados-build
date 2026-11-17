@@ -13,6 +13,14 @@ except ImportError:
 GPU='applegpu_g17g'
 def counts(text):return dict(collections.Counter(l.split('\t',1)[0] for l in text.splitlines() if l and not l.startswith('#')))
 def stamp(text):return dict(l.split('\t',1) for l in text.splitlines() if '\t' in l)
+def install_indexes(scripts,bundle):
+    for archive in Path(bundle).glob(GPU+'-prewarm-*.mtl4a'):
+        part=archive.name[len(GPU+'-'):].replace('.mtl4a','.keys')
+        raw=(Path(scripts)/part).read_bytes()
+        if len(raw)<16 or raw[:8]!=b'DMPSOIX2':raise ValueError('v10 native descriptor index missing')
+        complete,n=struct.unpack_from('<II',raw,8)
+        if complete!=1 or n<1 or len(raw)!=16+8*n:raise ValueError('v10 native descriptor index incomplete')
+        shutil.copyfile(Path(scripts)/part,archive.with_suffix('.keys'))
 def metadata_coverage(report,seed,archives):
     try:
         from .oot2_fullwarm import validate_render_coverage
@@ -31,7 +39,7 @@ def official_bundle(folder,seed):
     if CHAIN not in (folder/'prebuilt.tsv').read_text():raise ValueError('v10 base stamp')
     summary=stamp((folder/'archive.tsv').read_text()).get('prewarm','')
     if not metadata and not re.search(r', 0 pipelines left out',summary):raise ValueError('v10 exporter omitted pipelines')
-    for p in ([] if metadata else archives):
+    for p in archives:
         data=p.with_suffix('.keys').read_bytes()
         if len(data)<16 or data[:8]!=b'DMPSOIX2':raise ValueError('v10 archive index version')
         complete,n=struct.unpack_from('<II',data,8)
@@ -79,7 +87,7 @@ def validate_delivery(path):
             mr=json.loads(z.read(pre+'pso/fullwarm.json'));metadata_coverage(mr,seed,archives)
             for name,meta in mr['archives'].items():
                 if any(meta[k]!=r['resources'][name][k] for k in ('bytes','sha256')):raise ValueError('v10 metadata archive hash')
-        for n in ([] if metadata else archives):
+        for n in archives:
             raw=z.read(pre+'pso/'+n[:-6]+'.keys')
             if len(raw)<16 or raw[:8]!=b'DMPSOIX2':raise ValueError('v10 keys')
             complete,count=struct.unpack_from('<II',raw,8)
@@ -107,6 +115,7 @@ def build(root,slim,work):
     scripts=work/'descriptors';full.export(root,inputs,scripts)
     bundle=work/'bundle'
     full.compile_lists(root,inputs/f'msl/b-{CHAIN}.img',scripts,work/'full-cache',bundle)
+    install_indexes(scripts,bundle)
     base=aot.compile_archive(root,slim,work/'base')
     for p in base.iterdir():shutil.copyfile(p,bundle/p.name)
     with (bundle/'prewarm.tsv').open('a') as f:f.write(f"lines\t{seed['R']+seed['M']}\n")
@@ -126,4 +135,16 @@ def build(root,slim,work):
             item=zipfile.ZipInfo(pre+'pso/'+p.name);item.external_attr=0o100644<<16;item.compress_type=zipfile.ZIP_STORED
             with p.open('rb') as a,dst.open(item,'w',force_zip64=True) as b:shutil.copyfileobj(a,b,8<<20)
     validate_delivery(output);print('PASS: official v10 expanded prewarm and all archive indexes verified.',flush=True)
-if __name__=='__main__':build(*sys.argv[1:])
+def monitored(args):
+    root,slim,work=map(Path,args);log=Path(str(work)+'.log');started=time.monotonic()
+    with log.open('wb') as out:
+        proc=subprocess.Popen([sys.executable,'-u',str(Path(__file__).resolve()),'--worker',*args],stdout=out,stderr=subprocess.STDOUT)
+        while True:
+            try:rc=proc.wait(timeout=30);break
+            except subprocess.TimeoutExpired:
+                print(f'V10 offline pipelines: elapsed={int(time.monotonic()-started)}s; private log={log.stat().st_size} bytes; completed archives={len(list(work.rglob("*.mtl4a")))}',flush=True)
+    if rc:raise RuntimeError('v10 offline build failed; detailed diagnostic remains private on CachyOS')
+    print('PASS: v10 offline archives and final packed resources validated.',flush=True)
+if __name__=='__main__':
+    if sys.argv[1:2]==['--worker']:build(*sys.argv[2:])
+    else:monitored(sys.argv[1:])

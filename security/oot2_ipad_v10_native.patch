@@ -200,18 +200,20 @@ diff --git a/dm/gfx/nvn/oot2_fullwarm_export.inc b/dm/gfx/nvn/oot2_fullwarm_expo
 new file mode 100644
 --- /dev/null
 +++ b/dm/gfx/nvn/oot2_fullwarm_export.inc
-@@ -0,0 +1,196 @@
+@@ -0,0 +1,207 @@
 +// Included only by the offline descriptor tool, after nvn_mtl.m. There is no
 +// compiler, pipeline-state creation, command submission or fake successful PSO.
 +// All descriptors come from the real warm_parse/pso_desc/mtk_desc4 paths.
 +#include "oot2_fullwarm_enums.h"
 +static NSMutableArray *full_libraries, *full_functions, *full_specialized, *full_render, *full_mesh;
 +static NSMutableDictionary *full_library_names;
++static NSMutableData *full_keys;
 +static NSString *full_directory;
 +static unsigned full_period, full_rows, full_failed, full_rrows, full_mrows;
 +static unsigned full_emitted_r, full_emitted_m, full_device_r;
 +
 +static void full_reset(void) {
++    full_keys = [NSMutableData data];
 +    full_libraries = [NSMutableArray array]; full_functions = [NSMutableArray array]; full_specialized = [NSMutableArray array];
 +    full_render = [NSMutableArray array]; full_mesh = [NSMutableArray array]; full_library_names = [NSMutableDictionary dictionary];
 +}
@@ -223,7 +225,14 @@ new file mode 100644
 +    NSError *e = nil; NSData *data = [NSJSONSerialization dataWithJSONObject:script options:NSJSONWritingSortedKeys error:&e];
 +    NSString *path = [full_directory stringByAppendingPathComponent:[NSString stringWithFormat:@"prewarm-%05u.mtl4-json", full_period++]];
 +    if (!data || ![data writeToFile:path atomically:YES]) { fprintf(stderr, "Full prewarm script write failed\n"); abort(); }
++    NSString *kp = [path.stringByDeletingPathExtension stringByAppendingPathExtension:@"keys"];
++    if (!arch_keys_write(kp, full_keys, 1)) { fprintf(stderr, "Native prewarm index write failed\n"); abort(); }
 +    full_reset();
++}
++static int full_key(MTL4PipelineDescriptor *descriptor) {
++    uint64_t key = arch_key(descriptor);
++    if (!key) return 0;
++    [full_keys appendBytes:&key length:sizeof key]; return 1;
 +}
 +static NSString *full_function(MTL4FunctionDescriptor *descriptor) {
 +    if (!descriptor) return nil;
@@ -296,12 +305,14 @@ new file mode 100644
 +        @"max_vertex_amplification_count": @(d.maxVertexAmplificationCount), @"color_attachments": full_colors(d.colorAttachments)} mutableCopy];
 +    if (ff) row[@"fragment_function_descriptor"] = ff;
 +    if (d.vertexDescriptor) row[@"vertex_descriptor"] = full_vertex(d.vertexDescriptor);
++    if (!full_key(d)) return 0;
 +    [full_render addObject:row]; full_emitted_r++; return 1;
 +}
 +static int full_add_mesh(MTL4MeshRenderPipelineDescriptor *d) {
 +    if (!d) return 0;
 +    NSString *of = full_function(d.objectFunctionDescriptor), *mf = full_function(d.meshFunctionDescriptor), *ff = full_function(d.fragmentFunctionDescriptor);
 +    if (!of || !mf || !ff) return 0;
++    if (!full_key(d)) return 0;
 +    [full_mesh addObject:@{@"object_function_descriptor": of, @"mesh_function_descriptor": mf, @"fragment_function_descriptor": ff,
 +        @"max_total_threads_per_object_threadgroup": @(d.maxTotalThreadsPerObjectThreadgroup),
 +        @"max_total_threads_per_mesh_threadgroup": @(d.maxTotalThreadsPerMeshThreadgroup), @"payload_memory_length": @(d.payloadMemoryLength),

@@ -15,10 +15,11 @@
   },
   "scope": "complete audited official runtime and translator; metadata-only runner exporter under OOT2_FULLWARM_TOOL, verified NUP release",
   "gpu_runtime_validated": false,
-  "patch_sha256": "b40a0a052c6047681cb088fb2d5f4e170296011ff322463ad67d7c5a9e204e9c",
+  "patch_sha256": "11ff48c52a127806d3f091276bb3b629f6b3e77d126eac5688648305396f7840",
   "new_files": [
     "dm/gfx/nvn/oot2_fullwarm_constants.inc",
     "dm/gfx/nvn/oot2_fullwarm_export.inc",
     "dm/gfx/tests/oot2_fullwarm_harness.m"
-  ]
+  ],
+  "index_mode": "native arch_key and arch_keys_write from identical iOS library bytes; no Mac archive copied"
 }

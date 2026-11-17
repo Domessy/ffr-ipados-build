@@ -59,6 +59,25 @@ class V10Tests(unittest.TestCase):
                 self.assertIsNone(z.testzip());self.assertEqual(z.read('Payload/Game.app/romfs.img'),image.read_bytes())
             self.assertEqual(o.validate_delivery(final)['chain'],CHAIN)
             self.assertEqual(stable.read_bytes(),b'v9 retained')
+    def test_native_index_copy_requires_complete_nonempty_content(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);src=root/'scripts';out=root/'out';src.mkdir();out.mkdir()
+            archive=out/(o.GPU+'-prewarm-00000.mtl4a');archive.write_bytes(b'archive')
+            index=src/'prewarm-00000.keys'
+            for raw in (b'',b'DMPSOIX2'+struct.pack('<IIQ',0,1,1),b'DMPSOIX2'+struct.pack('<II',1,0)):
+                index.write_bytes(raw)
+                with self.assertRaises(ValueError):o.install_indexes(src,out)
+            raw=b'DMPSOIX2'+struct.pack('<IIQ',1,1,123);index.write_bytes(raw)
+            o.install_indexes(src,out);self.assertEqual(archive.with_suffix('.keys').read_bytes(),raw)
+    def test_metadata_coverage_cannot_silently_omit_or_misclassify_rows(self):
+        seed={'R':7138,'M':164}
+        coverage={'render_rows':7138,'emitted_render':7125,'device_render_rows':13,'device_render_reason':'metal4_requires_fragment','mesh_rows':164,'emitted_mesh':164,'failed_tasks':0,'periods':1,'pipeline_creation_used':False,'new_shaders_compiled':False}
+        report={'chain':CHAIN,'gpu':o.GPU,'platform':'ios','coverage':coverage,'archives':{'a':{}}}
+        o.metadata_coverage(report,seed,['a'])
+        for key,value in [('render_rows',7137),('emitted_mesh',163),('failed_tasks',1),('pipeline_creation_used',True),('stale_keys',1)]:
+            with self.subTest(key=key):
+                changed=dict(coverage);changed[key]=value
+                with self.assertRaises(ValueError):o.metadata_coverage(dict(report,coverage=changed),seed,['a'])
     def test_wrong_resource_hash_is_rejected(self):
         with tempfile.TemporaryDirectory() as d:
             source=self.fixture(Path(d));target=Path(d)/'corrupt.ipa'

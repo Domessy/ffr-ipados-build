@@ -263,8 +263,8 @@ jobs:
             | ssh -o ConnectTimeout=20 ffr-cachyos oot2-write-log-v10 || true
         fi
         rm -f "$RUNNER_TEMP/oot2-nup/OcarinaOfTime.nup" "$RUNNER_TEMP/oot2_ssh_key" || true
-        if [ -s "$RUNNER_TEMP/v10-archives/official.log" ]; then
-          tail -c 33554432 "$RUNNER_TEMP/v10-archives/official.log" | ssh -o ConnectTimeout=20 ffr-cachyos oot2-write-archive-log-v10 || true
+        if [ -s "$RUNNER_TEMP/v10-archives.log" ]; then
+          tail -c 33554432 "$RUNNER_TEMP/v10-archives.log" | ssh -o ConnectTimeout=20 ffr-cachyos oot2-write-archive-log-v10 || true
         fi
     - name: Fermer la connexion Tailscale ephemere
       if: always()
@@ -454,8 +454,8 @@ jobs:
             | ssh -o ConnectTimeout=20 ffr-cachyos oot2-write-log-v10 || true
         fi
         rm -f "$RUNNER_TEMP/oot2-nup/OcarinaOfTime.nup" "$RUNNER_TEMP/oot2_ssh_key" || true
-        if [ -s "$RUNNER_TEMP/v10-archives/official.log" ]; then
-          tail -c 33554432 "$RUNNER_TEMP/v10-archives/official.log" | ssh -o ConnectTimeout=20 ffr-cachyos oot2-write-archive-log-v10 || true
+        if [ -s "$RUNNER_TEMP/v10-archives.log" ]; then
+          tail -c 33554432 "$RUNNER_TEMP/v10-archives.log" | ssh -o ConnectTimeout=20 ffr-cachyos oot2-write-archive-log-v10 || true
         fi
     - name: Fermer la connexion Tailscale ephemere
       if: always()

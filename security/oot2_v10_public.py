@@ -29,6 +29,12 @@ def main(root,work):
     first=full.compile_lists(root,image,work/'scripts',work/'cache',work/'bundle')
     again=full.compile_lists(root,image,work/'scripts',work/'cache',work/'bundle')
     if again['reused_groups']!=first['coverage']['periods']:raise ValueError('v10 archive cache reuse')
+    from oot2_v10_official import install_indexes
+    install_indexes(work/'scripts',work/'bundle')
+    # Re-export in a new process: content-based index keys must remain stable.
+    full.export(root,work/'fixture',work/'scripts-again')
+    for path in (work/'scripts').glob('*.keys'):
+        if path.read_bytes()!=(work/'scripts-again'/path.name).read_bytes():raise ValueError('v10 unstable native index')
     from oot2_aot_pilot import pilot
     pilot(root,work/'ios-pilot')
     subprocess.run([sys.executable,str(root/'dm/ios/tools/build_smoke.py'),'--output',str(work/'ios-smoke')],env=env,check=True)
