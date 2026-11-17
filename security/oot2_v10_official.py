@@ -39,11 +39,16 @@ def official_bundle(folder,seed):
     if CHAIN not in (folder/'prebuilt.tsv').read_text():raise ValueError('v10 base stamp')
     summary=stamp((folder/'archive.tsv').read_text()).get('prewarm','')
     if not metadata and not re.search(r', 0 pipelines left out',summary):raise ValueError('v10 exporter omitted pipelines')
+    indexed=0
     for p in archives:
         data=p.with_suffix('.keys').read_bytes()
         if len(data)<16 or data[:8]!=b'DMPSOIX2':raise ValueError('v10 archive index version')
         complete,n=struct.unpack_from('<II',data,8)
         if complete!=1 or n<1 or len(data)!=16+8*n:raise ValueError('v10 incomplete archive index')
+        indexed+=n
+    if metadata:
+        c=json.loads((folder/'fullwarm.json').read_text())['coverage']
+        if indexed!=c['emitted_render']+c['emitted_mesh']:raise ValueError('v10 index coverage')
     files={}
     for p in folder.iterdir():
         if p.is_symlink() or not p.is_file() or not re.fullmatch(r'[A-Za-z0-9_.-]{1,180}',p.name):raise ValueError('v10 archive resource')
@@ -87,11 +92,14 @@ def validate_delivery(path):
             mr=json.loads(z.read(pre+'pso/fullwarm.json'));metadata_coverage(mr,seed,archives)
             for name,meta in mr['archives'].items():
                 if any(meta[k]!=r['resources'][name][k] for k in ('bytes','sha256')):raise ValueError('v10 metadata archive hash')
+        indexed=0
         for n in archives:
             raw=z.read(pre+'pso/'+n[:-6]+'.keys')
             if len(raw)<16 or raw[:8]!=b'DMPSOIX2':raise ValueError('v10 keys')
             complete,count=struct.unpack_from('<II',raw,8)
             if complete!=1 or count<1 or len(raw)!=16+8*count:raise ValueError('v10 incomplete index')
+            indexed+=count
+        if metadata and indexed!=mr['coverage']['emitted_render']+mr['coverage']['emitted_mesh']:raise ValueError('v10 index coverage')
         if not metadata and not re.search(r', 0 pipelines left out',stamp(z.read(pre+'pso/archive.tsv').decode()).get('prewarm','')):raise ValueError('v10 omissions')
         return r
 

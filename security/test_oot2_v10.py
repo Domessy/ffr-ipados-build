@@ -78,6 +78,24 @@ class V10Tests(unittest.TestCase):
             with self.subTest(key=key):
                 changed=dict(coverage);changed[key]=value
                 with self.assertRaises(ValueError):o.metadata_coverage(dict(report,coverage=changed),seed,['a'])
+    def test_metadata_final_receipt_checks_all_indexed_rows(self):
+        for count in (7289,7288):
+            with tempfile.TemporaryDirectory() as d:
+                root=Path(d);source=self.fixture(root);target=root/'metadata.ipa';pre='Payload/Game.app/pso/'
+                with zipfile.ZipFile(source) as z:files={i.filename:z.read(i) for i in z.infolist()}
+                report=json.loads(files[pre+'oot2-v10.json']);archive=o.GPU+'-prewarm-00.mtl4a'
+                coverage={'render_rows':7138,'emitted_render':7125,'device_render_rows':13,'device_render_reason':'metal4_requires_fragment','mesh_rows':164,'emitted_mesh':164,'failed_tasks':0,'periods':1,'pipeline_creation_used':False,'new_shaders_compiled':False}
+                metadata={'chain':CHAIN,'gpu':o.GPU,'platform':'ios','coverage':coverage,'archives':{archive:report['resources'][archive]}}
+                files[pre+'fullwarm.json']=json.dumps(metadata).encode()
+                files[pre+archive[:-6]+'.keys']=b'DMPSOIX2'+struct.pack('<II',1,count)+struct.pack('<Q',123)*count
+                for n,b in files.items():
+                    if n.startswith(pre) and n!=pre+'oot2-v10.json':report['resources'][n[len(pre):]]={'bytes':len(b),'sha256':hashlib.sha256(b).hexdigest()}
+                files[pre+'oot2-v10.json']=json.dumps(report).encode()
+                with zipfile.ZipFile(target,'w') as z:
+                    for n,b in files.items():z.writestr(n,b)
+                if count==7289:self.assertEqual(o.validate_delivery(target)['prewarm_files'],1)
+                else:
+                    with self.assertRaisesRegex(ValueError,'index coverage'):o.validate_delivery(target)
     def test_wrong_resource_hash_is_rejected(self):
         with tempfile.TemporaryDirectory() as d:
             source=self.fixture(Path(d));target=Path(d)/'corrupt.ipa'
