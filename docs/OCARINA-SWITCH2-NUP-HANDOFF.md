@@ -1174,3 +1174,13 @@ Public macOS validation **43938199620** succeeded on commit **314b8363212eebf878
 Corrected overlay SHA-256: `7ad87e9bafbcc4f85e2fdba6fdc1a02ecea7f3f67582e7b9e8318cd6c583c24f`. Operational independent CachyOS gateway manifest updated atomically; fixed v9 readiness route succeeds. Existing NUP, shaders and v8 IPAs preserved.
 
 Full run **43939145417** dispatched with this validated code, build/ipad-v9/local-bundle/metal-snapshot: https://github.com/Domessy/ffr-ipados-build/actions/runs/43939145417 . The workflow retains the same mandatory public gates before private transfer. Full game build and iPad test remain pending. PR92 remains draft. Public validation proof: https://github.com/Domessy/ffr-ipados-build/actions/runs/43938199620 ; public log saved privately in resultats/oot2-v9-public-43938199620.log.
+
+## Relance du 17 novembre 2026
+
+À la demande de l’utilisateur, relance **43993999907** sur commit **40cb4cf91c1928cb92bc0ec73d8a08cf7a9ac0fd**, branche experimental/oot2-v9-chain-20261116, build/ipad-v9/local-bundle/metal-snapshot. L’ancien run 43939145417 est annulé pendant la compilation (dernier progrès 28 768/42 848, 67 %), pas un succès ni une nouvelle IPA.
+
+Inventaire compilé local : **417 052 entrées, 32 078 528 079 octets**, contre 362 211 entrées dans l’ancienne archive de transfert. Régénération du snapshot en cours avant restauration, afin d’inclure les checkpoints du run annulé. Cache source et conflits conservés. Même chaîne réelle **9eecb8412308**, même code et options ; les bibliothèques compilées restent indexées par contenu et compilateur, sans renommage d’anciens shaders vers une nouvelle chaîne. Les traductions et index de reprise v8 ne sont pas injectés dans v9. Le contrôle du manifeste de passerelle et la route locale v9 réussissent. La validation Mac préalable 43938199620 reste applicable (modification documentaire seulement depuis le code testé).
+
+Run : https://github.com/Domessy/ffr-ipados-build/actions/runs/43993999907 . Reprise effective des shaders sur le runner à confirmer après restauration ; ne pas confondre le progrès atteint avec le dernier checkpoint sauvegardé.
+
+Snapshot actualisé et publié : **417 052 entrées**, **412 943 blobs**, 32 078 528 079 octets sources ; SQLite 33 331 265 536 octets ; transfert compressé **17 968 407 197 octets (16,73 Gio)**. Empreinte d’inventaire `c8681ff5fbd677819aa99052f13029824ab5ebe3b537afe98588ee081a7abf79`. Construction SQLite/quick_check et compression terminées sans erreur. Route SSH fixe confirmée sur ce nouveau snapshot avant restauration. Le run est en installation/validation nxnative ; le transfert effectif reste à terminer automatiquement. Preuve locale : resultats/oot2-v9-relaunch-cache-20261117.json.
