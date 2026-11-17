@@ -36,6 +36,7 @@ jobs:
           "$RUNNER_TEMP/venv/bin/python" -m pip install -q lz4 capstone fonttools
           xcodebuild -downloadComponent MetalToolchain
           "$RUNNER_TEMP/venv/bin/python" security/oot2_v9_validate.py "$SRC"
+          "$RUNNER_TEMP/venv/bin/python" security/oot2_shader_identity.py "$SRC" --expected da13969b5e94fb5c63625b3deadc1ce5ddf41adffc521b588dfe2d8747e9fd38
           python3 -m unittest discover -s security -p 'test_oot2*.py' -q
       - name: Exercise translator fixes with the locked translator and Metal compilers
         run: |

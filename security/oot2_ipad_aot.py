@@ -56,7 +56,8 @@ def prepare_tools(root):
     subprocess.run(['git', '-C', str(root), 'apply', str(patch.resolve())], check=True)
 
 
-def inspect_ipa(path):
+def inspect_ipa(path, expected_chain=None):
+    chain = CHAIN if expected_chain is None else expected_chain
     validate_zip_headers(path)
     with zipfile.ZipFile(path) as z:
         names = z.namelist()
@@ -73,7 +74,7 @@ def inspect_ipa(path):
         if info.get('CFBundleIdentifier') != 'org.nxnative.0400486024dec000': raise ValueError('IPA title')
         if not z.getinfo(prefix + info['CFBundleExecutable']).file_size: raise ValueError('IPA executable')
         if prefix + 'romfs.img' in names: raise ValueError('AOT requires the slim input')
-        z.getinfo(prefix + f'msl/b-{CHAIN}.img')
+        z.getinfo(prefix + f'msl/b-{chain}.img')
         for table in TABLES: z.getinfo(prefix + 'dm/' + table)
         return prefix
 

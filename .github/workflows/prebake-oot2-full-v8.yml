@@ -30,8 +30,8 @@ on:
         description: Full cache for same-chain resume, or compiled Metal snapshot for a new chain
         type: choice
         required: true
-        default: metal-snapshot
-        options: [metal-snapshot, full, empty]
+        default: resume-v9
+        options: [resume-v9, metal-snapshot, full, empty]
 
 permissions:
   contents: read
@@ -407,10 +407,16 @@ jobs:
           export DMSH_CAS="$RUNNER_TEMP/oot2-shader-cas/cas.db"
           umask 077
           mkdir -p "$(dirname "$DMSH_CAS")"
-          if [ "$OOT2_CACHE_RESTORE" = metal-snapshot ] || [ "$OOT2_CACHE_RESTORE" = resume-v5 ] || [ "$OOT2_CACHE_RESTORE" = resume-v6 ] || [ "$OOT2_CACHE_RESTORE" = resume-v8 ]; then
+          if [ "$OOT2_CACHE_RESTORE" = resume-v9 ] || [ "$OOT2_CACHE_RESTORE" = metal-snapshot ] || [ "$OOT2_CACHE_RESTORE" = resume-v5 ] || [ "$OOT2_CACHE_RESTORE" = resume-v6 ] || [ "$OOT2_CACHE_RESTORE" = resume-v8 ]; then
             SNAPSHOT_ROUTE=oot2-metal-snapshot-info-v1
             SNAPSHOT_ROLE=metal-snapshot
-            if [ "$OOT2_CACHE_RESTORE" = resume-v8 ]; then
+            if [ "$OOT2_CACHE_RESTORE" = resume-v9 ]; then
+              [[ "$OOT2_RUNTIME_VARIANT" = ipad-v9 ]] || exit 1
+              # Match Python AST/code identity before transferring private inputs.
+              "$RUNNER_TEMP/oot2-venv/bin/python" security/oot2_shader_identity.py "$RUNNER_TEMP/nxnative" --expected da13969b5e94fb5c63625b3deadc1ce5ddf41adffc521b588dfe2d8747e9fd38
+              SNAPSHOT_ROUTE=oot2-resume-v9-info
+              SNAPSHOT_ROLE=resume-v9
+            elif [ "$OOT2_CACHE_RESTORE" = resume-v8 ]; then
               [[ "$OOT2_RUNTIME_VARIANT" = ipad-v9 ]] || { echo "Resume cache is specific to ipad-v9." >&2; exit 1; }
               SNAPSHOT_ROUTE=oot2-resume-v8-info
               SNAPSHOT_ROLE=resume-v8
@@ -512,6 +518,15 @@ jobs:
           ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 \
             ffr-cachyos "$KIT_ROUTE" < "$RUNNER_TEMP/OOT2HostKit-$KIT_VERSION.tar.zst"
           echo 'Private rebuild inputs saved; host-only rebuild still requires validation.'
+
+      - name: Preserve compiled v9 IPA before archive compilation
+        if: ${{ inputs.mode == 'build' }}
+        run: |
+          set -euo pipefail
+          test -s "$RUNNER_TEMP/ZeldaOcarinaOfTime.ipa"
+          ssh -o ConnectTimeout=20 -o ServerAliveInterval=30 -o ServerAliveCountMax=6 \
+            ffr-cachyos oot2-write-checkpoint-v9 < "$RUNNER_TEMP/ZeldaOcarinaOfTime.ipa"
+          echo 'Compiled v9 checkpoint saved privately; full prewarm and final IPA still pending.'
 
       - name: Rebuild complete iPad pipeline archives for the genuine v9 chain
         if: ${{ inputs.mode == 'build' }}

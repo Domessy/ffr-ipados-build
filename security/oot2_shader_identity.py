@@ -19,6 +19,8 @@ def identity(root):
     names = ('dmsh_chain', 'dmsh_geometry', 'dmsh_atomic', 'dmsh_wide',
              'dmsh_meshstage', 'dmsh_rewrite', 'dmsh_reflect', 'dmsh_entry',
              'dmsh_ampere', 'dmsh_side', 'dmsh_abi', 'ios_metal', 'dmsh_fetch')
+    if (root/'dm/gfx/tools/dmsh_tess.py').is_file():
+        names += ('dmsh_tess',)
     modules = {name: importlib.import_module(name) for name in names}
     source = (root/'dm/gfx/tools/dmsh_build.py').read_text()
     tree = ast.parse(source)

@@ -14,7 +14,7 @@ except ImportError:
     from oot2_local_bundle import bundle, identity, regular, validate_zip_headers
     from oot2_fullwarm import validate_render_coverage
 GPU='applegpu_g17g'
-ROUTES={'oot2-write-slim-v9','oot2-write-host-kit-v9','oot2-local-bundle-v9-ready','oot2-write-log-v9'}
+ROUTES={'oot2-write-slim-v9','oot2-write-host-kit-v9','oot2-local-bundle-v9-ready','oot2-write-log-v9','oot2-write-checkpoint-v9'}
 
 def digest(path):
     h=hashlib.sha256()
@@ -67,6 +67,27 @@ def dispatch(command,parent,root,output,nup_identity):
             image=root/'local-bundle-v6/extract/v131072/RomFS.img';meta=root/'local-bundle-v6/romfs-manifest.json';regular(image);regular(meta);m=json.loads(meta.read_text())
             if m['source_identity']!=nup_identity() or list(identity(image))!=m['identity']:raise ValueError('v9 local RomFS identity')
             print('OOT2_LOCAL_BUNDLE_READY_V9',image.stat().st_size)
+        elif command=='oot2-write-checkpoint-v9':
+            try:
+                from .oot2_ipad_aot import inspect_ipa
+            except ImportError:
+                from oot2_ipad_aot import inspect_ipa
+            uploaded=output/'v9-checkpoint-upload.ipa'
+            parent.receive_file(uploaded.name,16<<30)
+            pre=inspect_ipa(uploaded,expected_chain=CHAIN)
+            with zipfile.ZipFile(uploaded) as z:
+                images=[n for n in z.namelist() if re.fullmatch(re.escape(pre)+r'msl/b-[0-9a-f]{12}\.img',n)]
+                if images!=[pre+f'msl/b-{CHAIN}.img']:raise ValueError('checkpoint shader chain')
+                info=plistlib.loads(z.read(pre+'Info.plist'))
+                with z.open(pre+info['CFBundleExecutable']) as f:
+                    header=f.read(8)
+                if header!=bytes.fromhex('cffaedfe0c000001'):raise ValueError('checkpoint ARM64 executable')
+                if z.testzip() is not None:raise ValueError('checkpoint CRC')
+            checkpoint=output/'ZeldaOcarinaOfTime-v9-unwarmed-checkpoint.ipa'
+            preserve(checkpoint);uploaded.rename(checkpoint)
+            record={'chain':CHAIN,'bytes':checkpoint.stat().st_size,'sha256':digest(checkpoint),'fullwarm_validated':False}
+            (output/'v9-checkpoint.json').write_text(json.dumps(record,indent=2)+'\n')
+            print('OOT2_V9_CHECKPOINT_SAVED',record['bytes'])
         elif command=='oot2-write-host-kit-v9':
             preserve(output/'OOT2HostKit-v9.tar.zst');parent.receive_file('OOT2HostKit-v9.tar.zst',1<<30)
         elif command=='oot2-write-log-v9':parent.receive_file('oot2-v9-build.log',32<<20)

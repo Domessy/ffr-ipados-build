@@ -20,7 +20,7 @@ CONFLICTS = ROOT / "shader-cache-conflicts"
 OUTPUT = ROOT / "resultats"
 
 ROUTES = frozenset({
-    "oot2-write-slim-v9", "oot2-write-host-kit-v9", "oot2-local-bundle-v9-ready", "oot2-write-log-v9",
+    "oot2-write-checkpoint-v9", "oot2-write-slim-v9", "oot2-write-host-kit-v9", "oot2-local-bundle-v9-ready", "oot2-write-log-v9",
     "oot2-fullwarm-v8-write-next-slim", "oot2-fullwarm-v8-write-next-log",
     "oot2-fullwarm-v8-write-experimental-slim", "oot2-fullwarm-v8-write-experimental-log",
     "oot2-fullwarm-v8-info", "oot2-fullwarm-v8-read-kit", "oot2-fullwarm-v8-read-cache",
@@ -36,6 +36,7 @@ ROUTES = frozenset({
     "oot2-read-resume-v5", "oot2-resume-v5-info",
     "oot2-read-resume-v6", "oot2-resume-v6-info",
     "oot2-read-resume-v8", "oot2-resume-v8-info",
+    "oot2-read-resume-v9", "oot2-resume-v9-info",
     "oot2-write-host-kit-v7", "oot2-write-slim-v7", "oot2-local-bundle-v7-ready",
     "oot2-write-host-kit-v8", "oot2-write-slim-v8", "oot2-local-bundle-v8-ready",
     "oot2-write-host-kit-v1",
@@ -263,17 +264,18 @@ def dispatch(command, parent):
     if command == "oot2-read-nup":
         parent.send_file(nup_file())
         return 0
-    if command in ("oot2-read-metal-snapshot-v1", "oot2-metal-snapshot-info-v1", "oot2-read-resume-v5", "oot2-resume-v5-info", "oot2-read-resume-v6", "oot2-resume-v6-info", "oot2-read-resume-v8", "oot2-resume-v8-info"):
+    if command in ("oot2-read-metal-snapshot-v1", "oot2-metal-snapshot-info-v1", "oot2-read-resume-v5", "oot2-resume-v5-info", "oot2-read-resume-v6", "oot2-resume-v6-info", "oot2-read-resume-v8", "oot2-resume-v8-info", "oot2-read-resume-v9", "oot2-resume-v9-info"):
         try:
             from .oot2_cache_snapshot import snapshot
         except ImportError:
             from oot2_cache_snapshot import snapshot
-        resume = ("v8" if command in ("oot2-read-resume-v8", "oot2-resume-v8-info") else
+        resume = ("v9" if command in ("oot2-read-resume-v9", "oot2-resume-v9-info") else
+                  "v8" if command in ("oot2-read-resume-v8", "oot2-resume-v8-info") else
                   "v6" if command in ("oot2-read-resume-v6", "oot2-resume-v6-info") else
                   "v5" if command in ("oot2-read-resume-v5", "oot2-resume-v5-info") else None)
         archive, stats = (snapshot(ROOT / ("cache-resume-" + resume), ROOT / ("cache-transfer-resume-" + resume), translations=True)
                           if resume else snapshot(CACHE, ROOT / "cache-transfer"))
-        if command in ("oot2-metal-snapshot-info-v1", "oot2-resume-v5-info", "oot2-resume-v6-info", "oot2-resume-v8-info"):
+        if command in ("oot2-metal-snapshot-info-v1", "oot2-resume-v5-info", "oot2-resume-v6-info", "oot2-resume-v8-info", "oot2-resume-v9-info"):
             print("OOT2_METAL_SNAPSHOT_V1", archive.stat().st_size,
                   stats["sqlite_bytes"], stats["entries"])
         else:
