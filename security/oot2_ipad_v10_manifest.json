@@ -1,0 +1,25 @@
+{
+  "base_revision": "e4b0d9b75d39c41c10fdcfec2f0b070df496d7e5",
+  "shader_chain": "a9bfaeb9fa8c",
+  "originals": {
+    "scripts/build_ipa_from_nsp.py": "3302c0da97a3b8585510d2af20c9f221c6d4be4fc4ae5bdf0e3c8d13509ca03d",
+    "dm/gfx/nvn/dmsh_chain.h": "6d4833cec46d22453123395949c573eb0ab590f0dd440e5348012688928ee638",
+    "dm/gfx/nvn/nvn_mtl.m": "79f84b1726cceebb82c0ddba466065af713b84f18d0acba932b559d67e3096ea",
+    "dm/gfx/tests/Makefile": "ee8a023b17cb4d5bfe61d654d9a23be038024c8c291c25f766e8359b7240f08f"
+  },
+  "seed_counts": {
+    "S": 16818,
+    "C": 1043,
+    "R": 7138,
+    "M": 164
+  },
+  "scope": "complete audited official runtime and translator; metadata-only runner exporter under OOT2_FULLWARM_TOOL, verified NUP release",
+  "gpu_runtime_validated": false,
+  "patch_sha256": "11ff48c52a127806d3f091276bb3b629f6b3e77d126eac5688648305396f7840",
+  "new_files": [
+    "dm/gfx/nvn/oot2_fullwarm_constants.inc",
+    "dm/gfx/nvn/oot2_fullwarm_export.inc",
+    "dm/gfx/tests/oot2_fullwarm_harness.m"
+  ],
+  "index_mode": "native arch_key and arch_keys_write from identical iOS library bytes; no Mac archive copied"
+}

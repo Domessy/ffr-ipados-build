@@ -1,0 +1,470 @@
+name: OOT2 v10 - complete upstream, durable checkpoint then official iPad prewarm
+'on':
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: New genuine shader build, or finish from a verified v10 checkpoint
+        type: choice
+        required: true
+        default: build
+        options:
+        - build
+        - finish
+      runtime_variant:
+        type: choice
+        required: true
+        default: ipad-v10
+        options:
+        - ipad-v10
+      ipa_layout:
+        type: choice
+        required: true
+        default: local-bundle
+        options:
+        - local-bundle
+permissions:
+  contents: read
+concurrency:
+  group: oot2-switch2-build
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: xcode-27
+    timeout-minutes: 345
+    defaults:
+      run:
+        shell: bash
+    if: vars.FFR_SECURITY_READY == 'true' && inputs.mode == 'build'
+    env:
+      OOT2_RUNTIME_VARIANT: ipad-v10
+      OOT2_IPA_LAYOUT: local-bundle
+    steps:
+    - name: Recuperer les scripts de cache du meme commit GitHub
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      with:
+        persist-credentials: false
+    - name: Verifier les scripts et tests NUP avant tout transfert prive
+      run: |
+        set -euo pipefail
+        python3 -m unittest discover -s security -p 'test_oot2*.py' -q
+    - name: Verifier les secrets reseau avant toute installation couteuse
+      env:
+        TS_AUTHKEY: ${{ secrets.FFR_TS_AUTHKEY }}
+        SSH_KEY: ${{ secrets.FFR_SSH_KEY }}
+        SSH_KNOWN_HOSTS: ${{ secrets.FFR_SSH_KNOWN_HOSTS }}
+        TS_HOST: ${{ secrets.FFR_TS_HOST }}
+        SSH_USER: ${{ secrets.FFR_SSH_USER }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        # Never echo tokens or private SSH material. GitHub provides empty
+        # strings for missing secrets, so fail before Xcode/Metal/Homebrew.
+        for name in TS_AUTHKEY SSH_KEY SSH_KNOWN_HOSTS TS_HOST SSH_USER; do
+          if [ -z "${!name}" ]; then
+            echo "OOT2 preflight: missing required network secret: ${name}" >&2
+            exit 1
+          fi
+        done
+        echo 'OOT2 network secrets: declared and nonempty (values hidden).'
+    - name: Selectionner Xcode 27.2 et verifier Metal, puis liberer de l'espace
+      run: "set -euo pipefail\necho 'Espace initial :'\ndf -h \"$RUNNER_TEMP\"\n# The pinned nxnative commit requires Apple Metal 32023.922.\n# xcode-27 images may\
+        \ expose Xcode 27.2 as an alias to its RC app.\nCANDIDATE=''\nfor app in /Applications/Xcode_27.2.app /Applications/Xcode_27.2.0.app /Applications/Xcode_27.2_Release_Candidate.app;\
+        \ do\n  if [ -d \"$app/Contents/Developer\" ]; then\n    CANDIDATE=\"$app\"\n    break\n  fi\ndone\nif [ -z \"$CANDIDATE\" ]; then\n  echo 'Xcode 27.2 is\
+        \ unavailable on this GitHub runner image.' >&2\n  exit 1\nfi\n# Resolve aliases before cleanup: never remove the actual selected Xcode.\nKEEP=\"$(cd \"$CANDIDATE\"\
+        \ && pwd -P)\"\necho \"Xcode conserve : $KEEP\"\nsudo xcode-select -s \"$KEEP/Contents/Developer\"\nxcodebuild -version\nxcodebuild -version | grep -Eq '^Xcode\
+        \ 27\\.2(\\.|$)'\nfor app in /Applications/Xcode_*.app; do\n  [ -d \"$app\" ] || continue\n  [ -L \"$app\" ] && continue\n  [ \"$(cd \"$app\" && pwd -P)\"\
+        \ = \"$KEEP\" ] && continue\n  echo \"Suppression sur runner ephemere : $app\"\n  sudo rm -rf -- \"$app\"\ndone\n# Metal is an optional Xcode component; fetch\
+        \ only if not installed.\nif ! xcodebuild -showComponent metalToolchain 2>/dev/null | grep -qi 'Status: installed'; then\n  echo 'Installation du Metal Toolchain\
+        \ correspondant a Xcode 27.2.'\n  xcodebuild -downloadComponent metalToolchain\nfi\necho 'Compilateurs Metal selectionnes :'\nxcrun -sdk macosx metal --version\n\
+        xcrun -sdk iphoneos metal --version\nfor sdk in macosx iphoneos; do\n  xcrun -sdk \"$sdk\" metal --version \\\n    | grep -Fq 'Apple metal version 32023.922\
+        \ (metalfe-32023.922.4)' || {\n      echo \"Incorrect Metal compiler for $sdk; stopping before private transfers.\" >&2\n      exit 1\n    }\ndone\necho 'Metal\
+        \ 32023.922 verified for macOS and iPhoneOS SDKs.'\n\n# xcodebuild uses the iOS DEVICE SDK, not an Android SDK or\n# simulator runtime. All cleanup is confined\
+        \ to this ephemeral runner,\n# never to CachyOS or any developer workstation.\necho 'Liberation espace temporaire pour OOT2.'\nif [ \"$HOME\" = \"/Users/runner\"\
+        \ ]; then\n  for sdk in \"$HOME/Library/Android/sdk\" \"$HOME/Library/Android/Sdk\"; do\n    if [ -d \"$sdk\" ] && [ ! -L \"$sdk\" ]; then\n      du -sh \"\
+        $sdk\" || true\n      sudo rm -rf -- \"$sdk\"\n    fi\n  done\nfi\nfree_kb=$(df -Pk \"$RUNNER_TEMP\" | awk 'NR == 2 {print $4}')\nif [ \"$free_kb\" -lt 95000000\
+        \ ]; then\n  echo 'OOT2: nettoyage des runtimes de simulateurs inutiles si l\u2019espace est limite.'\n  xcrun simctl runtime list || true\n  # On Xcode 27\
+        \ this supported simctl operation removes simulator\n  # runtime disk images, not the iOS device SDK or Metal compiler.\n  # Bound its runtime to avoid hanging\
+        \ a hosted job indefinitely.\n  python3 - <<'PY'\nimport subprocess\ntry:\n    p = subprocess.run(\n        [\"xcrun\", \"simctl\", \"runtime\", \"delete\"\
+        , \"all\"],\n        capture_output=True, text=True, timeout=240, check=False)\n    print(f\"Simulator runtime cleanup exit code: {p.returncode}\")\n    if\
+        \ p.returncode:\n        print(\"Simulator runtime cleanup unavailable; continuing to disk preflight.\")\nexcept (OSError, subprocess.TimeoutExpired):\n \
+        \   print(\"Simulator runtime cleanup timed out/unavailable; continuing to disk preflight.\")\nPY\n  xcrun simctl delete unavailable || true\nfi\ndf -h \"\
+        $RUNNER_TEMP\"\nfree_kb=$(df -Pk \"$RUNNER_TEMP\" | awk 'NR == 2 {print $4}')\n# Sufficient space for derived Zelda Ocarina Switch 2 game data, extracted\
+        \ RomFS, shader CAS and IPA.\nif [ \"$free_kb\" -lt 42000000 ]; then\n  echo 'OOT2 runner disk below initial 42 GB admission guard.' >&2\n  exit 1\nfi\n"
+    - name: Validate complete official v10 source before private transfers
+      run: |
+        set -euo pipefail
+        export HOMEBREW_NO_AUTO_UPDATE=1
+        brew install xcodegen zstd spirv-cross glslang python@3.15
+        "$(brew --prefix python@3.15)/bin/python3.15" -m venv "$RUNNER_TEMP/oot2-venv"
+        "$RUNNER_TEMP/oot2-venv/bin/python" -m pip install -q lz4 'capstone>=5,<6' fonttools nsz zbic
+        SRC="$RUNNER_TEMP/nxnative"
+        git init -q "$SRC"
+        git -C "$SRC" remote add origin https://github.com/seedds/nxnative.git
+        git -C "$SRC" fetch -q --depth 1 origin e4b0d9b75d39c41c10fdcfec2f0b070df496d7e5
+        git -C "$SRC" checkout -q --detach FETCH_HEAD
+        python3 security/oot2_prepare_ipad_v10.py "$SRC"
+        "$RUNNER_TEMP/oot2-venv/bin/python" security/oot2_v10_public.py "$SRC" "$RUNNER_TEMP/public-v10" > "$RUNNER_TEMP/public-v10.log" 2>&1 || { tail -140 "$RUNNER_TEMP/public-v10.log"; exit 1; }
+        tail -15 "$RUNNER_TEMP/public-v10.log"
+    - name: Installer Tailscale en ligne de commande (sans action DNS)
+      run: |
+        set -euo pipefail
+        export HOMEBREW_NO_AUTO_UPDATE=1
+        for attempt in 1 2 3; do
+          if brew install --formula tailscale; then break; fi
+          if [ "$attempt" -eq 3 ]; then exit 1; fi
+          sleep 15
+        done
+        command -v tailscale
+        command -v tailscaled
+    - name: Connecter Tailscale sans modifier les DNS macOS
+      env:
+        TS_AUTHKEY: ${{ secrets.FFR_TS_AUTHKEY }}
+      run: |
+        set -euo pipefail
+        test -n "$TS_AUTHKEY"
+        TS_CLI="$(command -v tailscale)"
+        TS_DAEMON="$(command -v tailscaled)"
+        TS_SOCKET="$RUNNER_TEMP/oot2-tailscaled.sock"
+        # Temporary daemon with in-memory state; no persistent login data.
+        nohup sudo -n "$TS_DAEMON" --state=mem: --socket="$TS_SOCKET" \
+          > "$RUNNER_TEMP/oot2-tailscaled.log" 2>&1 < /dev/null &
+        echo "$!" > "$RUNNER_TEMP/oot2-tailscaled.pid"
+        daemon_ready=0
+        for attempt in $(seq 1 30); do
+          if sudo -n "$TS_CLI" --socket="$TS_SOCKET" status --json > /dev/null 2>&1; then
+            daemon_ready=1
+            break
+          fi
+          sleep 1
+        done
+        if [ "$daemon_ready" -ne 1 ]; then
+          echo 'Tailscale daemon did not become ready.' >&2
+          exit 1
+        fi
+        # No MagicDNS required: the host is reached by its Tailscale IPv4 address.
+        sudo -n "$TS_CLI" --socket="$TS_SOCKET" up \
+          --authkey="$TS_AUTHKEY" \
+          --accept-dns=false \
+          --timeout=120s \
+          --hostname="oot2-ci-${GITHUB_RUN_ID}"
+        sudo -n "$TS_CLI" --socket="$TS_SOCKET" status --json \
+          | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("BackendState") == "Running"; print("Tailscale running; macOS system DNS unchanged.")'
+    - name: Configurer SSH avec cle d'hote epinglee
+      env:
+        SSH_KEY: ${{ secrets.FFR_SSH_KEY }}
+        HOSTKEY: ${{ secrets.FFR_SSH_KNOWN_HOSTS }}
+        PC_IP: ${{ secrets.FFR_TS_HOST }}
+        PC_USER: ${{ secrets.FFR_SSH_USER }}
+      run: |
+        set -euo pipefail
+        install -d -m 700 "$HOME/.ssh"
+        printf '%s\n' "$SSH_KEY" > "$RUNNER_TEMP/oot2_ssh_key"
+        printf '%s\n' "$HOSTKEY" > "$RUNNER_TEMP/oot2_known_hosts"
+        chmod 600 "$RUNNER_TEMP/oot2_ssh_key" "$RUNNER_TEMP/oot2_known_hosts"
+        {
+          echo 'Host ffr-cachyos'
+          printf '  HostName %s\n' "$PC_IP"
+          printf '  User %s\n' "$PC_USER"
+          echo '  Port 22'
+          printf '  IdentityFile %s\n' "$RUNNER_TEMP/oot2_ssh_key"
+          printf '  UserKnownHostsFile %s\n' "$RUNNER_TEMP/oot2_known_hosts"
+          echo '  StrictHostKeyChecking yes'
+          echo '  IdentitiesOnly yes'
+          echo '  BatchMode yes'
+        } > "$HOME/.ssh/config"
+        chmod 600 "$HOME/.ssh/config"
+        [ "$(ssh -o ConnectTimeout=15 ffr-cachyos oot2-probe-v1)" = 'OOT2_GATEWAY_V1' ]
+        ssh -o ConnectTimeout=15 ffr-cachyos oot2-diagnose-v1
+    - name: Verifier le NUP et la capacite disque avant transfert
+      run: |
+        set -euo pipefail
+        read -r TITLE VERSION NUP_BYTES BASE PATCHES PKGS <<< "$(ssh -o ConnectTimeout=20 ffr-cachyos oot2-manifest-v1)"
+        [[ "$TITLE" == "0400486024DEC000" && "$VERSION" == "v131072" && "$BASE" =~ ^[01]$ && "$PATCHES" == 1 ]]
+        [[ "$NUP_BYTES" =~ ^[1-9][0-9]*$ && "$PKGS" =~ ^[1-9][0-9]*$ ]]
+        free=$(( $(df -Pk "$RUNNER_TEMP" | awk 'NR==2 {print $4}') * 1024 ))
+        # The NUP is retained while its files are unpacked. Measure the
+        # selected RomFS from the verified TOC, rather than assuming an
+        # arbitrary second NUP copy plus 32 GiB.
+        read -r MARK SOURCE_BYTES ROMFS_BYTES <<< "$(ssh -o ConnectTimeout=25 ffr-cachyos oot2-space-v1)"
+        [[ "$MARK" == OOT2_SPACE_V1 && "$SOURCE_BYTES" == "$NUP_BYTES" && "$ROMFS_BYTES" =~ ^[1-9][0-9]*$ ]]
+        required=$(( NUP_BYTES + ROMFS_BYTES + 12 * 1024**3 ))
+        echo "OOT2: source_bytes=$NUP_BYTES; romfs_bytes=$ROMFS_BYTES; packages=$PKGS; free_bytes=$free; required_bytes=$required"
+        if (( free < required )); then
+          echo 'OOT2: insufficient temporary disk; NUP not transferred.' >&2
+          exit 1
+        fi
+        echo 'OOT2 remote metadata and runner disk preflight passed.'
+        read -r RELEASE_MARK RELEASE_ID <<< "$(ssh -o ConnectTimeout=25 ffr-cachyos oot2-release-preflight-v1)"
+        [[ "$RELEASE_MARK" == OOT2_RELEASE_READY_V1 && "$RELEASE_ID" =~ ^[1-9][0-9]*:[0-9a-f]{64}$ ]]
+        echo "OOT2_NUP_ID=$RELEASE_ID" >> "$GITHUB_ENV"
+        echo 'OOT2 runner-copy release eligibility checked before cache and NUP transfer.'
+        if [ "${{ inputs.ipa_layout }}" = local-bundle ]; then
+          LOCAL_ROUTE=oot2-local-bundle-v6-ready
+          LOCAL_EXPECT=OOT2_LOCAL_BUNDLE_READY_V6
+          if [ "${{ inputs.runtime_variant }}" = ipad-v10 ]; then
+            LOCAL_ROUTE=oot2-local-bundle-v10-ready
+            LOCAL_EXPECT=OOT2_LOCAL_BUNDLE_READY_V10
+          elif [ "${{ inputs.runtime_variant }}" = ipad-v7 ]; then
+            LOCAL_ROUTE=oot2-local-bundle-v7-ready
+            LOCAL_EXPECT=OOT2_LOCAL_BUNDLE_READY_V7
+          else
+            [[ "${{ inputs.runtime_variant }}" = ipad-v6 ]] || exit 1
+          fi
+          read -r LOCAL_MARK LOCAL_BYTES <<< "$(ssh ffr-cachyos "$LOCAL_ROUTE")"
+          [[ "$LOCAL_MARK" = "$LOCAL_EXPECT" && "$LOCAL_BYTES" =~ ^[1-9][0-9]*$ ]]
+          echo 'OOT2 local final assembly inputs verified before transfers.'
+        fi
+    - name: Initialize fresh CAS for the genuinely new shader chain
+      run: |
+        set -euo pipefail
+        umask 077
+        mkdir -p "$RUNNER_TEMP/oot2-shader-cas"
+        python3 security/oot2_sqlite_cas.py prepare "$RUNNER_TEMP/oot2-shader-cas"
+        echo 'New a9bfaeb9fa8c chain: no incompatible translation indexes restored; previous local caches preserved.'
+    - name: Transferer uniquement le NUP, sans cles
+      run: |
+        set -euo pipefail
+        umask 077
+        mkdir -p "$RUNNER_TEMP/oot2-nup"
+        read -r TITLE VERSION NUP_BYTES BASE PATCHES PKGS <<< "$(ssh ffr-cachyos oot2-manifest-v1)"
+        [[ "$TITLE" == 0400486024DEC000 && "$VERSION" == v131072 && "$BASE" =~ ^[01]$ && "$PATCHES" == 1 ]]
+        python3 security/oot2_transfer.py nup "$NUP_BYTES" "$RUNNER_TEMP/oot2-nup/OcarinaOfTime.nup"
+        python3 security/oot2_nup_info.py "$RUNNER_TEMP/oot2-nup/OcarinaOfTime.nup"
+        echo 'OOT2 transfer complete; originals and keys stay on CachyOS.'
+    - name: Compiler IPA experimentale Ocarina Switch 2
+      env:
+        OOT2_IPA_LAYOUT: ${{ inputs.ipa_layout }}
+        OOT2_RUNTIME_VARIANT: ${{ inputs.runtime_variant }}
+      run: |
+        set -euo pipefail
+        python3 security/run_oot2.py
+    - name: Save exact v10 compiled checkpoint and require receipt
+      run: |
+        set -euo pipefail
+        test -s "$RUNNER_TEMP/ZeldaOcarinaOfTime.ipa"
+        read -r MARK BYTES <<< "$(ssh -o ConnectTimeout=20 -o ServerAliveInterval=30 -o ServerAliveCountMax=6 \
+          ffr-cachyos oot2-write-checkpoint-v10 < "$RUNNER_TEMP/ZeldaOcarinaOfTime.ipa")"
+        EXPECTED_BYTES=$(wc -c < "$RUNNER_TEMP/ZeldaOcarinaOfTime.ipa" | tr -d ' ')
+        [[ "$MARK" == OOT2_V10_CHECKPOINT_SAVED && "$BYTES" == "$EXPECTED_BYTES" ]]
+        echo 'Compiled v10 checkpoint saved privately; full prewarm and final IPA still pending.'
+    - name: Conserver les entrees privees pour une future reconstruction du moteur
+      continue-on-error: true
+      env:
+        OOT2_RUNTIME_VARIANT: ipad-v10
+      run: |
+        set -euo pipefail
+        python3 security/oot2_export_buildkit.py "$RUNNER_TEMP" "$RUNNER_TEMP/OOT2HostKit-v10.tar.zst"
+        ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 ffr-cachyos oot2-write-host-kit-v10 < "$RUNNER_TEMP/OOT2HostKit-v10.tar.zst"
+    - name: Synchroniser diagnostic prive sur succes ou echec
+      if: always()
+      run: |
+        if [ -s "$RUNNER_TEMP/oot2-build.log" ]; then
+          tail -c 33554432 "$RUNNER_TEMP/oot2-build.log" \
+            | ssh -o ConnectTimeout=20 ffr-cachyos oot2-write-log-v10 || true
+        fi
+        rm -f "$RUNNER_TEMP/oot2-nup/OcarinaOfTime.nup" "$RUNNER_TEMP/oot2_ssh_key" || true
+        if [ -s "$RUNNER_TEMP/v10-archives.log" ]; then
+          tail -c 33554432 "$RUNNER_TEMP/v10-archives.log" | ssh -o ConnectTimeout=20 ffr-cachyos oot2-write-archive-log-v10 || true
+        fi
+    - name: Fermer la connexion Tailscale ephemere
+      if: always()
+      run: |
+        TS_SOCKET="$RUNNER_TEMP/oot2-tailscaled.sock"
+        if command -v tailscale >/dev/null 2>&1; then
+          sudo -n tailscale --socket="$TS_SOCKET" logout > /dev/null 2>&1 || true
+        fi
+        if [ -s "$RUNNER_TEMP/oot2-tailscaled.pid" ]; then
+          sudo -n kill "$(cat "$RUNNER_TEMP/oot2-tailscaled.pid")" > /dev/null 2>&1 || true
+        fi
+        rm -f "$RUNNER_TEMP/oot2_ssh_key" || true
+  finish:
+    runs-on: xcode-27
+    timeout-minutes: 345
+    defaults:
+      run:
+        shell: bash
+    needs:
+    - build
+    if: always() && vars.FFR_SECURITY_READY == 'true' && (inputs.mode == 'finish' || (inputs.mode == 'build' && needs.build.result == 'success'))
+    steps:
+    - name: Recuperer les scripts de cache du meme commit GitHub
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      with:
+        persist-credentials: false
+    - name: Verifier les scripts et tests NUP avant tout transfert prive
+      run: |
+        set -euo pipefail
+        python3 -m unittest discover -s security -p 'test_oot2*.py' -q
+    - name: Verifier les secrets reseau avant toute installation couteuse
+      env:
+        TS_AUTHKEY: ${{ secrets.FFR_TS_AUTHKEY }}
+        SSH_KEY: ${{ secrets.FFR_SSH_KEY }}
+        SSH_KNOWN_HOSTS: ${{ secrets.FFR_SSH_KNOWN_HOSTS }}
+        TS_HOST: ${{ secrets.FFR_TS_HOST }}
+        SSH_USER: ${{ secrets.FFR_SSH_USER }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        # Never echo tokens or private SSH material. GitHub provides empty
+        # strings for missing secrets, so fail before Xcode/Metal/Homebrew.
+        for name in TS_AUTHKEY SSH_KEY SSH_KNOWN_HOSTS TS_HOST SSH_USER; do
+          if [ -z "${!name}" ]; then
+            echo "OOT2 preflight: missing required network secret: ${name}" >&2
+            exit 1
+          fi
+        done
+        echo 'OOT2 network secrets: declared and nonempty (values hidden).'
+    - name: Selectionner Xcode 27.2 et verifier Metal, puis liberer de l'espace
+      run: "set -euo pipefail\necho 'Espace initial :'\ndf -h \"$RUNNER_TEMP\"\n# The pinned nxnative commit requires Apple Metal 32023.922.\n# xcode-27 images may\
+        \ expose Xcode 27.2 as an alias to its RC app.\nCANDIDATE=''\nfor app in /Applications/Xcode_27.2.app /Applications/Xcode_27.2.0.app /Applications/Xcode_27.2_Release_Candidate.app;\
+        \ do\n  if [ -d \"$app/Contents/Developer\" ]; then\n    CANDIDATE=\"$app\"\n    break\n  fi\ndone\nif [ -z \"$CANDIDATE\" ]; then\n  echo 'Xcode 27.2 is\
+        \ unavailable on this GitHub runner image.' >&2\n  exit 1\nfi\n# Resolve aliases before cleanup: never remove the actual selected Xcode.\nKEEP=\"$(cd \"$CANDIDATE\"\
+        \ && pwd -P)\"\necho \"Xcode conserve : $KEEP\"\nsudo xcode-select -s \"$KEEP/Contents/Developer\"\nxcodebuild -version\nxcodebuild -version | grep -Eq '^Xcode\
+        \ 27\\.2(\\.|$)'\nfor app in /Applications/Xcode_*.app; do\n  [ -d \"$app\" ] || continue\n  [ -L \"$app\" ] && continue\n  [ \"$(cd \"$app\" && pwd -P)\"\
+        \ = \"$KEEP\" ] && continue\n  echo \"Suppression sur runner ephemere : $app\"\n  sudo rm -rf -- \"$app\"\ndone\n# Metal is an optional Xcode component; fetch\
+        \ only if not installed.\nif ! xcodebuild -showComponent metalToolchain 2>/dev/null | grep -qi 'Status: installed'; then\n  echo 'Installation du Metal Toolchain\
+        \ correspondant a Xcode 27.2.'\n  xcodebuild -downloadComponent metalToolchain\nfi\necho 'Compilateurs Metal selectionnes :'\nxcrun -sdk macosx metal --version\n\
+        xcrun -sdk iphoneos metal --version\nfor sdk in macosx iphoneos; do\n  xcrun -sdk \"$sdk\" metal --version \\\n    | grep -Fq 'Apple metal version 32023.922\
+        \ (metalfe-32023.922.4)' || {\n      echo \"Incorrect Metal compiler for $sdk; stopping before private transfers.\" >&2\n      exit 1\n    }\ndone\necho 'Metal\
+        \ 32023.922 verified for macOS and iPhoneOS SDKs.'\n\n# xcodebuild uses the iOS DEVICE SDK, not an Android SDK or\n# simulator runtime. All cleanup is confined\
+        \ to this ephemeral runner,\n# never to CachyOS or any developer workstation.\necho 'Liberation espace temporaire pour OOT2.'\nif [ \"$HOME\" = \"/Users/runner\"\
+        \ ]; then\n  for sdk in \"$HOME/Library/Android/sdk\" \"$HOME/Library/Android/Sdk\"; do\n    if [ -d \"$sdk\" ] && [ ! -L \"$sdk\" ]; then\n      du -sh \"\
+        $sdk\" || true\n      sudo rm -rf -- \"$sdk\"\n    fi\n  done\nfi\nfree_kb=$(df -Pk \"$RUNNER_TEMP\" | awk 'NR == 2 {print $4}')\nif [ \"$free_kb\" -lt 95000000\
+        \ ]; then\n  echo 'OOT2: nettoyage des runtimes de simulateurs inutiles si l\u2019espace est limite.'\n  xcrun simctl runtime list || true\n  # On Xcode 27\
+        \ this supported simctl operation removes simulator\n  # runtime disk images, not the iOS device SDK or Metal compiler.\n  # Bound its runtime to avoid hanging\
+        \ a hosted job indefinitely.\n  python3 - <<'PY'\nimport subprocess\ntry:\n    p = subprocess.run(\n        [\"xcrun\", \"simctl\", \"runtime\", \"delete\"\
+        , \"all\"],\n        capture_output=True, text=True, timeout=240, check=False)\n    print(f\"Simulator runtime cleanup exit code: {p.returncode}\")\n    if\
+        \ p.returncode:\n        print(\"Simulator runtime cleanup unavailable; continuing to disk preflight.\")\nexcept (OSError, subprocess.TimeoutExpired):\n \
+        \   print(\"Simulator runtime cleanup timed out/unavailable; continuing to disk preflight.\")\nPY\n  xcrun simctl delete unavailable || true\nfi\ndf -h \"\
+        $RUNNER_TEMP\"\nfree_kb=$(df -Pk \"$RUNNER_TEMP\" | awk 'NR == 2 {print $4}')\n# Sufficient space for derived Zelda Ocarina Switch 2 game data, extracted\
+        \ RomFS, shader CAS and IPA.\nif [ \"$free_kb\" -lt 42000000 ]; then\n  echo 'OOT2 runner disk below initial 42 GB admission guard.' >&2\n  exit 1\nfi\n"
+    - name: Validate complete official v10 source before private transfers
+      run: |
+        set -euo pipefail
+        export HOMEBREW_NO_AUTO_UPDATE=1
+        brew install xcodegen zstd spirv-cross glslang python@3.15
+        "$(brew --prefix python@3.15)/bin/python3.15" -m venv "$RUNNER_TEMP/oot2-venv"
+        "$RUNNER_TEMP/oot2-venv/bin/python" -m pip install -q lz4 'capstone>=5,<6' fonttools nsz zbic
+        SRC="$RUNNER_TEMP/nxnative"
+        git init -q "$SRC"
+        git -C "$SRC" remote add origin https://github.com/seedds/nxnative.git
+        git -C "$SRC" fetch -q --depth 1 origin e4b0d9b75d39c41c10fdcfec2f0b070df496d7e5
+        git -C "$SRC" checkout -q --detach FETCH_HEAD
+        python3 security/oot2_prepare_ipad_v10.py "$SRC"
+        "$RUNNER_TEMP/oot2-venv/bin/python" security/oot2_v10_public.py "$SRC" "$RUNNER_TEMP/public-v10" > "$RUNNER_TEMP/public-v10.log" 2>&1 || { tail -140 "$RUNNER_TEMP/public-v10.log"; exit 1; }
+        tail -15 "$RUNNER_TEMP/public-v10.log"
+    - name: Installer Tailscale en ligne de commande (sans action DNS)
+      run: |
+        set -euo pipefail
+        export HOMEBREW_NO_AUTO_UPDATE=1
+        for attempt in 1 2 3; do
+          if brew install --formula tailscale; then break; fi
+          if [ "$attempt" -eq 3 ]; then exit 1; fi
+          sleep 15
+        done
+        command -v tailscale
+        command -v tailscaled
+    - name: Connecter Tailscale sans modifier les DNS macOS
+      env:
+        TS_AUTHKEY: ${{ secrets.FFR_TS_AUTHKEY }}
+      run: |
+        set -euo pipefail
+        test -n "$TS_AUTHKEY"
+        TS_CLI="$(command -v tailscale)"
+        TS_DAEMON="$(command -v tailscaled)"
+        TS_SOCKET="$RUNNER_TEMP/oot2-tailscaled.sock"
+        # Temporary daemon with in-memory state; no persistent login data.
+        nohup sudo -n "$TS_DAEMON" --state=mem: --socket="$TS_SOCKET" \
+          > "$RUNNER_TEMP/oot2-tailscaled.log" 2>&1 < /dev/null &
+        echo "$!" > "$RUNNER_TEMP/oot2-tailscaled.pid"
+        daemon_ready=0
+        for attempt in $(seq 1 30); do
+          if sudo -n "$TS_CLI" --socket="$TS_SOCKET" status --json > /dev/null 2>&1; then
+            daemon_ready=1
+            break
+          fi
+          sleep 1
+        done
+        if [ "$daemon_ready" -ne 1 ]; then
+          echo 'Tailscale daemon did not become ready.' >&2
+          exit 1
+        fi
+        # No MagicDNS required: the host is reached by its Tailscale IPv4 address.
+        sudo -n "$TS_CLI" --socket="$TS_SOCKET" up \
+          --authkey="$TS_AUTHKEY" \
+          --accept-dns=false \
+          --timeout=120s \
+          --hostname="oot2-ci-${GITHUB_RUN_ID}"
+        sudo -n "$TS_CLI" --socket="$TS_SOCKET" status --json \
+          | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("BackendState") == "Running"; print("Tailscale running; macOS system DNS unchanged.")'
+    - name: Configurer SSH avec cle d'hote epinglee
+      env:
+        SSH_KEY: ${{ secrets.FFR_SSH_KEY }}
+        HOSTKEY: ${{ secrets.FFR_SSH_KNOWN_HOSTS }}
+        PC_IP: ${{ secrets.FFR_TS_HOST }}
+        PC_USER: ${{ secrets.FFR_SSH_USER }}
+      run: |
+        set -euo pipefail
+        install -d -m 700 "$HOME/.ssh"
+        printf '%s\n' "$SSH_KEY" > "$RUNNER_TEMP/oot2_ssh_key"
+        printf '%s\n' "$HOSTKEY" > "$RUNNER_TEMP/oot2_known_hosts"
+        chmod 600 "$RUNNER_TEMP/oot2_ssh_key" "$RUNNER_TEMP/oot2_known_hosts"
+        {
+          echo 'Host ffr-cachyos'
+          printf '  HostName %s\n' "$PC_IP"
+          printf '  User %s\n' "$PC_USER"
+          echo '  Port 22'
+          printf '  IdentityFile %s\n' "$RUNNER_TEMP/oot2_ssh_key"
+          printf '  UserKnownHostsFile %s\n' "$RUNNER_TEMP/oot2_known_hosts"
+          echo '  StrictHostKeyChecking yes'
+          echo '  IdentitiesOnly yes'
+          echo '  BatchMode yes'
+        } > "$HOME/.ssh/config"
+        chmod 600 "$HOME/.ssh/config"
+        [ "$(ssh -o ConnectTimeout=15 ffr-cachyos oot2-probe-v1)" = 'OOT2_GATEWAY_V1' ]
+        ssh -o ConnectTimeout=15 ffr-cachyos oot2-diagnose-v1
+    - name: Restore verified v10 checkpoint without NUP or shader compilation
+      run: |
+        set -euo pipefail
+        umask 077
+        read -r MARK BYTES SHA <<< "$(ssh -o ConnectTimeout=20 ffr-cachyos oot2-checkpoint-v10-info)"
+        [[ "$MARK" == OOT2_V10_CHECKPOINT_V1 && "$BYTES" =~ ^[1-9][0-9]*$ && "$SHA" =~ ^[0-9a-f]{64}$ ]]
+        FREE=$(( $(df -Pk "$RUNNER_TEMP" | awk 'NR==2 {print $4}') * 1024 ))
+        (( FREE >= BYTES + 50 * 1024**3 )) || { echo 'Insufficient disk for v10 archives.' >&2; exit 1; }
+        mkdir -p "$RUNNER_TEMP/oot2-v10"
+        python3 security/oot2_transfer.py v10-checkpoint "$BYTES" "$RUNNER_TEMP/oot2-v10/input.ipa"
+        RECEIVED_SHA=$(shasum -a 256 "$RUNNER_TEMP/oot2-v10/input.ipa" | awk '{print $1}')
+        [[ "$RECEIVED_SHA" == "$SHA" ]]
+        mv "$RUNNER_TEMP/oot2-v10/input.ipa" "$RUNNER_TEMP/ZeldaOcarinaOfTime.ipa"
+        ssh -o ConnectTimeout=20 ffr-cachyos oot2-local-bundle-v10-ready
+        echo 'Exact compiled v10 app restored; no NUP, shader translation or game executable compilation.'
+    - name: Compile official expanded iPad archives and strictly validate output
+      run: |
+        set -euo pipefail
+        "$RUNNER_TEMP/oot2-venv/bin/python" security/oot2_v10_official.py "$RUNNER_TEMP/nxnative" "$RUNNER_TEMP/ZeldaOcarinaOfTime.ipa" "$RUNNER_TEMP/v10-archives"
+    - name: Deliver verified v10 IPA and assemble original RomFS on CachyOS
+      run: |
+        set -euo pipefail
+        ssh -o ConnectTimeout=20 -o ServerAliveInterval=30 -o ServerAliveCountMax=6 ffr-cachyos oot2-write-slim-v10 < "$RUNNER_TEMP/v10-archives/fullwarm.ipa"
+    - name: Synchroniser diagnostic prive sur succes ou echec
+      if: always()
+      run: |
+        if [ -s "$RUNNER_TEMP/oot2-build.log" ]; then
+          tail -c 33554432 "$RUNNER_TEMP/oot2-build.log" \
+            | ssh -o ConnectTimeout=20 ffr-cachyos oot2-write-log-v10 || true
+        fi
+        rm -f "$RUNNER_TEMP/oot2-nup/OcarinaOfTime.nup" "$RUNNER_TEMP/oot2_ssh_key" || true
+        if [ -s "$RUNNER_TEMP/v10-archives.log" ]; then
+          tail -c 33554432 "$RUNNER_TEMP/v10-archives.log" | ssh -o ConnectTimeout=20 ffr-cachyos oot2-write-archive-log-v10 || true
+        fi
+    - name: Fermer la connexion Tailscale ephemere
+      if: always()
+      run: |
+        TS_SOCKET="$RUNNER_TEMP/oot2-tailscaled.sock"
+        if command -v tailscale >/dev/null 2>&1; then
+          sudo -n tailscale --socket="$TS_SOCKET" logout > /dev/null 2>&1 || true
+        fi
+        if [ -s "$RUNNER_TEMP/oot2-tailscaled.pid" ]; then
+          sudo -n kill "$(cat "$RUNNER_TEMP/oot2-tailscaled.pid")" > /dev/null 2>&1 || true
+        fi
+        rm -f "$RUNNER_TEMP/oot2_ssh_key" || true

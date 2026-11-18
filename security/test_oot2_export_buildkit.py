@@ -17,6 +17,10 @@ from security import ffr_ssh_gate as gate
 
 class BuildkitTests(unittest.TestCase):
     def setUp(self):
+        # Synthetic files below deliberately describe upstream-v4. Do not let
+        # a real build job's variant change their identity underneath the test.
+        variant=patch.dict(os.environ,{'OOT2_RUNTIME_VARIANT':'upstream-v4'})
+        variant.start();self.addCleanup(variant.stop)
         t = tempfile.TemporaryDirectory()
         self.addCleanup(t.cleanup)
         self.root = Path(t.name)
@@ -45,6 +49,15 @@ class BuildkitTests(unittest.TestCase):
         self.assertIn('patched/main.patched.bin', files)
         self.assertIn('Gen/dm/env.txt', files)
         self.assertFalse(any('prod.keys' in n or 'RomFS' in n for n in files))
+
+    def test_v10_collection_uses_actual_job_identity(self):
+        with patch.dict(os.environ,{'OOT2_RUNTIME_VARIANT':'ipad-v10'}):
+            pin,chain,recipe=kit.build_identity()
+            self.assertEqual(pin,'e4b0d9b75d39c41c10fdcfec2f0b070df496d7e5')
+            self.assertEqual(chain,'a9bfaeb9fa8c');self.assertEqual(len(recipe),64)
+            (self.source/'dm/gfx/nvn/dmsh_chain.h').write_text(f'#define DMSH_CHAIN "{chain}"')
+            with patch.object(kit.subprocess,'check_output',return_value=pin):
+                self.assertIn('patched/main.patched.bin',kit.collect(self.root))
 
     def test_ipad_v6_identity_and_separate_kit_route(self):
         import os, json, hashlib

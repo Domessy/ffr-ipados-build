@@ -1,57 +1,42 @@
-name: OOT2 v9 public translator and complete prewarm validation
-on:
-  workflow_dispatch:
-  pull_request:
-    branches: [main]
-    paths: ['security/oot2*v9*', '.github/workflows/*oot2-v9.yml']
+name: OOT2 v10 official public Mac and iOS gates
+'on':
+  workflow_dispatch: null
 permissions:
   contents: read
-concurrency:
-  group: oot2-v9-validation-${{ github.ref }}
-  cancel-in-progress: true
 jobs:
   public:
-    runs-on: xcode-27
-    timeout-minutes: 35
     env:
-      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
-    defaults:
-      run:
-        shell: bash
+      OOT2_RUNTIME_VARIANT: ipad-v10
+      OOT2_IPA_LAYOUT: local-bundle
+    runs-on: xcode-27
+    timeout-minutes: 40
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with:
-          persist-credentials: false
-      - name: Prepare immutable official host and genuine translator
-        run: |
-          set -euo pipefail
-          SRC="$RUNNER_TEMP/nxnative"
-          git init -q "$SRC"
-          git -C "$SRC" remote add origin https://github.com/seedds/nxnative.git
-          git -C "$SRC" fetch -q --depth 1 origin 87422462a4c020def29cc39d3042b08cc9eab02a
-          git -C "$SRC" checkout -q --detach FETCH_HEAD
-          python3 security/oot2_prepare_ipad_v9.py "$SRC"
-          brew install python@3.15 xcodegen zstd
-          "$(brew --prefix python@3.15)/bin/python3.15" -m venv "$RUNNER_TEMP/venv"
-          "$RUNNER_TEMP/venv/bin/python" -m pip install -q lz4 capstone fonttools
-          xcodebuild -downloadComponent MetalToolchain
-          "$RUNNER_TEMP/venv/bin/python" security/oot2_v9_validate.py "$SRC"
-          "$RUNNER_TEMP/venv/bin/python" security/oot2_shader_identity.py "$SRC" --expected da13969b5e94fb5c63625b3deadc1ce5ddf41adffc521b588dfe2d8747e9fd38
-          python3 -m unittest discover -s security -p 'test_oot2*.py' -q
-      - name: Exercise translator fixes with the locked translator and Metal compilers
-        run: |
-          set -euo pipefail
-          cd "$RUNNER_TEMP/nxnative"
-          export DMSH_TEST_XLATE="$PWD/dm/gfx/tools/dmsh_xlate_bin/dmsh_xlate"
-          export DMSH_TEST_METAL=1
-          "$RUNNER_TEMP/venv/bin/python" -m unittest -q dm/gfx/tests/test_dmsh_raw_noinline.py dm/gfx/tests/test_dmsh_membar_fence.py dm/gfx/tests/test_dmsh_ldc_offset.py dm/gfx/tests/test_dmsh_typed.py dm/tools/tests/test_nsp_chain.py dm/tools/tests/test_residency_naming.py
-      - name: Compile production iOS host with synthetic guest modules
-        run: |
-          set -euo pipefail
-          GAME=0400486024DEC000 "$RUNNER_TEMP/venv/bin/python" "$RUNNER_TEMP/nxnative/dm/ios/tools/build_smoke.py" --output "$RUNNER_TEMP/public-ios" > "$RUNNER_TEMP/ios.log" 2>&1 || { sed -n '/error:/p;/Undefined symbols/,+18p' "$RUNNER_TEMP/ios.log"; tail -100 "$RUNNER_TEMP/ios.log"; exit 1; }
-          tail -4 "$RUNNER_TEMP/ios.log"
-      - name: Execute CPU owner and write-index checks and compile actual iOS R/M archives
-        run: |
-          set -euo pipefail
-          "$RUNNER_TEMP/venv/bin/python" security/oot2_v9_public.py "$RUNNER_TEMP/nxnative" "$RUNNER_TEMP/public-archives" > "$RUNNER_TEMP/public-archives.log" 2>&1 || { sed -n '/error:/p;/Undefined symbols/,+18p' "$RUNNER_TEMP/public-archives.log"; tail -130 "$RUNNER_TEMP/public-archives.log"; exit 1; }
-          tail -15 "$RUNNER_TEMP/public-archives.log"
+    - name: Recuperer les scripts de cache du meme commit GitHub
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      with:
+        persist-credentials: false
+    - name: Select exact Metal toolchain
+      shell: bash
+      run: |
+        set -euo pipefail
+        sudo xcode-select -s /Applications/Xcode_27.2.app/Contents/Developer
+        xcodebuild -downloadComponent MetalToolchain
+    - name: Verifier les scripts et tests NUP avant tout transfert prive
+      run: |
+        set -euo pipefail
+        python3 -m unittest discover -s security -p 'test_oot2*.py' -q
+    - name: Validate complete official v10 source before private transfers
+      run: |
+        set -euo pipefail
+        export HOMEBREW_NO_AUTO_UPDATE=1
+        brew install xcodegen zstd spirv-cross glslang python@3.15
+        "$(brew --prefix python@3.15)/bin/python3.15" -m venv "$RUNNER_TEMP/oot2-venv"
+        "$RUNNER_TEMP/oot2-venv/bin/python" -m pip install -q lz4 'capstone>=5,<6' fonttools nsz zbic
+        SRC="$RUNNER_TEMP/nxnative"
+        git init -q "$SRC"
+        git -C "$SRC" remote add origin https://github.com/seedds/nxnative.git
+        git -C "$SRC" fetch -q --depth 1 origin e4b0d9b75d39c41c10fdcfec2f0b070df496d7e5
+        git -C "$SRC" checkout -q --detach FETCH_HEAD
+        python3 security/oot2_prepare_ipad_v10.py "$SRC"
+        "$RUNNER_TEMP/oot2-venv/bin/python" security/oot2_v10_public.py "$SRC" "$RUNNER_TEMP/public-v10" > "$RUNNER_TEMP/public-v10.log" 2>&1 || { tail -140 "$RUNNER_TEMP/public-v10.log"; exit 1; }
+        tail -15 "$RUNNER_TEMP/public-v10.log"
