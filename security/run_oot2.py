@@ -167,12 +167,29 @@ def handler(_signum, _frame):
     raise KeyboardInterrupt
 
 
+def build_budget(now=None, environ=None):
+    """Leave time to save CAS/checkpoint after a slow NUP transfer."""
+    environ = os.environ if environ is None else environ
+    deadline = environ.get("OOT2_JOB_DEADLINE_EPOCH")
+    if deadline is None:
+        return MAX_BUILD_SECONDS
+    if not deadline.isdecimal() or int(deadline) <= 0:
+        raise ValueError("invalid OOT2 job deadline")
+    remaining = int(deadline) - (time.time() if now is None else now) - 15 * 60
+    return min(MAX_BUILD_SECONDS, max(0, remaining))
+
+
 def compile_ipa():
     global active
     layout = os.environ.get("OOT2_IPA_LAYOUT", "bundle")
     if layout not in ("bundle", "separate", "local-bundle"):
         print("OOT2: invalid IPA layout; refusing build.", flush=True)
         return 1
+    budget = build_budget()
+    if budget < 60:
+        print("OOT2: insufficient job time remaining for a safe build; no compiler started.", flush=True)
+        return 75
+    print(f"OOT2 compiler time budget: {int(budget / 60)} min; checkpoint reserve: 15 min when job deadline is set.", flush=True)
     # Upstream's separate mode needs the extracted RomFS to stay available
     # after packaging for its one-time device transfer. This is runner-local;
     # it does not make an ephemeral runner persistent or skip shader builds.
@@ -244,7 +261,7 @@ def compile_ipa():
                     since_ns = checkpoint(since_ns)
                     sync_private_diagnostic()
                     last_sync = time.monotonic()
-                if (time.monotonic() - started >= MAX_BUILD_SECONDS
+                if (time.monotonic() - started >= budget
                         or shutil.disk_usage(TEMP).free < MIN_DISK_BYTES):
                     planned_stop = True
                     print("Pausing build to protect runner limit/disk; saving CAS.", flush=True)

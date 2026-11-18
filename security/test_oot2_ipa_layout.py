@@ -102,6 +102,21 @@ class IpaLayoutTests(unittest.TestCase):
         self.assertEqual(defaults.name,'oot2_ipad_v10_defaults.env')
         self.assertIn('DM_GUEST_FILE=1',defaults.read_text())
 
+    def test_job_deadline_reserves_checkpoint_after_variable_transfer_time(self):
+        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {'RUNNER_TEMP':temp,'GITHUB_WORKSPACE':str(ROOT)}):
+            spec=importlib.util.spec_from_file_location('oot2_budget_fixture',ROOT/'security/run_oot2.py')
+            module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        self.assertEqual(module.build_budget(now=1000,environ={}),265*60)
+        self.assertEqual(module.build_budget(now=1000,environ={'OOT2_JOB_DEADLINE_EPOCH':'30000'}),265*60)
+        self.assertEqual(module.build_budget(now=1000,environ={'OOT2_JOB_DEADLINE_EPOCH':'5000'}),3100)
+        self.assertEqual(module.build_budget(now=1000,environ={'OOT2_JOB_DEADLINE_EPOCH':'1800'}),0)
+        with self.assertRaises(ValueError):module.build_budget(now=1000,environ={'OOT2_JOB_DEADLINE_EPOCH':'invalid'})
+
+    def test_expired_job_deadline_never_starts_compiler(self):
+        with patch.dict(os.environ,{'OOT2_JOB_DEADLINE_EPOCH':'1'}):
+            rc,call,count=self.exercise('local-bundle','ipad-v11')
+        self.assertEqual(rc,75);self.assertEqual(count,0)
+
     def test_v11_uses_new_defaults_bounded_workers_and_pipeline_free_checkpoint(self):
         with patch('os.cpu_count',return_value=12):
             rc,call,_=self.exercise('local-bundle','ipad-v11')
