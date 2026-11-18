@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Public Mac/iOS gates for the unchanged complete upstream source tree."""
 from pathlib import Path
-import json,os,subprocess,sys
+import hashlib,json,os,subprocess,sys
 from oot2_prepare_ipad_v11 import PIN,CHAIN,TITLE,recipe
 
 def main(root,work):
@@ -9,9 +9,13 @@ def main(root,work):
     if subprocess.check_output(['git','-C',str(root),'rev-parse','HEAD'],text=True).strip()!=PIN:raise ValueError('v11 pin')
     if subprocess.check_output([sys.executable,str(root/'dm/gfx/tools/dmsh_chain.py')],text=True).strip()!=CHAIN:raise ValueError('v11 chain')
     if json.loads((root/'.oot2-v11.json').read_text())!={'base':PIN,'chain':CHAIN,'recipe_sha256':recipe()}:raise ValueError('v11 provenance')
+    spec=json.loads(Path(__file__).with_name('oot2_ipad_v11_manifest.json').read_text())['shader_profile_refresh']
+    expected=dict(spec['preserved'], **{'shader_map.tsv':spec['output_sha256']})
+    for name,digest in expected.items():
+        if hashlib.sha256((root/'dm/games'/TITLE/name).read_bytes()).hexdigest()!=digest:raise ValueError('v11 refreshed profile gate')
     subprocess.run([sys.executable,str(root/'dm/gfx/tools/tool_lock.py'),'--check-tools'],check=True)
     env=dict(os.environ,DMSH_TEST_XLATE=str(root/'dm/gfx/tools/dmsh_xlate_bin/dmsh_xlate'),DMSH_TEST_METAL='1',GAME=TITLE)
-    suites=['dm/gfx/tests/test_dmsh_raw_noinline.py','dm/gfx/tests/test_dmsh_shfl.py','dm/gfx/tests/test_dmsh_maxwell_ftz.py','dm/gfx/tests/test_spirv_ordered_ne.py','dm/gfx/tests/test_dmsh_wide.py','dm/gfx/tests/test_dmsh_raw_last.py','dm/gfx/tests/test_dmsh_ampere_alu.py','dm/gfx/tests/test_dmsh_ampere_orin.py','dm/tools/tests/test_nsp_chain.py','dm/tools/tests/test_x18_select.py','dm/tools/tests/test_pso_offline.py']
+    suites=['dm/gfx/tests/test_dmsh_raw_noinline.py','dm/gfx/tests/test_dmsh_shfl.py','dm/gfx/tests/test_dmsh_maxwell_ftz.py','dm/gfx/tests/test_spirv_ordered_ne.py','dm/gfx/tests/test_dmsh_wide.py','dm/gfx/tests/test_dmsh_raw_last.py','dm/gfx/tests/test_dmsh_ampere_alu.py','dm/gfx/tests/test_dmsh_ampere_orin.py','dm/tools/tests/test_nsp_chain.py','dm/tools/tests/test_x18_select.py','dm/tools/tests/test_pso_offline.py','dm/tools/tests/test_split_bahs_entries.py','dm.tools.tests.test_nsp_incremental.SplitShaders']
     subprocess.run([sys.executable,'-m','unittest','-q',*suites],cwd=root,env=env,check=True)
     subprocess.run(['make','-C',str(root/'dm/host'),'GAME='+TITLE,'-j3',f'gen/{TITLE}/dmhost'],check=True)
     names=['t_pso_prewarm','t_pool_replay','t_arena_trim','t_pso_demand_record','t_pso_skey','t_link_latch','t_link_drain','t_link_ticks','t_link_latch_cb','t_unwritten_store','t_upgrade_alias','t_mtl_init','t_pso_pending','t_mdx_prescan']
