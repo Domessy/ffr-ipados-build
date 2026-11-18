@@ -1,9 +1,9 @@
-name: OOT2 v10 - complete upstream, durable checkpoint then official iPad prewarm
+name: OOT2 v11 - complete upstream, durable checkpoint then official iPad prewarm
 'on':
   workflow_dispatch:
     inputs:
       mode:
-        description: New genuine shader build, or finish from a verified v10 checkpoint
+        description: New genuine shader build, or finish from a verified v11 checkpoint
         type: choice
         required: true
         default: build
@@ -13,9 +13,9 @@ name: OOT2 v10 - complete upstream, durable checkpoint then official iPad prewar
       runtime_variant:
         type: choice
         required: true
-        default: ipad-v10
+        default: ipad-v11
         options:
-        - ipad-v10
+        - ipad-v11
       ipa_layout:
         type: choice
         required: true
@@ -36,7 +36,7 @@ jobs:
         shell: bash
     if: vars.FFR_SECURITY_READY == 'true' && inputs.mode == 'build'
     env:
-      OOT2_RUNTIME_VARIANT: ipad-v10
+      OOT2_RUNTIME_VARIANT: ipad-v11
       OOT2_IPA_LAYOUT: local-bundle
     steps:
     - name: Recuperer les scripts de cache du meme commit GitHub
@@ -90,7 +90,7 @@ jobs:
         \   print(\"Simulator runtime cleanup timed out/unavailable; continuing to disk preflight.\")\nPY\n  xcrun simctl delete unavailable || true\nfi\ndf -h \"\
         $RUNNER_TEMP\"\nfree_kb=$(df -Pk \"$RUNNER_TEMP\" | awk 'NR == 2 {print $4}')\n# Sufficient space for derived Zelda Ocarina Switch 2 game data, extracted\
         \ RomFS, shader CAS and IPA.\nif [ \"$free_kb\" -lt 42000000 ]; then\n  echo 'OOT2 runner disk below initial 42 GB admission guard.' >&2\n  exit 1\nfi\n"
-    - name: Validate complete official v10 source before private transfers
+    - name: Validate complete official v11 source before private transfers
       run: |
         set -euo pipefail
         export HOMEBREW_NO_AUTO_UPDATE=1
@@ -100,11 +100,11 @@ jobs:
         SRC="$RUNNER_TEMP/nxnative"
         git init -q "$SRC"
         git -C "$SRC" remote add origin https://github.com/seedds/nxnative.git
-        git -C "$SRC" fetch -q --depth 1 origin e4b0d9b75d39c41c10fdcfec2f0b070df496d7e5
+        git -C "$SRC" fetch -q --depth 1 origin 0b5fd6020093407af8bb5ad166e78e00bd2b7242
         git -C "$SRC" checkout -q --detach FETCH_HEAD
-        python3 security/oot2_prepare_ipad_v10.py "$SRC"
-        "$RUNNER_TEMP/oot2-venv/bin/python" security/oot2_v10_public.py "$SRC" "$RUNNER_TEMP/public-v10" > "$RUNNER_TEMP/public-v10.log" 2>&1 || { tail -140 "$RUNNER_TEMP/public-v10.log"; exit 1; }
-        tail -15 "$RUNNER_TEMP/public-v10.log"
+        python3 security/oot2_prepare_ipad_v11.py "$SRC"
+        "$RUNNER_TEMP/oot2-venv/bin/python" security/oot2_v11_public.py "$SRC" "$RUNNER_TEMP/public-v11" > "$RUNNER_TEMP/public-v11.log" 2>&1 || { tail -140 "$RUNNER_TEMP/public-v11.log"; exit 1; }
+        tail -15 "$RUNNER_TEMP/public-v11.log"
     - name: Installer Tailscale en ligne de commande (sans action DNS)
       run: |
         set -euo pipefail
@@ -201,9 +201,9 @@ jobs:
         if [ "${{ inputs.ipa_layout }}" = local-bundle ]; then
           LOCAL_ROUTE=oot2-local-bundle-v6-ready
           LOCAL_EXPECT=OOT2_LOCAL_BUNDLE_READY_V6
-          if [ "${{ inputs.runtime_variant }}" = ipad-v10 ]; then
-            LOCAL_ROUTE=oot2-local-bundle-v10-ready
-            LOCAL_EXPECT=OOT2_LOCAL_BUNDLE_READY_V10
+          if [ "${{ inputs.runtime_variant }}" = ipad-v11 ]; then
+            LOCAL_ROUTE=oot2-local-bundle-v11-ready
+            LOCAL_EXPECT=OOT2_LOCAL_BUNDLE_READY_V11
           elif [ "${{ inputs.runtime_variant }}" = ipad-v7 ]; then
             LOCAL_ROUTE=oot2-local-bundle-v7-ready
             LOCAL_EXPECT=OOT2_LOCAL_BUNDLE_READY_V7
@@ -220,7 +220,7 @@ jobs:
         umask 077
         mkdir -p "$RUNNER_TEMP/oot2-shader-cas"
         python3 security/oot2_sqlite_cas.py prepare "$RUNNER_TEMP/oot2-shader-cas"
-        echo 'New a9bfaeb9fa8c chain: no incompatible translation indexes restored; previous local caches preserved.'
+        echo 'New 03a3ac831bfb chain: no incompatible translation indexes restored; previous local caches preserved.'
     - name: Transferer uniquement le NUP, sans cles
       run: |
         set -euo pipefail
@@ -238,33 +238,33 @@ jobs:
       run: |
         set -euo pipefail
         python3 security/run_oot2.py
-    - name: Save exact v10 compiled checkpoint and require receipt
+    - name: Save exact v11 compiled checkpoint and require receipt
       run: |
         set -euo pipefail
         test -s "$RUNNER_TEMP/ZeldaOcarinaOfTime.ipa"
         read -r MARK BYTES <<< "$(ssh -o ConnectTimeout=20 -o ServerAliveInterval=30 -o ServerAliveCountMax=6 \
-          ffr-cachyos oot2-write-checkpoint-v10 < "$RUNNER_TEMP/ZeldaOcarinaOfTime.ipa")"
+          ffr-cachyos oot2-write-checkpoint-v11 < "$RUNNER_TEMP/ZeldaOcarinaOfTime.ipa")"
         EXPECTED_BYTES=$(wc -c < "$RUNNER_TEMP/ZeldaOcarinaOfTime.ipa" | tr -d ' ')
-        [[ "$MARK" == OOT2_V10_CHECKPOINT_SAVED && "$BYTES" == "$EXPECTED_BYTES" ]]
-        echo 'Compiled v10 checkpoint saved privately; full prewarm and final IPA still pending.'
+        [[ "$MARK" == OOT2_V11_CHECKPOINT_SAVED && "$BYTES" == "$EXPECTED_BYTES" ]]
+        echo 'Compiled v11 checkpoint saved privately; full prewarm and final IPA still pending.'
     - name: Conserver les entrees privees pour une future reconstruction du moteur
       continue-on-error: true
       env:
-        OOT2_RUNTIME_VARIANT: ipad-v10
+        OOT2_RUNTIME_VARIANT: ipad-v11
       run: |
         set -euo pipefail
-        python3 security/oot2_export_buildkit.py "$RUNNER_TEMP" "$RUNNER_TEMP/OOT2HostKit-v10.tar.zst"
-        ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 ffr-cachyos oot2-write-host-kit-v10 < "$RUNNER_TEMP/OOT2HostKit-v10.tar.zst"
+        python3 security/oot2_export_buildkit.py "$RUNNER_TEMP" "$RUNNER_TEMP/OOT2HostKit-v11.tar.zst"
+        ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 ffr-cachyos oot2-write-host-kit-v11 < "$RUNNER_TEMP/OOT2HostKit-v11.tar.zst"
     - name: Synchroniser diagnostic prive sur succes ou echec
       if: always()
       run: |
         if [ -s "$RUNNER_TEMP/oot2-build.log" ]; then
           tail -c 33554432 "$RUNNER_TEMP/oot2-build.log" \
-            | ssh -o ConnectTimeout=20 ffr-cachyos oot2-write-log-v10 || true
+            | ssh -o ConnectTimeout=20 ffr-cachyos oot2-write-log-v11 || true
         fi
         rm -f "$RUNNER_TEMP/oot2-nup/OcarinaOfTime.nup" "$RUNNER_TEMP/oot2_ssh_key" || true
-        if [ -s "$RUNNER_TEMP/v10-archives.log" ]; then
-          tail -c 33554432 "$RUNNER_TEMP/v10-archives.log" | ssh -o ConnectTimeout=20 ffr-cachyos oot2-write-archive-log-v10 || true
+        if [ -s "$RUNNER_TEMP/v11-archives.log" ]; then
+          tail -c 33554432 "$RUNNER_TEMP/v11-archives.log" | ssh -o ConnectTimeout=20 ffr-cachyos oot2-write-archive-log-v11 || true
         fi
     - name: Fermer la connexion Tailscale ephemere
       if: always()
@@ -338,7 +338,7 @@ jobs:
         \   print(\"Simulator runtime cleanup timed out/unavailable; continuing to disk preflight.\")\nPY\n  xcrun simctl delete unavailable || true\nfi\ndf -h \"\
         $RUNNER_TEMP\"\nfree_kb=$(df -Pk \"$RUNNER_TEMP\" | awk 'NR == 2 {print $4}')\n# Sufficient space for derived Zelda Ocarina Switch 2 game data, extracted\
         \ RomFS, shader CAS and IPA.\nif [ \"$free_kb\" -lt 42000000 ]; then\n  echo 'OOT2 runner disk below initial 42 GB admission guard.' >&2\n  exit 1\nfi\n"
-    - name: Validate complete official v10 source before private transfers
+    - name: Validate complete official v11 source before private transfers
       run: |
         set -euo pipefail
         export HOMEBREW_NO_AUTO_UPDATE=1
@@ -348,11 +348,11 @@ jobs:
         SRC="$RUNNER_TEMP/nxnative"
         git init -q "$SRC"
         git -C "$SRC" remote add origin https://github.com/seedds/nxnative.git
-        git -C "$SRC" fetch -q --depth 1 origin e4b0d9b75d39c41c10fdcfec2f0b070df496d7e5
+        git -C "$SRC" fetch -q --depth 1 origin 0b5fd6020093407af8bb5ad166e78e00bd2b7242
         git -C "$SRC" checkout -q --detach FETCH_HEAD
-        python3 security/oot2_prepare_ipad_v10.py "$SRC"
-        "$RUNNER_TEMP/oot2-venv/bin/python" security/oot2_v10_public.py "$SRC" "$RUNNER_TEMP/public-v10" > "$RUNNER_TEMP/public-v10.log" 2>&1 || { tail -140 "$RUNNER_TEMP/public-v10.log"; exit 1; }
-        tail -15 "$RUNNER_TEMP/public-v10.log"
+        python3 security/oot2_prepare_ipad_v11.py "$SRC"
+        "$RUNNER_TEMP/oot2-venv/bin/python" security/oot2_v11_public.py "$SRC" "$RUNNER_TEMP/public-v11" > "$RUNNER_TEMP/public-v11.log" 2>&1 || { tail -140 "$RUNNER_TEMP/public-v11.log"; exit 1; }
+        tail -15 "$RUNNER_TEMP/public-v11.log"
     - name: Installer Tailscale en ligne de commande (sans action DNS)
       run: |
         set -euo pipefail
@@ -423,39 +423,39 @@ jobs:
         chmod 600 "$HOME/.ssh/config"
         [ "$(ssh -o ConnectTimeout=15 ffr-cachyos oot2-probe-v1)" = 'OOT2_GATEWAY_V1' ]
         ssh -o ConnectTimeout=15 ffr-cachyos oot2-diagnose-v1
-    - name: Restore verified v10 checkpoint without NUP or shader compilation
+    - name: Restore verified v11 checkpoint without NUP or shader compilation
       run: |
         set -euo pipefail
         umask 077
-        read -r MARK BYTES SHA <<< "$(ssh -o ConnectTimeout=20 ffr-cachyos oot2-checkpoint-v10-info)"
-        [[ "$MARK" == OOT2_V10_CHECKPOINT_V1 && "$BYTES" =~ ^[1-9][0-9]*$ && "$SHA" =~ ^[0-9a-f]{64}$ ]]
+        read -r MARK BYTES SHA <<< "$(ssh -o ConnectTimeout=20 ffr-cachyos oot2-checkpoint-v11-info)"
+        [[ "$MARK" == OOT2_V11_CHECKPOINT_V1 && "$BYTES" =~ ^[1-9][0-9]*$ && "$SHA" =~ ^[0-9a-f]{64}$ ]]
         FREE=$(( $(df -Pk "$RUNNER_TEMP" | awk 'NR==2 {print $4}') * 1024 ))
-        (( FREE >= BYTES + 50 * 1024**3 )) || { echo 'Insufficient disk for v10 archives.' >&2; exit 1; }
-        mkdir -p "$RUNNER_TEMP/oot2-v10"
-        python3 security/oot2_transfer.py v10-checkpoint "$BYTES" "$RUNNER_TEMP/oot2-v10/input.ipa"
-        RECEIVED_SHA=$(shasum -a 256 "$RUNNER_TEMP/oot2-v10/input.ipa" | awk '{print $1}')
+        (( FREE >= BYTES + 50 * 1024**3 )) || { echo 'Insufficient disk for v11 archives.' >&2; exit 1; }
+        mkdir -p "$RUNNER_TEMP/oot2-v11"
+        python3 security/oot2_transfer.py v11-checkpoint "$BYTES" "$RUNNER_TEMP/oot2-v11/input.ipa"
+        RECEIVED_SHA=$(shasum -a 256 "$RUNNER_TEMP/oot2-v11/input.ipa" | awk '{print $1}')
         [[ "$RECEIVED_SHA" == "$SHA" ]]
-        mv "$RUNNER_TEMP/oot2-v10/input.ipa" "$RUNNER_TEMP/ZeldaOcarinaOfTime.ipa"
-        ssh -o ConnectTimeout=20 ffr-cachyos oot2-local-bundle-v10-ready
-        echo 'Exact compiled v10 app restored; no NUP, shader translation or game executable compilation.'
+        mv "$RUNNER_TEMP/oot2-v11/input.ipa" "$RUNNER_TEMP/ZeldaOcarinaOfTime.ipa"
+        ssh -o ConnectTimeout=20 ffr-cachyos oot2-local-bundle-v11-ready
+        echo 'Exact compiled v11 app restored; no NUP, shader translation or game executable compilation.'
     - name: Compile official expanded iPad archives and strictly validate output
       run: |
         set -euo pipefail
-        "$RUNNER_TEMP/oot2-venv/bin/python" security/oot2_v10_official.py "$RUNNER_TEMP/nxnative" "$RUNNER_TEMP/ZeldaOcarinaOfTime.ipa" "$RUNNER_TEMP/v10-archives"
-    - name: Deliver verified v10 IPA and assemble original RomFS on CachyOS
+        "$RUNNER_TEMP/oot2-venv/bin/python" security/oot2_v11_official.py "$RUNNER_TEMP/nxnative" "$RUNNER_TEMP/ZeldaOcarinaOfTime.ipa" "$RUNNER_TEMP/v11-archives"
+    - name: Deliver verified v11 IPA and assemble original RomFS on CachyOS
       run: |
         set -euo pipefail
-        ssh -o ConnectTimeout=20 -o ServerAliveInterval=30 -o ServerAliveCountMax=6 ffr-cachyos oot2-write-slim-v10 < "$RUNNER_TEMP/v10-archives/fullwarm.ipa"
+        ssh -o ConnectTimeout=20 -o ServerAliveInterval=30 -o ServerAliveCountMax=6 ffr-cachyos oot2-write-slim-v11 < "$RUNNER_TEMP/v11-archives/fullwarm.ipa"
     - name: Synchroniser diagnostic prive sur succes ou echec
       if: always()
       run: |
         if [ -s "$RUNNER_TEMP/oot2-build.log" ]; then
           tail -c 33554432 "$RUNNER_TEMP/oot2-build.log" \
-            | ssh -o ConnectTimeout=20 ffr-cachyos oot2-write-log-v10 || true
+            | ssh -o ConnectTimeout=20 ffr-cachyos oot2-write-log-v11 || true
         fi
         rm -f "$RUNNER_TEMP/oot2-nup/OcarinaOfTime.nup" "$RUNNER_TEMP/oot2_ssh_key" || true
-        if [ -s "$RUNNER_TEMP/v10-archives.log" ]; then
-          tail -c 33554432 "$RUNNER_TEMP/v10-archives.log" | ssh -o ConnectTimeout=20 ffr-cachyos oot2-write-archive-log-v10 || true
+        if [ -s "$RUNNER_TEMP/v11-archives.log" ]; then
+          tail -c 33554432 "$RUNNER_TEMP/v11-archives.log" | ssh -o ConnectTimeout=20 ffr-cachyos oot2-write-archive-log-v11 || true
         fi
     - name: Fermer la connexion Tailscale ephemere
       if: always()

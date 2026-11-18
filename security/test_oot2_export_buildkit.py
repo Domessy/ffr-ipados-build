@@ -59,6 +59,15 @@ class BuildkitTests(unittest.TestCase):
             with patch.object(kit.subprocess,'check_output',return_value=pin):
                 self.assertIn('patched/main.patched.bin',kit.collect(self.root))
 
+    def test_v11_collection_uses_actual_job_identity(self):
+        with patch.dict(os.environ,{'OOT2_RUNTIME_VARIANT':'ipad-v11'}):
+            pin,chain,recipe=kit.build_identity()
+            self.assertEqual(pin,'0b5fd6020093407af8bb5ad166e78e00bd2b7242')
+            self.assertEqual(chain,'03a3ac831bfb');self.assertEqual(len(recipe),64)
+            (self.source/'dm/gfx/nvn/dmsh_chain.h').write_text(f'#define DMSH_CHAIN "{chain}"')
+            with patch.object(kit.subprocess,'check_output',return_value=pin):
+                self.assertIn('patched/main.patched.bin',kit.collect(self.root))
+
     def test_ipad_v6_identity_and_separate_kit_route(self):
         import os, json, hashlib
         with patch.dict(os.environ, {'OOT2_RUNTIME_VARIANT':'ipad-v6'}):
