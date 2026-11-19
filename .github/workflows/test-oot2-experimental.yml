@@ -1,4 +1,4 @@
-name: OOT2 v10 official public Mac and iOS gates
+name: OOT2 v11 official public Mac and iOS gates
 'on':
   workflow_dispatch: null
 permissions:
@@ -6,7 +6,7 @@ permissions:
 jobs:
   public:
     env:
-      OOT2_RUNTIME_VARIANT: ipad-v10
+      OOT2_RUNTIME_VARIANT: ipad-v11
       OOT2_IPA_LAYOUT: local-bundle
     runs-on: xcode-27
     timeout-minutes: 40
@@ -25,7 +25,7 @@ jobs:
       run: |
         set -euo pipefail
         python3 -m unittest discover -s security -p 'test_oot2*.py' -q
-    - name: Validate complete official v10 source before private transfers
+    - name: Validate complete official v11 source before private transfers
       run: |
         set -euo pipefail
         export HOMEBREW_NO_AUTO_UPDATE=1
@@ -35,8 +35,8 @@ jobs:
         SRC="$RUNNER_TEMP/nxnative"
         git init -q "$SRC"
         git -C "$SRC" remote add origin https://github.com/seedds/nxnative.git
-        git -C "$SRC" fetch -q --depth 1 origin e4b0d9b75d39c41c10fdcfec2f0b070df496d7e5
+        git -C "$SRC" fetch -q --depth 1 origin 0b5fd6020093407af8bb5ad166e78e00bd2b7242
         git -C "$SRC" checkout -q --detach FETCH_HEAD
-        python3 security/oot2_prepare_ipad_v10.py "$SRC"
-        "$RUNNER_TEMP/oot2-venv/bin/python" security/oot2_v10_public.py "$SRC" "$RUNNER_TEMP/public-v10" > "$RUNNER_TEMP/public-v10.log" 2>&1 || { tail -140 "$RUNNER_TEMP/public-v10.log"; exit 1; }
-        tail -15 "$RUNNER_TEMP/public-v10.log"
+        python3 security/oot2_prepare_ipad_v11.py "$SRC"
+        "$RUNNER_TEMP/oot2-venv/bin/python" security/oot2_v11_public.py "$SRC" "$RUNNER_TEMP/public-v11" > "$RUNNER_TEMP/public-v11.log" 2>&1 || { tail -140 "$RUNNER_TEMP/public-v11.log"; exit 1; }
+        tail -15 "$RUNNER_TEMP/public-v11.log"

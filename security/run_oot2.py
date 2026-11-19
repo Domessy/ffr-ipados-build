@@ -101,7 +101,7 @@ def sync_private_diagnostic():
     try:
         proc = subprocess.run(
             ["ssh", "-o", "ConnectTimeout=20", "-o", "ServerAliveInterval=30",
-             "-o", "ServerAliveCountMax=6", "ffr-cachyos", ("oot2-write-log-v10" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v10" else "oot2-write-log-v9" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v9" else "oot2-write-log")],
+             "-o", "ServerAliveCountMax=6", "ffr-cachyos", ("oot2-write-log-v11" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v11" else "oot2-write-log-v10" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v10" else "oot2-write-log-v9" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v9" else "oot2-write-log")],
             input=data, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             check=False, timeout=90,
         )
@@ -167,12 +167,29 @@ def handler(_signum, _frame):
     raise KeyboardInterrupt
 
 
+def build_budget(now=None, environ=None):
+    """Leave time to save CAS/checkpoint after a slow NUP transfer."""
+    environ = os.environ if environ is None else environ
+    deadline = environ.get("OOT2_JOB_DEADLINE_EPOCH")
+    if deadline is None:
+        return MAX_BUILD_SECONDS
+    if not deadline.isdecimal() or int(deadline) <= 0:
+        raise ValueError("invalid OOT2 job deadline")
+    remaining = int(deadline) - (time.time() if now is None else now) - 15 * 60
+    return min(MAX_BUILD_SECONDS, max(0, remaining))
+
+
 def compile_ipa():
     global active
     layout = os.environ.get("OOT2_IPA_LAYOUT", "bundle")
     if layout not in ("bundle", "separate", "local-bundle"):
         print("OOT2: invalid IPA layout; refusing build.", flush=True)
         return 1
+    budget = build_budget()
+    if budget < 60:
+        print("OOT2: insufficient job time remaining for a safe build; no compiler started.", flush=True)
+        return 75
+    print(f"OOT2 compiler time budget: {int(budget / 60)} min; checkpoint reserve: 15 min when job deadline is set.", flush=True)
     # Upstream's separate mode needs the extracted RomFS to stay available
     # after packaging for its one-time device transfer. This is runner-local;
     # it does not make an ephemeral runner persistent or skip shader builds.
@@ -185,7 +202,7 @@ def compile_ipa():
         return 1
     env = dict(os.environ, DMSH_CAS=str(CAS_DB),
                OOT2_RELEASE_EPHEMERAL_NUP=str(NUP))
-    if os.environ.get("OOT2_RUNTIME_VARIANT") in ("ipad-v8", "ipad-v9", "ipad-v10"):
+    if os.environ.get("OOT2_RUNTIME_VARIANT") in ("ipad-v8", "ipad-v9", "ipad-v10", "ipad-v11"):
         workers = min(os.cpu_count() or 2, 4)
         env["J"] = str(workers)
         env["DMSH_PROCS"] = str(workers)
@@ -209,11 +226,11 @@ def compile_ipa():
            str(NUP), "-o", str(OUTPUT), "-p", "v131072",
            "--platform", "ios", "--work-dir", str(TEMP / "oot2-work"),
            "--show-fps", "--gpu", "none", *layout_args]
-    if os.environ.get("OOT2_RUNTIME_VARIANT") in ("upstream-v4", "ipad-v5", "ipad-v6", "ipad-v7", "ipad-v8", "ipad-v9", "ipad-v10"):
+    if os.environ.get("OOT2_RUNTIME_VARIANT") in ("upstream-v4", "ipad-v5", "ipad-v6", "ipad-v7", "ipad-v8", "ipad-v9", "ipad-v10", "ipad-v11"):
         # Bake the proven setting into this diagnostic IPA so deleting a data
         # container cannot silently restore anonymous guest memory. The host
         # reads Documents/env.txt first, so an explicit device override wins.
-        filename = ("oot2_ipad_v10_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v10" else "oot2_ipad_v9_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v9" else "oot2_ipad_v8_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v8" else "oot2_ipad_v7_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v7" else "oot2_ipad_v6_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v6" else "oot2_ipad_v5_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v5"
+        filename = ("oot2_ipad_v11_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v11" else "oot2_ipad_v10_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v10" else "oot2_ipad_v9_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v9" else "oot2_ipad_v8_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v8" else "oot2_ipad_v7_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v7" else "oot2_ipad_v6_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v6" else "oot2_ipad_v5_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v5"
                     else "oot2_ipados_defaults.env")
         defaults = WORKSPACE / "security" / filename
         if not defaults.is_file() or defaults.is_symlink():
@@ -244,7 +261,7 @@ def compile_ipa():
                     since_ns = checkpoint(since_ns)
                     sync_private_diagnostic()
                     last_sync = time.monotonic()
-                if (time.monotonic() - started >= MAX_BUILD_SECONDS
+                if (time.monotonic() - started >= budget
                         or shutil.disk_usage(TEMP).free < MIN_DISK_BYTES):
                     planned_stop = True
                     print("Pausing build to protect runner limit/disk; saving CAS.", flush=True)

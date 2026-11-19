@@ -1,0 +1,41 @@
+{
+  "base_revision": "0b5fd6020093407af8bb5ad166e78e00bd2b7242",
+  "shader_chain": "03a3ac831bfb",
+  "originals": {
+    "dm/gfx/nvn/nvn_mtl.m": "9c6f4fead261026399d4fd7593b96deee6f683d675102512a324982b2fef7cb1",
+    "scripts/build_ipa_from_nsp.py": "d029214fd231f5fe10d52dfc446536a382858e0edff9d198716a3cde1b6ec5cf",
+    "dm/gfx/nvn/dmsh_chain.h": "31ebba013d8dffb8489b093864715af34774abb8de7800fc3d1c9163f21a48db",
+    "dm/gfx/tests/Makefile": "4bd133d88da9d87caa3180e56d4c410fb67829bd1e6b60ac0622a539b68a38b1",
+    "dm/games/0400486024DEC000/shader_map.tsv": "a7ccd5fbefa4a57a92482b4516e99ef4f8dfda09992e40965b2ff2b9e965bb1e"
+  },
+  "seed_counts": {
+    "S": 16818,
+    "C": 1043,
+    "R": 7138,
+    "M": 164
+  },
+  "scope": "complete audited official runtime and translator; metadata-only runner exporter under OOT2_FULLWARM_TOOL, verified NUP release",
+  "gpu_runtime_validated": false,
+  "patch_sha256": "093a0f916a1e2e9a9faff6a11d4c89cf040d47e6207f8001ef5671036105098a",
+  "new_files": [
+    "dm/gfx/nvn/oot2_fullwarm_constants.inc",
+    "dm/gfx/nvn/oot2_fullwarm_export.inc",
+    "dm/gfx/tests/oot2_fullwarm_harness.m"
+  ],
+  "index_mode": "native arch_key and arch_keys_write from identical iOS library bytes; no Mac archive copied",
+  "upstream_commits_after_v10": 50,
+  "mesh_identity": "native normalization of NVN2 7 to host 4, deduplicated by optional task and pipeline key",
+  "shader_profile_refresh": {
+    "input_sha256": "a7ccd5fbefa4a57a92482b4516e99ef4f8dfda09992e40965b2ff2b9e965bb1e",
+    "output_sha256": "972f6e4a1118b274b430cddaa73b56234aee3a1e7eb9ee13bb876bbe74958333",
+    "removed_key": "ce0eba6c3584814d",
+    "preserved": {
+      "shader_facts.tsv": "4aea03b4c319a07ccace9c6c95c4552ccda37e45d5f1785919152c534cf75c56",
+      "shader_pairs.tsv": "7ff90a9ce98455a2a65f814592a29133b3e6d150952de7b0254e7cc80931e14c",
+      "pso_pairs.tsv": "59a2feceaee6f6f8dd81cd781071842aca86dfe6a7e67990a1cc4b03c1d699bd",
+      "pso_manifest.tsv": "cefcec984e8b2680c6737df7c0ddbb1a6cdff8a181063c86e7e96f5c287c0962"
+    },
+    "validated_shaders": 42847,
+    "cause": "5df3dbe8 authoritative BAHS binary array excludes one stray descriptor; full original-file split verified on CachyOS"
+  }
+}
