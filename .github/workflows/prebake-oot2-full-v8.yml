@@ -215,13 +215,29 @@ jobs:
           [[ "$LOCAL_MARK" = "$LOCAL_EXPECT" && "$LOCAL_BYTES" =~ ^[1-9][0-9]*$ ]]
           echo 'OOT2 local final assembly inputs verified before transfers.'
         fi
-    - name: Initialize fresh CAS for the genuinely new shader chain
+    - name: Restore verified v11 shaders saved before the time limit
       run: |
         set -euo pipefail
         umask 077
-        mkdir -p "$RUNNER_TEMP/oot2-shader-cas"
-        python3 security/oot2_sqlite_cas.py prepare "$RUNNER_TEMP/oot2-shader-cas"
-        echo 'New 03a3ac831bfb chain: no incompatible translation indexes restored; previous local caches preserved.'
+        CACHE="$RUNNER_TEMP/oot2-shader-cas"
+        mkdir -p "$CACHE"
+        read -r MARK COMPRESSED SQLITE ENTRIES <<< "$(ssh -o ConnectTimeout=25 ffr-cachyos oot2-resume-v11-info)"
+        python3 security/oot2_v11_resume.py info "$MARK" "$COMPRESSED" "$SQLITE" "$ENTRIES"
+        free=$(( $(df -Pk "$RUNNER_TEMP" | awk 'NR==2 {print $4}') * 1024 ))
+        (( free >= COMPRESSED + SQLITE + 7 * 1024**3 )) || { echo 'OOT2: insufficient cache restore disk.' >&2; exit 1; }
+        python3 security/oot2_transfer.py resume-v11 "$COMPRESSED" "$CACHE/metal-snapshot.zst"
+        python3 security/oot2_v11_resume.py archive "$CACHE/metal-snapshot.zst"
+        echo 'OOT2 v11 cache transfer complete (100%); decompressing verified snapshot.'
+        zstd -q -d -c "$CACHE/metal-snapshot.zst" > "$CACHE/cas.db.partial"
+        rm "$CACHE/metal-snapshot.zst"
+        python3 security/oot2_cache_snapshot.py accept "$CACHE" --translations
+        python3 security/oot2_v11_resume.py indices "$CACHE/cas.db"
+        "$RUNNER_TEMP/oot2-venv/bin/python" "$RUNNER_TEMP/nxnative/dm/tools/shader_cache.py" "$CACHE/cas.db"
+        read -r MARK NUP_BYTES ROMFS_BYTES <<< "$(ssh -o ConnectTimeout=25 ffr-cachyos oot2-space-v1)"
+        [[ "$MARK" == OOT2_SPACE_V1 && "$NUP_BYTES" =~ ^[1-9][0-9]*$ && "$ROMFS_BYTES" =~ ^[1-9][0-9]*$ ]]
+        free=$(( $(df -Pk "$RUNNER_TEMP" | awk 'NR==2 {print $4}') * 1024 ))
+        (( free >= NUP_BYTES + ROMFS_BYTES + 12 * 1024**3 )) || { echo 'OOT2: insufficient post-cache extraction disk; NUP not transferred.' >&2; exit 1; }
+        echo 'OOT2 v11 exact shader cache restored; native digest checks remain enabled.'
     - name: Transferer uniquement le NUP, sans cles
       run: |
         set -euo pipefail

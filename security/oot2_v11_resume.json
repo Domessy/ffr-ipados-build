@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "fingerprint": "c26751bef46579c58b25ab0b078fb8a4cec9447d33349a2f32d7429985055997",
+  "entries": 244181,
+  "blobs": 228906,
+  "source_bytes": 10768398673,
+  "sqlite_bytes": 10845306880,
+  "compressed_bytes": 2621978916,
+  "source": "0b5fd6020093407af8bb5ad166e78e00bd2b7242",
+  "chain": "03a3ac831bfb",
+  "recipe_sha256": "223676a28e67942a8d954fb522037edf3ccd6dc7c4690a280c41250dcef38aae",
+  "indices": 42166,
+  "code_fp": "d86fbcf4ee2d72e94e03a9abcf62d1bb07d88ff7d56fe4a032280e17332f399a",
+  "sha256": "f69c80fdcab4d6a4312996d823d93f7ed06369f860a2ea41fefbd570c7a1ce36",
+  "source_run": 44409994833
+}
