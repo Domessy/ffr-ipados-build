@@ -41,7 +41,7 @@ def checkpoint(since_ns, final=False):
     print("Saving private shader-cache checkpoint to CachyOS...", flush=True)
     recv = subprocess.Popen(
         ["ssh", "-o", "ConnectTimeout=20", "-o", "ServerAliveInterval=30",
-         "-o", "ServerAliveCountMax=6", "ffr-cachyos", "oot2-write-cache"],
+         "-o", "ServerAliveCountMax=6", "ffr-cachyos", ("oot2-write-cache-v12" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v12" else "oot2-write-cache")],
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
     )
     sender = subprocess.Popen(
@@ -101,7 +101,7 @@ def sync_private_diagnostic():
     try:
         proc = subprocess.run(
             ["ssh", "-o", "ConnectTimeout=20", "-o", "ServerAliveInterval=30",
-             "-o", "ServerAliveCountMax=6", "ffr-cachyos", ("oot2-write-log-v11" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v11" else "oot2-write-log-v10" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v10" else "oot2-write-log-v9" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v9" else "oot2-write-log")],
+             "-o", "ServerAliveCountMax=6", "ffr-cachyos", ("oot2-write-log-v12" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v12" else "oot2-write-log-v11" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v11" else "oot2-write-log-v10" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v10" else "oot2-write-log-v9" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v9" else "oot2-write-log")],
             input=data, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             check=False, timeout=90,
         )
@@ -202,7 +202,7 @@ def compile_ipa():
         return 1
     env = dict(os.environ, DMSH_CAS=str(CAS_DB),
                OOT2_RELEASE_EPHEMERAL_NUP=str(NUP))
-    if os.environ.get("OOT2_RUNTIME_VARIANT") in ("ipad-v8", "ipad-v9", "ipad-v10", "ipad-v11"):
+    if os.environ.get("OOT2_RUNTIME_VARIANT") in ("ipad-v8", "ipad-v9", "ipad-v10", "ipad-v11", "ipad-v12"):
         workers = min(os.cpu_count() or 2, 4)
         env["J"] = str(workers)
         env["DMSH_PROCS"] = str(workers)
@@ -226,11 +226,11 @@ def compile_ipa():
            str(NUP), "-o", str(OUTPUT), "-p", "v131072",
            "--platform", "ios", "--work-dir", str(TEMP / "oot2-work"),
            "--show-fps", "--gpu", "none", *layout_args]
-    if os.environ.get("OOT2_RUNTIME_VARIANT") in ("upstream-v4", "ipad-v5", "ipad-v6", "ipad-v7", "ipad-v8", "ipad-v9", "ipad-v10", "ipad-v11"):
+    if os.environ.get("OOT2_RUNTIME_VARIANT") in ("upstream-v4", "ipad-v5", "ipad-v6", "ipad-v7", "ipad-v8", "ipad-v9", "ipad-v10", "ipad-v11", "ipad-v12"):
         # Bake the proven setting into this diagnostic IPA so deleting a data
         # container cannot silently restore anonymous guest memory. The host
         # reads Documents/env.txt first, so an explicit device override wins.
-        filename = ("oot2_ipad_v11_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v11" else "oot2_ipad_v10_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v10" else "oot2_ipad_v9_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v9" else "oot2_ipad_v8_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v8" else "oot2_ipad_v7_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v7" else "oot2_ipad_v6_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v6" else "oot2_ipad_v5_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v5"
+        filename = ("oot2_ipad_v12_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v12" else "oot2_ipad_v11_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v11" else "oot2_ipad_v10_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v10" else "oot2_ipad_v9_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v9" else "oot2_ipad_v8_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v8" else "oot2_ipad_v7_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v7" else "oot2_ipad_v6_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v6" else "oot2_ipad_v5_defaults.env" if os.environ.get("OOT2_RUNTIME_VARIANT") == "ipad-v5"
                     else "oot2_ipados_defaults.env")
         defaults = WORKSPACE / "security" / filename
         if not defaults.is_file() or defaults.is_symlink():
