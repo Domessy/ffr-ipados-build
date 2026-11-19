@@ -3,6 +3,7 @@
 import contextlib
 import hashlib
 import io
+import json
 import os
 from pathlib import Path
 import sqlite3
@@ -38,6 +39,23 @@ def archive(root, since, before):
 
 
 class SQLiteCasTests(unittest.TestCase):
+    def test_interrupted_upload_prefix_never_publishes_index_before_payload(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            with contextlib.redirect_stdout(io.StringIO()):cas.prepare(root)
+            payloads=['shader/digest/mac/key_b.json','shader/digest/ios/key_b.metallib','variant/ready.bin']
+            for name in payloads:add(root/'cas.db',name,b'complete payload',time.time()-4)
+            add(root/'cas.db','index/key.json',json.dumps({'requires':payloads}).encode(),time.time()-3)
+            output=archive(root,0,time.time_ns());self.assertEqual(output.returncode,0,output.stderr)
+            seen=set()
+            with tarfile.open(fileobj=io.BytesIO(output.stdout),mode='r:gz') as tar:
+                for member in tar:
+                    if member.name.startswith('index/'):
+                        required=json.loads(tar.extractfile(member).read())['requires']
+                        self.assertTrue(set(required)<=seen)
+                    seen.add(member.name)
+            self.assertIn('index/key.json',seen)
+
     def test_prepare_uses_one_sqlite_file_not_directory(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)

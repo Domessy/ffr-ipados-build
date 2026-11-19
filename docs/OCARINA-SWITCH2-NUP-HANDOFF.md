@@ -1391,3 +1391,9 @@ Préparation d’une copie propre réussie. Split complet des originaux : **1865
 Tentative de scripts/regress.py check pour cinq jeux (OOT2, BOTW, TOTK, Pokémon Scarlet, Bananza) : indisponible sur CachyOS, import libproc.dylib échoue. Ces jeux couvrent mémoire/mesh/variantes/gardes ; aucune régression GPU cinq-jeux revendiquée. Préflight Apple prévu : suites du traducteur verrouillé, host Mac, sync-wait CPU,22 fixtures GPU compilées (pas exécutées sur VM), export R/M et archives iOS réelles, caches et index stables, entrée pull réfléchie, puis app iOS de production compilée/éditée de liens. Test M5 de la v12 encore requis.
 
 Preuves sous resultats : oot2-v12-profile-verified-20261119.json, oot2-v12-workflow-check-20261119.json, oot2-v12-pipeline-tests-20261119.log, oot2-v12-native-tests-20261119.log, oot2-v12-five-game-regression-20261119.log. Split privé dans oot2-v12-split-20261119. Shaders extraits et données de jeu absents du dépôt public.
+
+## Validation publique en cours et durabilité des sauvegardes
+
+PR **95 draft** : https://github.com/Domessy/ffr-ipados-build/pull/95. Contrôle Apple public **44593528018**, commit e5f1a0d6e523c44326ac1d1c36ca15c79b6c11fb ; premiers tests réussis, compilation native/archives en cours. Aucun transfert de données privées dans ce contrôle.
+
+Revue du transport : l’exporteur CAS envoyait les index avant les payloads par ordre alphabétique. Une coupure SSH pouvait donc exposer un index sans ses fichiers, malgré la conservation des versions. Correction générique : exporter toutes les données puis les index. Test reproduisant effectivement l’échec de l’ancien exporteur et la réussite du nouveau ; **441 tests pipeline passent**. Preuve resultats/oot2-v12-index-order-red-green-20261119.json. Cette correction du transport ne change ni source native, ni patch/recette, ni générateur d’archives testés par44593528018 ; la première étape de chaque job privé réexécutera les tests du dernier commit.

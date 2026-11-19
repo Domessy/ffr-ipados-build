@@ -133,7 +133,11 @@ def export(root, since_ns, before_ns):
         cursor = db.execute(
             "SELECT e.name, b.data, e.mtime "
             "FROM entry e JOIN blob b ON b.id=e.blob "
-            "WHERE e.mtime>? AND e.mtime<=? AND substr(e.name,1,6) != 'stage/' ORDER BY e.name",
+            # Publish payloads before indices: a cut SSH upload may leave a
+            # complete prefix on CachyOS, which must not expose an index before
+            # the shader outputs from this checkpoint have arrived.
+            "WHERE e.mtime>? AND e.mtime<=? AND substr(e.name,1,6) != 'stage/' "
+            "ORDER BY CASE WHEN substr(e.name,1,6)='index/' THEN 1 ELSE 0 END,e.name",
             (since, before))
         with tarfile.open(fileobj=sys.stdout.buffer, mode="w|gz",
                           compresslevel=1) as tar:
