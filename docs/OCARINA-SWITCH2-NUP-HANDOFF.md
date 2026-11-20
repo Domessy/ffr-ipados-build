@@ -1403,3 +1403,14 @@ Les sauvegardes utilisent deux parcours ordonnés dans la même lecture SQLite :
 ## Protocole après construction de la v12
 
 Conserver la sauvegarde et la v11. Comparer le même trajet Kokiri pendant20 min avec les mêmes réglages, Metal4 pipelines activé, puis entrée/sortie d’un bâtiment et seconde session à chaud. Relever durée du préchauffage, chutes FPS et leur durée, sol, porte brillante et feuilles caméra immobile. Pour isoler les deux options expérimentales mémoire, comparer ensuite avec DM_NVN_UPLOAD_IDLE_MS=0 et DM_NVN_UPLOAD_SRC_MB=0 dans Documents/env.txt, une option à la fois. En cas de fermeture, garder log.txt, heure exacte et JetsamEvent. Aucun gain mémoire/FPS M5 ni absence de scintillement affirmé avant ces essais.
+
+
+## Veille OOT2 — 20 novembre 2026
+
+Comparaison figée v12 préparée 087faba98da29811e59e52658e1d51715258830e → main d43d4355865c130759f26727c5aeaf37c7be79d5 (20 novembre,05:34 UTC) :28 nouveaux commits. Aucun fichier du profil dm/games/0400486024DEC000 modifié, README et listes de préchauffage compris. Dernier changement du README :31fdefeb,19 novembre03:09 UTC ; les quatre correctifs mémoire sont déjà dans la v12 préparée. La v11 livrée reste distincte et ne les contient pas.
+
+Hors page OOT2, trois correctifs NVN applicables en général :950212b9 suit les écritures CPU dans certaines textures compressées à disposition sparse sur pool non virtuel (Bloodstained) ; d43a3790 utilise des vues float sur les images-buffer entières (histogramme Skywalker Saga) ; ce41059a remplace le mélange ADD/ONE/ZERO par une écriture directe sur les cibles float (bloom infini Skywalker Saga). Ils n'ont pas été validés sur OOT2/iPad : aucun lien causal établi avec les feuilles ou la porte brillante. b95a6b24 corrige la synchronisation de captures diagnostiques des producteurs OpenGL/Vulkan, pas un correctif FPS OOT2 démontré. Le rewriter5c198742 conserve les bornes32 bits ;81f8e8ce répartit les sauts entre zones accessibles, tous deux validés sur d'autres jeux. Nombreux autres ajouts OpenGL/Vulkan/profils.
+
+Main annonce désormais la chaîne e641898384f7, contre d80be0f9fadd préparée. Une migration complète nécessite de revalider la chaîne et les outils ; ne pas relabeller les caches ni considérer la validation Apple de la v12 actuelle comme couvrant ces28 commits. Décision de cette veille :aucun changement de source/defaults/workflow, aucun build lancé. Preuve détaillée locale :resultats/oot2-upstream-watch-20261120.json.
+
+Sources :https://github.com/seedds/nxnative/compare/087faba98da29811e59e52658e1d51715258830e...d43d4355865c130759f26727c5aeaf37c7be79d5 ; https://github.com/seedds/nxnative/blob/d43d4355865c130759f26727c5aeaf37c7be79d5/dm/games/0400486024DEC000/README.md .
