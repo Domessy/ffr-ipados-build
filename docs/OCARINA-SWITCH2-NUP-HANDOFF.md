@@ -1414,3 +1414,10 @@ Hors page OOT2, trois correctifs NVN applicables en général :950212b9 suit les
 Main annonce désormais la chaîne e641898384f7, contre d80be0f9fadd préparée. Une migration complète nécessite de revalider la chaîne et les outils ; ne pas relabeller les caches ni considérer la validation Apple de la v12 actuelle comme couvrant ces28 commits. Décision de cette veille :aucun changement de source/defaults/workflow, aucun build lancé. Preuve détaillée locale :resultats/oot2-upstream-watch-20261120.json.
 
 Sources :https://github.com/seedds/nxnative/compare/087faba98da29811e59e52658e1d51715258830e...d43d4355865c130759f26727c5aeaf37c7be79d5 ; https://github.com/seedds/nxnative/blob/d43d4355865c130759f26727c5aeaf37c7be79d5/dm/games/0400486024DEC000/README.md .
+
+
+## Run v12 lancé — 20 novembre 2026,07:08 Paris
+
+Run **44685671639** :https://github.com/Domessy/ffr-ipados-build/actions/runs/44685671639 ; branche experimental/oot2-v12-complete-upstream-20261119, commit2f0e08d6542ef2b405b2997574ca41f3ed8a20ff. Un seul dispatch HTTP204, confirmé in_progress. Inputs build / ipad-v12 / local-bundle. Source v12 prévue087faba98da29811e59e52658e1d51715258830e, chaîne d80be0f9fadd ; les28 commits de la veille suivante ne sont pas ajoutés à ce run validé.
+
+Préflight local :201 tests OOT2 réussis, NUP sélectionné et identité contrôlés, RomFS local prêt26247576430 octets ; CASv12 vide pour cette nouvelle chaîne. Pas d'autre build actif avant dispatch. Sur GitHub, checkout, tests pipeline et secrets réseau réussis ; préparation Xcode/Metal et nettoyage disque en cours au premier contrôle. La compilation du jeu et les transferts n'ont pas encore commencé à cet instant. Reprise automatique éventuelle puis finish/assemblage CachyOS prévus ; aucune IPA v12 livrée à ce stade. Anciennes livraisons et caches conservés. Preuve :resultats/oot2-v12-run-44685671639-20261120.json.
