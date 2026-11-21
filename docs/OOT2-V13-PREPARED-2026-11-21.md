@@ -2,7 +2,7 @@
 
 ## État
 
-Branche experimental/oot2-v13-complete-upstream-20261121, depuis la v12. Source officielle figée **a63ca65115cbd586ccca3bedc4af89984eddf2e5**, **122 commits après v12** (28 puis94 relevés), chaîne réellement recalculée **26e1a5f38264**, recette **0a55055d5c8f861488c1a50d89845f6d12b1149bbccc8c04cd7d0cdcacae0739**. Toutes les nouveautés de ces commits conservées, sans cherry-pick partiel. Aucun build privé v13 lancé. Préflight Apple public à exécuter avant de déclarer la préparation terminée.
+Branche experimental/oot2-v13-complete-upstream-20261121, depuis la v12. Source officielle figée **a63ca65115cbd586ccca3bedc4af89984eddf2e5**, **122 commits après v12** (28 puis94 relevés), chaîne réellement recalculée **26e1a5f38264**, recette **efd65d45793f2fd3d236a5d09b34175f15fad6dd341ced5a9331464ca33e4f1e**. Toutes les nouveautés de ces commits conservées, sans cherry-pick partiel. Aucun build privé v13 lancé. Préflight Apple public à exécuter avant de déclarer la préparation terminée.
 
 Le run v12 **44685671639** a terminé build et finish SUCCESS ; reprise non nécessaire. Livraisons et caches v11/v12 conservés. La livraison v12 doit encore faire l'objet d'un contrôle indépendant avant de l'annoncer vérifiée de bout en bout.
 
@@ -14,7 +14,7 @@ Chaîne :offsets runtime gather corrigés et helpers subgroup mesh hors ligne po
 
 Exporter metadata-only rebasé sur le nouveau lib_from_map ; la propriété upstream des octets et le digest sont conservés, l'association du chemin et les constantes suivies sont réservées à OOT2_FULLWARM_TOOL. En production les macros restent les opérations originales. Fixture pullmain/Short4, constantes, fragment fusionné, profondeur et alias stage4/7 conservé. Le NUP éphémère est libéré après extraction, identité vérifiée, uniquement sans siblings ni DLC externe ; l'ancre a été adaptée à stage_external_dlc. Tests de refus/suppression réelle sur données synthétiques.
 
-Défauts conservés :DM_GUEST_FILE=1,DM_NVN_RT_RECYCLE=1,DM_GFX_SCALE=1,DM_FPS_HOLD=off,DM_NVN_UPLOAD_IDLE_MS=2000,DM_NVN_UPLOAD_SRC_MB=96. Aucun aspect forcé :16:9 par défaut, Picture shape/Match screen disponible seulement après correspondance des hooks.4:3 peut augmenter le coût GPU ; commencer les comparaisons au même format que v12. Documents/env.txt prioritaire.
+Défauts conservés :DM_GUEST_FILE=1,DM_NVN_RT_RECYCLE=1,DM_GFX_SCALE=1,DM_FPS_HOLD=off,DM_NVN_UPLOAD_IDLE_MS=2000,DM_NVN_UPLOAD_SRC_MB=96. Aucun aspect forcé par env.txt :le lanceur iOS amont choisit Match screen (auto) par défaut, et propose16:9 après correspondance des hooks.4:3 peut augmenter le coût GPU ; commencer les comparaisons au même format que v12. Documents/env.txt prioritaire.
 
 ## Workflow et transfert
 
@@ -31,3 +31,5 @@ Preuves locales resultats/oot2-v13-{pipeline-tests,native-tests,private-split,re
 ## Protocole iPad après construction
 
 Préserver sauvegarde et ancienne IPA. Comparer20 min de Kokiri puis intérieur/extérieur, mêmes options et16:9, Metal4 pipelines activé ; relever préchauffage, fréquence/durée des drops, porte brillante, feuilles caméra immobile, sols et fermetures. Refaire à chaud. Tester ensuite Picture shape/Match screen :HUD/menus aux bords, films non étirés, comparaison du coût GPU. La Chambre des Sages exige une sauvegarde qui atteint cette transition. Tester enfin arrière-plan/retour ; conserver log.txt, heure et JetsamEvent en cas de fermeture. Les défauts idle2000ms/source96MiB restent expérimentaux, A/B possibles avec0 une option à la fois.
+
+PR96 draft. Premier contrôle public44929325351 arrêté avant conclusion pour limiter la suite gather aux réécritures CPU et aux tests du traducteur runtime (ampere_mem) ; la classe OnGpu suppose une exécution matérielle, indisponible sur le runner. Aucun test GPU runtime prétendu réussi. Nouveau contrôle public à lancer sur la correction.

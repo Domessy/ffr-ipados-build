@@ -41,5 +41,5 @@
     "patches.py": "6c98d4e525d95e2f10c328626ba10dab40107691cd019539c01d8a6084281980",
     "shape_anchor.c": "353fcad821277b461713a97417392d32e8c85ca43dc8af787f11646e99d0e930"
   },
-  "screen_aspect_default": "upstream 16:9; optional Picture shape enabled only after all hooks match"
+  "screen_aspect_default": "upstream iOS Match screen (auto); optional 16:9 remains available after all hooks match"
 }
