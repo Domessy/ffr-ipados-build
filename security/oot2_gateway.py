@@ -32,6 +32,11 @@ try:
 except ImportError:
     from oot2_v12_gateway import ROUTES as V12_ROUTES
 
+try:
+    from .oot2_v13_gateway import ROUTES as V13_ROUTES
+except ImportError:
+    from oot2_v13_gateway import ROUTES as V13_ROUTES
+
 HOME = Path.home()
 ROOT = HOME / "portage-ipados" / "oot-switch2"
 SOURCE_LINK = ROOT / "source"
@@ -61,7 +66,7 @@ ROUTES = frozenset({
     "oot2-write-host-kit-v8", "oot2-write-slim-v8", "oot2-local-bundle-v8-ready",
     "oot2-write-host-kit-v1",
     "oot2-write-host-kit-v5", "oot2-write-host-kit-v6", "oot2-write-slim-v6", "oot2-local-bundle-v6-ready",
-}) | V9_ROUTES | V10_ROUTES | V11_ROUTES | V12_ROUTES
+}) | V9_ROUTES | V10_ROUTES | V11_ROUTES | V12_ROUTES | V13_ROUTES
 
 
 def nup_file():
@@ -138,6 +143,12 @@ def dispatch(command, parent):
         except ImportError:
             from oot2_v10_gateway import dispatch as v10_dispatch
         return v10_dispatch(command,parent,ROOT,OUTPUT,lambda:release_identity(nup_file()))
+    if command in V13_ROUTES:
+        try:
+            from .oot2_v13_gateway import dispatch as v13_dispatch
+        except ImportError:
+            from oot2_v13_gateway import dispatch as v13_dispatch
+        return v13_dispatch(command,parent,ROOT,OUTPUT,lambda:release_identity(nup_file()))
     if command in V12_ROUTES:
         try:
             from .oot2_v12_gateway import dispatch as v12_dispatch
