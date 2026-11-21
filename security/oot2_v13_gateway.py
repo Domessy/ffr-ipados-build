@@ -1,4 +1,4 @@
-"""Fixed-path receipt for v13 only; v10 files and shader archives remain intact."""
+"""Fixed-path receipt for v13 only; previous IPA files and shader archives remain intact."""
 import hashlib
 import json
 from pathlib import Path

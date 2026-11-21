@@ -27,10 +27,10 @@ class V13Tests(unittest.TestCase):
         for chain,bad in [('a9bfaeb9fa8c',False),('03a3ac831bfb',False),('d80be0f9fadd',False),(CHAIN,True)]:
             with tempfile.TemporaryDirectory() as d:
                 with self.assertRaises(ValueError):o.validate_delivery(self.fixture(Path(d),chain,bad))
-    def test_top_gateway_checkpoint_round_trip_and_preserves_v10(self):
+    def test_top_gateway_checkpoint_round_trip_and_preserves_v12(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d).resolve();out=root/'out';out.mkdir();source=self.fixture(root)
-            stable=out/'ZeldaOcarinaOfTime-v10-unwarmed-checkpoint.ipa';stable.write_bytes(b'preserve v10')
+            stable=out/'ZeldaOcarinaOfTime-v12-unwarmed-checkpoint.ipa';stable.write_bytes(b'preserve v12')
             parent=SimpleNamespace(CACHE=root/'cache',CONFLICTS=root/'conflicts',OUTPUT=out)
             import shutil
             parent.receive_file=lambda name,limit:shutil.copyfile(source,parent.OUTPUT/name)
@@ -38,7 +38,7 @@ class V13Tests(unittest.TestCase):
             with patch.object(gate,'ROOT',root),patch.object(gate,'OUTPUT',out):
                 self.assertEqual(gate.dispatch('oot2-write-checkpoint-v13',parent),0)
                 self.assertEqual(gate.dispatch('oot2-checkpoint-v13-info',parent),0)
-            self.assertEqual(stable.read_bytes(),b'preserve v10')
+            self.assertEqual(stable.read_bytes(),b'preserve v12')
             self.assertFalse((out/'ZeldaOcarinaOfTime-ipad-v13-fullwarm-livecontainer.ipa').exists())
     def test_complete_top_level_delivery_assembles_original_romfs(self):
         import shutil
@@ -50,7 +50,7 @@ class V13Tests(unittest.TestCase):
             ident=identity(image);meta=root/'local-bundle-v6/romfs-manifest.json'
             meta.write_text(json.dumps({'bytes':image.stat().st_size,'identity':ident,'sha256':hashlib.sha256(image.read_bytes()).hexdigest(),'source_identity':'fixture'}))
             with zipfile.ZipFile(source,'a') as z:z.writestr('Payload/Game.app/romfs.id',f'DMROMFSID1 title={o.TITLE} size={ident[0]} index={ident[1]}')
-            stable=out/'ZeldaOcarinaOfTime-ipad-v10-fullwarm-livecontainer.ipa';stable.write_bytes(b'v10 retained')
+            stable=out/'ZeldaOcarinaOfTime-ipad-v12-fullwarm-livecontainer.ipa';stable.write_bytes(b'v12 retained')
             parent=SimpleNamespace(CACHE=root/'cache',CONFLICTS=root/'conflicts',OUTPUT=out)
             parent.receive_file=lambda name,limit:shutil.copyfile(source,parent.OUTPUT/name)
             with patch.object(gate,'ROOT',root),patch.object(gate,'OUTPUT',out):
@@ -59,7 +59,7 @@ class V13Tests(unittest.TestCase):
             with zipfile.ZipFile(final) as z:
                 self.assertIsNone(z.testzip());self.assertEqual(z.read('Payload/Game.app/romfs.img'),image.read_bytes())
             self.assertEqual(o.validate_delivery(final)['chain'],CHAIN)
-            self.assertEqual(stable.read_bytes(),b'v10 retained')
+            self.assertEqual(stable.read_bytes(),b'v12 retained')
     def test_native_index_copy_requires_complete_nonempty_content(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);src=root/'scripts';out=root/'out';src.mkdir();out.mkdir()

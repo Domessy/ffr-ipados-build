@@ -52,7 +52,7 @@ class V13RestoreTests(unittest.TestCase):
 
     def test_top_gateway_cache_is_separate_and_parent_state_is_restored(self):
         with tempfile.TemporaryDirectory() as d:
-            root=Path(d).resolve();old=root/'shader-cache';old.mkdir();(old/'preserve').write_bytes(b'v11')
+            root=Path(d).resolve();old=root/'shader-cache-v12';old.mkdir();(old/'preserve').write_bytes(b'v11')
             output=root/'resultats';output.mkdir()
             parent=SimpleNamespace(CACHE=old,CONFLICTS=root/'old-conflicts',OUTPUT=output)
             def receive():
