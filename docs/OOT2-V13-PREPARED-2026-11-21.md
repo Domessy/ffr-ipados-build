@@ -2,7 +2,7 @@
 
 ## État
 
-Branche experimental/oot2-v13-complete-upstream-20261121, depuis la v12. Source officielle figée **a63ca65115cbd586ccca3bedc4af89984eddf2e5**, **122 commits après v12** (28 puis94 relevés), chaîne réellement recalculée **26e1a5f38264**, recette **efd65d45793f2fd3d236a5d09b34175f15fad6dd341ced5a9331464ca33e4f1e**. Toutes les nouveautés de ces commits conservées, sans cherry-pick partiel. Aucun build privé v13 lancé. **Préparation terminée :préflight Apple public44929593636 SUCCESS**, compilation iOS et archives comprises. PR96 draft prête pour le build privé, qui reste non lancé.
+Branche experimental/oot2-v13-complete-upstream-20261121, depuis la v12. Source officielle figée **a63ca65115cbd586ccca3bedc4af89984eddf2e5**, **122 commits après v12** (28 puis94 relevés), chaîne réellement recalculée **26e1a5f38264**, recette **efd65d45793f2fd3d236a5d09b34175f15fad6dd341ced5a9331464ca33e4f1e**. Toutes les nouveautés de ces commits conservées, sans cherry-pick partiel. Au terme de la préparation, aucun build privé v13 n’avait été lancé. **Préparation terminée :préflight Apple public44929593636 SUCCESS**, compilation iOS et archives comprises. PR96 draft prête pour le build privé, lancé ensuite sous le run44930522270 (état courant en fin de document).
 
 Le run v12 **44685671639** a terminé build et finish SUCCESS ; reprise non nécessaire. Livraisons et caches v11/v12 conservés. La livraison v12 doit encore faire l'objet d'un contrôle indépendant avant de l'annoncer vérifiée de bout en bout.
 
@@ -34,10 +34,17 @@ Préserver sauvegarde et ancienne IPA. Comparer20 min de Kokiri puis intérieur/
 
 PR96 draft. Premier contrôle public44929325351 arrêté avant conclusion pour limiter la suite gather aux réécritures CPU et aux tests du traducteur runtime (ampere_mem) ; la classe OnGpu suppose une exécution matérielle, indisponible sur le runner. Aucun test GPU runtime prétendu réussi. Le contrôle corrigé44929593636 a ensuite réussi.
 
-Contrôle Apple public courant **44929593636**, commit8a1042f5425af00dffba3c875dace39a722cc80e :https://github.com/Domessy/ffr-ipados-build/actions/runs/44929593636 . Toutes les étapes réussies, compilation terminée le21 novembre à17:28 UTC (18:28 Paris). Métadonnées R/M, archives iOS/g17g, réemploi et app de production compilée/éditée de liens validés. Tests de préservation explicitement exercés sur les IPA/checkpoint/cache v12 ;14 tests de réception/reprise passent,461 tests pipeline au total. Aucun build privé v13 lancé.
+Contrôle Apple public courant **44929593636**, commit8a1042f5425af00dffba3c875dace39a722cc80e :https://github.com/Domessy/ffr-ipados-build/actions/runs/44929593636 . Toutes les étapes réussies, compilation terminée le21 novembre à17:28 UTC (18:28 Paris). Métadonnées R/M, archives iOS/g17g, réemploi et app de production compilée/éditée de liens validés. Tests de préservation explicitement exercés sur les IPA/checkpoint/cache v12 ;14 tests de réception/reprise passent,461 tests pipeline au total. Au terme de la préparation, aucun build privé v13 n’avait été lancé.
 
 ## État final vérifiable
 
 PR **96 draft** :https://github.com/Domessy/ffr-ipados-build/pull/96 . Code testé Apple au commit **8a1042f5425af00dffba3c875dace39a722cc80e** ; dernier commit fonctionnel identique. Les changements suivants ne touchent que documentation, tests de conservation v12 et docstring du gateway (corps strictement identique), vérifiés dans resultats/oot2-v13-apple-scope-20261121.json. Les461 tests pipeline du dernier état passent. Log public complet :resultats/oot2-v13-public-44929593636.log ; bilan :resultats/oot2-v13-prepared-20261121.json.
 
-Aucun build privé v13 n’a été lancé. Chemin opérationnel prêt :workflow enregistré prebake-oot2-full-v8.yml sur la branche v13, mode=build/runtime_variant=ipad-v13/ipa_layout=local-bundle. NUP requis ; première CAS v13 vide. Ne pas modifier le pin ou importer les index v12 lors du lancement. Les preuves de compilation ne remplacent pas les essais de jeu sur M5.
+Le build privé v13 a été lancé ensuite sous le run44930522270 ; voir l’état courant ci-dessous. Chemin opérationnel prêt :workflow enregistré prebake-oot2-full-v8.yml sur la branche v13, mode=build/runtime_variant=ipad-v13/ipa_layout=local-bundle. NUP requis ; première CAS v13 vide. Ne pas modifier le pin ou importer les index v12 lors du lancement. Les preuves de compilation ne remplacent pas les essais de jeu sur M5.
+
+
+## Run v13 lancé — 21 novembre 2026,18:31 Paris
+
+**État courant :run44930522270 IN_PROGRESS**, https://github.com/Domessy/ffr-ipados-build/actions/runs/44930522270 . Branche experimental/oot2-v13-complete-upstream-20261121, commit **b5789daaaaaca5c6990df9a05266d2a5c08e1f87**. Inputs build/ipad-v13/local-bundle. Un seul dispatch HTTP204, aucun build actif ou en attente avant lancement. Source a63ca65115cbd586ccca3bedc4af89984eddf2e5, chaîne26e1a5f38264, implémentation identique à celle validée Apple44929593636 (diff documentation/tests/docstring seulement).
+
+NUP sélectionné et identité validés, RomFS original prêt26247576430 octets, CASv13 vide attendue pour la nouvelle chaîne ; espace local libre2.0T. Sur le runner :checkout, tests pipeline et secrets réseau réussis ; préparation Xcode/Metal/nettoyage disque en cours au premier contrôle. Pas encore de transfert NUP ni de compilation du jeu à cet instant. Reprise automatique éventuelle et finish/assemblage CachyOS prévus. Pas d'IPA v13 livrée à ce stade. Toutes les versions précédentes conservées. Preuve :resultats/oot2-v13-run-44930522270-20261121.json.
