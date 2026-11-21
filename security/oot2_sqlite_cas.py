@@ -130,24 +130,29 @@ def export(root, since_ns, before_ns):
     try:
         db.execute("PRAGMA busy_timeout=120000")
         db.execute("BEGIN")
-        cursor = db.execute(
-            "SELECT e.name, b.data, e.mtime "
-            "FROM entry e JOIN blob b ON b.id=e.blob "
-            "WHERE e.mtime>? AND e.mtime<=? AND substr(e.name,1,6) != 'stage/' ORDER BY e.name",
-            (since, before))
+        # Publish payloads first, then indices, inside the same read snapshot.
+        # Two ordered scans avoid sorting large binary payloads into a temp
+        # B-tree just to put index names last.
         with tarfile.open(fileobj=sys.stdout.buffer, mode="w|gz",
                           compresslevel=1) as tar:
-            for name, data, mtime in cursor:
-                if not valid(name) or len(data) > MAX_ITEM:
-                    raise ValueError("cache_item")
-                if exported >= MAX_ITEMS:
-                    raise ValueError("cache_count")
-                info = tarfile.TarInfo(name)
-                info.size = len(data)
-                info.mtime = int(mtime)
-                info.mode = 0o600
-                tar.addfile(info, io.BytesIO(data))
-                exported += 1
+            for indices in (0, 1):
+                cursor = db.execute(
+                    "SELECT e.name, b.data, e.mtime "
+                    "FROM entry e JOIN blob b ON b.id=e.blob "
+                    "WHERE e.mtime>? AND e.mtime<=? AND substr(e.name,1,6) != 'stage/' "
+                    "AND (substr(e.name,1,6)='index/')=? ORDER BY e.name",
+                    (since, before, indices))
+                for name, data, mtime in cursor:
+                    if not valid(name) or len(data) > MAX_ITEM:
+                        raise ValueError("cache_item")
+                    if exported >= MAX_ITEMS:
+                        raise ValueError("cache_count")
+                    info = tarfile.TarInfo(name)
+                    info.size = len(data)
+                    info.mtime = int(mtime)
+                    info.mode = 0o600
+                    tar.addfile(info, io.BytesIO(data))
+                    exported += 1
         db.commit()
     finally:
         db.close()

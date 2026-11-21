@@ -1,4 +1,4 @@
-name: OOT2 v11 official public Mac and iOS gates
+name: OOT2 v12 official public Mac and iOS gates
 'on':
   workflow_dispatch: null
 permissions:
@@ -6,7 +6,7 @@ permissions:
 jobs:
   public:
     env:
-      OOT2_RUNTIME_VARIANT: ipad-v11
+      OOT2_RUNTIME_VARIANT: ipad-v12
       OOT2_IPA_LAYOUT: local-bundle
     runs-on: xcode-27
     timeout-minutes: 40
@@ -25,18 +25,18 @@ jobs:
       run: |
         set -euo pipefail
         python3 -m unittest discover -s security -p 'test_oot2*.py' -q
-    - name: Validate complete official v11 source before private transfers
+    - name: Validate complete official v12 source before private transfers
       run: |
         set -euo pipefail
         export HOMEBREW_NO_AUTO_UPDATE=1
         brew install xcodegen zstd spirv-cross glslang python@3.15
         "$(brew --prefix python@3.15)/bin/python3.15" -m venv "$RUNNER_TEMP/oot2-venv"
-        "$RUNNER_TEMP/oot2-venv/bin/python" -m pip install -q lz4 'capstone>=5,<6' fonttools nsz zbic
+        "$RUNNER_TEMP/oot2-venv/bin/python" -m pip install -q lz4 'capstone>=5,<6' fonttools nsz zbic PyYAML
         SRC="$RUNNER_TEMP/nxnative"
         git init -q "$SRC"
         git -C "$SRC" remote add origin https://github.com/seedds/nxnative.git
-        git -C "$SRC" fetch -q --depth 1 origin 0b5fd6020093407af8bb5ad166e78e00bd2b7242
+        git -C "$SRC" fetch -q --depth 1 origin 087faba98da29811e59e52658e1d51715258830e
         git -C "$SRC" checkout -q --detach FETCH_HEAD
-        python3 security/oot2_prepare_ipad_v11.py "$SRC"
-        "$RUNNER_TEMP/oot2-venv/bin/python" security/oot2_v11_public.py "$SRC" "$RUNNER_TEMP/public-v11" > "$RUNNER_TEMP/public-v11.log" 2>&1 || { tail -140 "$RUNNER_TEMP/public-v11.log"; exit 1; }
-        tail -15 "$RUNNER_TEMP/public-v11.log"
+        python3 security/oot2_prepare_ipad_v12.py "$SRC"
+        "$RUNNER_TEMP/oot2-venv/bin/python" security/oot2_v12_public.py "$SRC" "$RUNNER_TEMP/public-v12" > "$RUNNER_TEMP/public-v12.log" 2>&1 || { tail -140 "$RUNNER_TEMP/public-v12.log"; exit 1; }
+        tail -15 "$RUNNER_TEMP/public-v12.log"

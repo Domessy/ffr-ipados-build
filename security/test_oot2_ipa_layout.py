@@ -129,6 +129,18 @@ class IpaLayoutTests(unittest.TestCase):
         self.assertEqual(defaults.name,'oot2_ipad_v11_defaults.env')
         self.assertIn('DM_GUEST_FILE=1',defaults.read_text())
 
+    def test_v12_uses_new_defaults_bounded_workers_and_pipeline_free_checkpoint(self):
+        with patch('os.cpu_count',return_value=12):
+            rc,call,_=self.exercise('local-bundle','ipad-v12')
+        self.assertEqual(rc,0)
+        argv=call.args[0];env=call.kwargs['env']
+        self.assertEqual((env['J'],env['DMSH_PROCS']),('4','4'))
+        self.assertEqual(argv[argv.index('--gpu')+1],'none')
+        self.assertEqual(argv[argv.index('--romfs')+1],'separate')
+        defaults=Path(argv[argv.index('--env-file')+1])
+        self.assertEqual(defaults.name,'oot2_ipad_v12_defaults.env')
+        self.assertIn('DM_GUEST_FILE=1',defaults.read_text())
+
     def test_v8_bounded_workers_and_comparison_defaults(self):
         with patch('os.cpu_count', return_value=12):
             rc, call, _ = self.exercise('local-bundle', 'ipad-v8')

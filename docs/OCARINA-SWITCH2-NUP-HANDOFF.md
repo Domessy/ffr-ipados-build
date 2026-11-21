@@ -1364,3 +1364,79 @@ Priorité mémoire : **943a6111** plafonne à 4 MiB la marge des heaps recyclés
 Autre ajout page OOT2 **ac3fc4d7** : correction du double suffixe.img.img à l’empaquetage Mac, pas la cause d’un défaut de notre IPA. Hors page mais utiles aux prochains builds : **b989137a** compilation groupée des variantes vertex (gains de compilation froide mesurés sur BOTW/TOTK Mac, pas OOT2), et **c311523c** scans de réécriture abrégés (équivalence de sorties vérifiée sur d’autres jeux). Main annonce chaîne **d80be0f9fadd**, contre03a3ac831bfb livrée : une migration complète impose validation et reconstruction de la nouvelle chaîne, pas un renommage de caches. Les quatre correctifs mémoire ne changent pas eux-mêmes la chaîne shader ; possibilité de reconstruction du seul moteur à étudier/valider depuis le hostkit conservé. iOS4815cbbf améliore la copie des images changées en staging ; iOS3d8fc824 applique le choix HUD assez tôt. Aucun nouveau build lancé pour cette demande de veille.
 
 Preuves exactes : resultats/oot2-upstream-audit-20261119/{audit.json,oot2-readme.diff,oot2-readme-current.md,commits.txt}. Sources : commits amont cités, docs/reference/memory.md à087faba9. v11 livrée et ses caches conservés ; retour M5 encore absent.
+
+
+# OOT2 v12 — préparation du prochain run (19 novembre 2026)
+
+## État
+
+Branche **experimental/oot2-v12-complete-upstream-20261119**, depuis la v11 livrée. Source officielle figée **087faba98da29811e59e52658e1d51715258830e**, les 51 commits audités après v11 intégrés, chaîne recalculée **d80be0f9fadd**, recette **caafe78d258293a055ada7d6fa6a052883eefde61d4e2f9e46d1c3f872186965**. Migration complète, sans renommer les bibliothèques v11. IPA et caches v11 conservés. Aucun build privé du jeu lancé pour cette demande de préparation. Préparation terminée : contrôle Apple public **44593528018 SUCCESS**. PR95 draft prête pour le build privé, sans lancement de celui-ci.
+
+## Changements
+
+Quatre correctifs mémoire : marge des grandes cibles recyclées plafonnée à4 MiB, zéro-remplissage par bandes utilisant le tampon4 MiB, libération du staging terminé au repos, budget des sources zéro-copie par lot. Réglages expérimentaux intégrés : **DM_NVN_UPLOAD_IDLE_MS=2000**, **DM_NVN_UPLOAD_SRC_MB=96** ; comparaison M5 encore ouverte, remise à0 possible dans Documents/env.txt pour A/B. Valeurs retenues parmi les essais amont, pas un gain iPad affirmé. Défauts v11 conservés : DM_GUEST_FILE=1, RT_RECYCLE=1, GFX_SCALE=1, FPS_HOLD=off. Empreinte des défauts liée à la recette et contenu intégré contrôlé à la réception.
+
+Optimisations du traducteur/compilateur : variantes vertex groupées, noms d’entrée pull/vin lus dans la réflexion, scans de gardes abrégés, ainsi que les autres nouveautés main (staging iOS, HUD initial, correction d’adresses mesh, attentes relatives). Nouveau fixture du préchauffage force une conversion Short4 et une entrée pullmain distincte pour vérifier le parcours de noms d’entrée, en plus des constantes, des passes de profondeur, du fragment fusionné et des alias stage4/7. Exporteur uniquement sous OOT2_FULLWARM_TOOL ; comportement ordinaire de production conservé. Chaîne d80be0f9fadd réellement recalculée avant/après adaptation.
+
+## Workflow
+
+Chemin enregistré à dispatcher sur cette branche : **prebake-oot2-full-v8.yml**, copie identique **build-oot2-v12.yml**. Inputs mode=build/runtime_variant=ipad-v12/ipa_layout=local-bundle. Trois jobs : build → reprise éventuelle → finish. Seul le code75 du wrapper, après accusé d’un cache durable non vide, produit state=paused ; resume démarre sur un Mac frais et restaure automatiquement cette CAS. Une deuxième pause ou une vraie erreur échoue explicitement. finish s’ouvre uniquement après state=ready et checkpoint compilé accusé, ou sur mode=finish explicite. Les checkpoints et hostkits sont ignorés tant que la compilation est en pause.
+
+CAS et conflits dédiés **shader-cache-v12 / shader-cache-conflicts-v12**, route fixe de sauvegarde et restauration auto vide/présente. Aucun index ancien importé dans la nouvelle chaîne. Snapshot vivant vérifié par SHA256, taille, inventaire, intégrité SQLite et tous les blobs, complétude des sorties Mac/iOS et chaîne de chaque réflexion ; ouverture par Store natif avant NUP. Préflight disque après cache avant NUP. Budget dynamique345 min/job, réserve15 min et sauvegardes périodiques conservés. NUP encore requis pour chaque nouveau workspace Mac ; l’IPA complète et son RomFS restent assemblés sur CachyOS. Les optimisations de variantes réduisent du travail de compilation, gain total OOT2 non encore mesuré.
+
+## Validations locales
+
+Préparation d’une copie propre réussie. Split complet des originaux : **186583 fichiers /42847 shaders**, aucune erreur ; toutes les tables correspondent exactement au profil corrigé BAHS, même rafraîchissement public qu’en v11. **441 tests pipeline PASS** (dont pause durable, erreur non masquée, reprise unique, anciennes chaînes refusées, défauts empaquetés et workflow). **196 tests natifs comptabilisés, dont 3 ignorés**, sans erreur : réécritures, cache toolchain, code_fp, pso_offline, lecteur BAHS, chaîne et split strict. Les tests nécessitant des outils Apple ne sont pas prétendus exécutés sur Linux. Quatre workflows YAML et chaque bloc shell validés ; dépendances DAG et conditions de checkpoint/finish testées. Gateway déployé atomiquement, dispatcher dernier ; readiness v12/v11 PASS ; CAS v12 actuellement vide, ce qui est normal pour cette nouvelle chaîne.
+
+Tentative de scripts/regress.py check pour cinq jeux (OOT2, BOTW, TOTK, Pokémon Scarlet, Bananza) : indisponible sur CachyOS, import libproc.dylib échoue. Ces jeux couvrent mémoire/mesh/variantes/gardes ; aucune régression GPU cinq-jeux revendiquée. Préflight Apple réussi : suites du traducteur verrouillé, host Mac, sync-wait CPU,22 fixtures GPU compilées (pas exécutées sur VM), export R/M et archives iOS réelles, caches et index stables, entrée pull réfléchie, puis app iOS de production compilée/éditée de liens. Test M5 de la v12 encore requis.
+
+Preuves sous resultats : oot2-v12-profile-verified-20261119.json, oot2-v12-workflow-check-20261119.json, oot2-v12-pipeline-tests-20261119.log, oot2-v12-native-tests-20261119.log, oot2-v12-five-game-regression-20261119.log. Split privé dans oot2-v12-split-20261119. Shaders extraits et données de jeu absents du dépôt public.
+
+## Validation publique réussie et durabilité des sauvegardes
+
+PR **95 draft** : https://github.com/Domessy/ffr-ipados-build/pull/95. Contrôle Apple public **44593528018**, commit e5f1a0d6e523c44326ac1d1c36ca15c79b6c11fb ; toutes les étapes réussies, terminé le 19 novembre à19:06 UTC. Compilation et édition de liens de production iOS réussies ; producteur natif R/M, archives iOS/g17g et réemploi du cache validés, y compris le parcours pullmain distinct. Fixtures CPU exécutées ; 22 fixtures GPU compilées uniquement. Aucun transfert de données privées dans ce contrôle.
+
+Revue du transport : l’exporteur CAS envoyait les index avant les payloads par ordre alphabétique. Une coupure SSH pouvait donc exposer un index sans ses fichiers, malgré la conservation des versions. Correction générique : exporter toutes les données puis les index. Test reproduisant effectivement l’échec de l’ancien exporteur et la réussite du nouveau ; **441 tests pipeline passent**. Preuve resultats/oot2-v12-index-order-red-green-20261119.json. Cette correction du transport ne change ni source native, ni patch/recette, ni générateur d’archives testés par44593528018 ; la première étape de chaque job privé réexécutera les tests du dernier commit.
+
+Les sauvegardes utilisent deux parcours ordonnés dans la même lecture SQLite : données puis index, sans tri temporaire des blobs binaires. Le plan de requête confirme l’absence de TEMP B-TREE. Preuve : resultats/oot2-v12-cache-stream-plan-20261119.json. Dernier commit fonctionnel **01b95ed480c1b9b04001ad6c43eca860692d2194**. Diff depuis le commit Apple : documentation, exporteur CAS et son test uniquement ; code natif, recette, défauts, workflows et outils de préchauffage strictement identiques. Log Apple conservé : resultats/oot2-v12-public-44593528018.log ; bilan : resultats/oot2-v12-prepared-20261119.json.
+
+## Protocole après construction de la v12
+
+Conserver la sauvegarde et la v11. Comparer le même trajet Kokiri pendant20 min avec les mêmes réglages, Metal4 pipelines activé, puis entrée/sortie d’un bâtiment et seconde session à chaud. Relever durée du préchauffage, chutes FPS et leur durée, sol, porte brillante et feuilles caméra immobile. Pour isoler les deux options expérimentales mémoire, comparer ensuite avec DM_NVN_UPLOAD_IDLE_MS=0 et DM_NVN_UPLOAD_SRC_MB=0 dans Documents/env.txt, une option à la fois. En cas de fermeture, garder log.txt, heure exacte et JetsamEvent. Aucun gain mémoire/FPS M5 ni absence de scintillement affirmé avant ces essais.
+
+
+## Veille OOT2 — 20 novembre 2026
+
+Comparaison figée v12 préparée 087faba98da29811e59e52658e1d51715258830e → main d43d4355865c130759f26727c5aeaf37c7be79d5 (20 novembre,05:34 UTC) :28 nouveaux commits. Aucun fichier du profil dm/games/0400486024DEC000 modifié, README et listes de préchauffage compris. Dernier changement du README :31fdefeb,19 novembre03:09 UTC ; les quatre correctifs mémoire sont déjà dans la v12 préparée. La v11 livrée reste distincte et ne les contient pas.
+
+Hors page OOT2, trois correctifs NVN applicables en général :950212b9 suit les écritures CPU dans certaines textures compressées à disposition sparse sur pool non virtuel (Bloodstained) ; d43a3790 utilise des vues float sur les images-buffer entières (histogramme Skywalker Saga) ; ce41059a remplace le mélange ADD/ONE/ZERO par une écriture directe sur les cibles float (bloom infini Skywalker Saga). Ils n'ont pas été validés sur OOT2/iPad : aucun lien causal établi avec les feuilles ou la porte brillante. b95a6b24 corrige la synchronisation de captures diagnostiques des producteurs OpenGL/Vulkan, pas un correctif FPS OOT2 démontré. Le rewriter5c198742 conserve les bornes32 bits ;81f8e8ce répartit les sauts entre zones accessibles, tous deux validés sur d'autres jeux. Nombreux autres ajouts OpenGL/Vulkan/profils.
+
+Main annonce désormais la chaîne e641898384f7, contre d80be0f9fadd préparée. Une migration complète nécessite de revalider la chaîne et les outils ; ne pas relabeller les caches ni considérer la validation Apple de la v12 actuelle comme couvrant ces28 commits. Décision de cette veille :aucun changement de source/defaults/workflow, aucun build lancé. Preuve détaillée locale :resultats/oot2-upstream-watch-20261120.json.
+
+Sources :https://github.com/seedds/nxnative/compare/087faba98da29811e59e52658e1d51715258830e...d43d4355865c130759f26727c5aeaf37c7be79d5 ; https://github.com/seedds/nxnative/blob/d43d4355865c130759f26727c5aeaf37c7be79d5/dm/games/0400486024DEC000/README.md .
+
+
+## Run v12 lancé — 20 novembre 2026,07:08 Paris
+
+Run **44685671639** :https://github.com/Domessy/ffr-ipados-build/actions/runs/44685671639 ; branche experimental/oot2-v12-complete-upstream-20261119, commit2f0e08d6542ef2b405b2997574ca41f3ed8a20ff. Un seul dispatch HTTP204, confirmé in_progress. Inputs build / ipad-v12 / local-bundle. Source v12 prévue087faba98da29811e59e52658e1d51715258830e, chaîne d80be0f9fadd ; les28 commits de la veille suivante ne sont pas ajoutés à ce run validé.
+
+Préflight local :201 tests OOT2 réussis, NUP sélectionné et identité contrôlés, RomFS local prêt26247576430 octets ; CASv12 vide pour cette nouvelle chaîne. Pas d'autre build actif avant dispatch. Sur GitHub, checkout, tests pipeline et secrets réseau réussis ; préparation Xcode/Metal et nettoyage disque en cours au premier contrôle. La compilation du jeu et les transferts n'ont pas encore commencé à cet instant. Reprise automatique éventuelle puis finish/assemblage CachyOS prévus ; aucune IPA v12 livrée à ce stade. Anciennes livraisons et caches conservés. Preuve :resultats/oot2-v12-run-44685671639-20261120.json.
+
+
+## Veille OOT2 — 21 novembre 2026
+
+Main figé **a63ca65115cbd586ccca3bedc4af89984eddf2e5**,94 commits depuis le relevé d43d4355 du20 novembre,122 depuis la v12 épinglée087faba9. Profil OOT2 désormais modifié :README,game.tsv,patches.py,shader_map.tsv, nouveau shape_anchor.c. Chaîne annoncée **26e1a5f38264**, distincte de d80be0f9fadd de notre v12. Aucun de ces nouveaux commits intégré ni nouveau run lancé durant cette veille.
+
+Priorités pour une future migration :
+- **47578ded / PR3037** :rendu Vert+ pour écrans plus hauts que16:9, DM_SCREEN_ASPECT de1.3 à1.77 (4:3 possible), caméra/HUD/menus ajustés, films conservés16:9.19 hooks installés ensemble après correspondance complète ; test final physique iPad du titre encore attendu. Cette option augmente la surface rendue et n'est pas une optimisation FPS démontrée.
+- **f7ae8a3a / issue3103** :alias virtuel4→8 Gio, réservation12.5→16.5 Gio, pour éviter une image blanche à la Chambre des Sages faute de trou aligné50.03 Mio. Transition validée Mac et confirmée iPhone18 Pro. Il s'agit d'espace d'adressage virtuel, pas de16.5 Gio de RAM résidente automatiquement allouée ; à mesurer sur notre M5.
+- **3ec5b785 / PR2831** :corrige le débordement des offsets runtime de gather sur Metal ; trois shaders OOT2 changés dans la comparaison amont, pas de nouvelle erreur/interface. Pas de preuve que cela règle nos feuilles ou notre porte.
+- **32fe34ef / PR3069** :contourne SIGBUS du compilateur mesh en gardant certains helpers subgroup hors ligne.44 sources changées/42847 shaders compilés ;164 descripteurs validés hors appareil pour les cibles documentées Mac. Retests M1/M2 affectés ouverts ; pas de gain FPS revendiqué (A/B M4 dans la variation), couverture iPad/g17g à revalider.
+- **c4f12d24 / PR2868** :retire le staging sur un worker pour éviter de bloquer la file feedback Metal4 ; cause du gel iPhone initial encore ouverte. **6df16dbe / PR2864** borne l'attente graphique en arrière-plan à3s et découple la persistance ; validation appareil encore ouverte.
+- **f539b2dc / PR3060** :diffère les écritures périodiques d'archives pendant le jeu fenêtré ; bénéfice longs à-coups mesuré sur Mario Kart Mac, aucun gain OOT2/iPad démontré.
+- **9df3c09f / issue2920** :NDVE reste actif après interruption du compilateur ; film titre OOT2 validé Mac. **2edad182** :ordonnancement audio amélioré pour les underruns ; iOS/power non validés.
+- **c075ab26 / PR3010** :officialise la même suppression de faux shader ce0eba6c3584814d et décalage3022 indices que notre rafraîchissement local déjà validé ;42847 clés conservées et autres tables inchangées. Pas42847 nouveaux shaders à récupérer.
+
+Build :72e81a32 évite des scans de tables redondants ;588a5d72 mutualise les sondages d'archives ;6aaf73ba décode les zstd sans sous-processus par fichier. Gains totaux OOT2 non mesurés. Le mode math relaxed de caccf926 est nouveau sur Mac, déjà utilisé iOS. Attention au loader8c94bd1e :libère les mappings shader mais utilise de la mémoire malloc ; le probe amont coûte environ219 Mio résidents supplémentaires à charge égale. Ce n'est pas une réduction mémoire démontrée pour notre iPad.
+
+Preuve :resultats/oot2-upstream-watch-20261121.json (messages, diff exact du profil et README figé). Sources :https://github.com/seedds/nxnative/blob/a63ca65115cbd586ccca3bedc4af89984eddf2e5/dm/games/0400486024DEC000/README.md et https://github.com/seedds/nxnative/compare/d43d4355865c130759f26727c5aeaf37c7be79d5...a63ca65115cbd586ccca3bedc4af89984eddf2e5 .

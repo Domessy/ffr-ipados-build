@@ -39,10 +39,9 @@ class ResumeTests(unittest.TestCase):
         self.assertIn('oot2-read-resume-v11',g.ROUTES)
 
     def test_workflow_restores_before_nup_and_never_initializes_empty_cas(self):
-        p=Path(__file__).resolve().parents[1]/'.github/workflows/prebake-oot2-full-v8.yml'
+        p=Path(__file__).resolve().parents[1]/'.github/workflows/build-oot2-v11.yml'
         text=p.read_text()
         self.assertLess(text.index('oot2_v11_resume.py archive'),text.index('security/oot2_transfer.py nup'))
         self.assertIn('oot2_v11_resume.py indices',text)
         self.assertIn('post-cache extraction disk',text)
         self.assertNotIn('oot2_sqlite_cas.py prepare',text)
-        self.assertEqual(text,p.with_name('build-oot2-v11.yml').read_text())
