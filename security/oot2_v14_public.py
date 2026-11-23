@@ -29,6 +29,7 @@ def main(root,work):
     full.CHAIN=fixture.CHAIN=CHAIN
     tool=full.build_exporter(root)
     subprocess.run([str(tool),'--fixture-constants'],check=True)
+    subprocess.run([str(tool),'--fixture-default-attribute'],check=True)
     fixture.fixture(work/'fixture',root,tool)
     report=full.export(root,work/'fixture',work/'scripts')
     if (report['failed_tasks'] or report['stale_keys'] or report['mesh_rows']!=2 or report['render_rows']!=5):raise ValueError('v14 native descriptor coverage')

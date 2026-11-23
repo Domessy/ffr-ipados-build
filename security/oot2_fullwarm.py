@@ -44,8 +44,9 @@ def validate_render_coverage(meta):
     """Every R row is archived or an explicitly classified native depth pass."""
     archived = meta['emitted_render']; total = meta['render_rows']
     device = meta.get('device_render_rows', 0)
-    if (any(type(n) is not int or n < 0 for n in (archived, total, device))
-        or archived + device != total or not archived
+    default_attribute = meta.get('device_default_attribute_rows', 0)
+    if (any(type(n) is not int or n < 0 for n in (archived, total, device, default_attribute))
+        or archived + device + default_attribute != total or not archived
         or (device and meta.get('device_render_reason') != 'metal4_requires_fragment')):
         raise ValueError('full prewarm render coverage')
 

@@ -216,10 +216,10 @@ index 00000000..2b929cc5
 +}
 diff --git a/dm/gfx/nvn/oot2_fullwarm_export.inc b/dm/gfx/nvn/oot2_fullwarm_export.inc
 new file mode 100644
-index 00000000..b3785d7f
+index 00000000..df853136
 --- /dev/null
 +++ b/dm/gfx/nvn/oot2_fullwarm_export.inc
-@@ -0,0 +1,209 @@
+@@ -0,0 +1,226 @@
 +// Included only by the offline descriptor tool, after nvn_mtl.m. There is no
 +// compiler, pipeline-state creation, command submission or fake successful PSO.
 +// All descriptors come from the real warm_parse/pso_desc/mtk_desc4 paths.
@@ -229,7 +229,7 @@ index 00000000..b3785d7f
 +static NSMutableData *full_keys;
 +static NSString *full_directory;
 +static unsigned full_period, full_rows, full_failed, full_rrows, full_mrows;
-+static unsigned full_emitted_r, full_emitted_m, full_device_r;
++static unsigned full_emitted_r, full_emitted_m, full_device_r, full_device_stride_r;
 +
 +static void full_reset(void) {
 +    full_keys = [NSMutableData data];
@@ -314,6 +314,19 @@ index 00000000..b3785d7f
 +    }
 +    return @{@"attributes": attributes, @"layouts": layouts};
 +}
++// The offline iOS backend bounds constant attributes by the layout stride.
++static int full_uses_oversize_default_attribute(MTLVertexDescriptor *descriptor) {
++    if (!descriptor) return 0;
++    MTLVertexBufferLayoutDescriptor *layout = descriptor.layouts[30];
++    if (layout.stepFunction != MTLVertexStepFunctionConstant || layout.stride != 16) return 0;
++    for (NSUInteger i = 0; i < 31; i++) {
++        MTLVertexAttributeDescriptor *a = descriptor.attributes[i];
++        if (a.bufferIndex == 30 && a.offset == 16 &&
++            (a.format == MTLVertexFormatFloat4 || a.format == MTLVertexFormatInt4 ||
++             a.format == MTLVertexFormatUInt4)) return 1;
++    }
++    return 0;
++}
 +static int full_add_render(MTL4RenderPipelineDescriptor *d) {
 +    if (!d) return 0;
 +    NSString *vf = full_function(d.vertexFunctionDescriptor), *ff = full_function(d.fragmentFunctionDescriptor);
@@ -377,7 +390,11 @@ index 00000000..b3785d7f
 +            full_device_r++; continue;
 +        }
 +        int unspecialized = r.rasterizationEnabled && ![r.label isEqualToString:PSO_WHOLE];
-+        if (!full_add_render(pso_desc4(r, unspecialized, !key.border))) ok = 0;
++        MTL4RenderPipelineDescriptor *d = pso_desc4(r, unspecialized, !key.border);
++        if (d && full_uses_oversize_default_attribute(d.vertexDescriptor)) {
++            full_device_stride_r++; continue;
++        }
++        if (!full_add_render(d)) ok = 0;
 +        if (full_render.count + full_mesh.count >= 256) full_flush();
 +    }
 +    return ok;
@@ -422,19 +439,19 @@ index 00000000..b3785d7f
 +    NSDictionary *coverage = @{@"chain": @(DMSH_CHAIN), @"render_rows": @(full_rrows), @"mesh_rows": @(full_mrows),
 +        @"rows": @(full_rows), @"failed_tasks": @(full_failed), @"periods": @(full_period), @"stale_keys": @(g_warm_skip_stale),
 +        @"emitted_render": @(full_emitted_r), @"device_render_rows": @(full_device_r),
-+        @"device_render_reason": @"metal4_requires_fragment", @"emitted_mesh": @(full_emitted_m),
++        @"device_render_reason": @"metal4_requires_fragment", @"device_default_attribute_rows": @(full_device_stride_r), @"emitted_mesh": @(full_emitted_m),
 +        @"pipeline_creation_used": @NO, @"new_shaders_compiled": @NO};
 +    NSData *report = [NSJSONSerialization dataWithJSONObject:coverage options:NSJSONWritingSortedKeys error:nil];
 +    [report writeToFile:[directory stringByAppendingPathComponent:@"coverage.json"] atomically:YES];
-+    printf("Full prewarm descriptors: R=%u M=%u device-depth=%u failed=%u periods=%u\n", full_rrows, full_mrows, full_device_r, full_failed, full_period);
-+    return full_failed || !full_rrows || !full_mrows || full_emitted_r + full_device_r != full_rrows || full_emitted_m != full_mrows;
++    printf("Full prewarm descriptors: R=%u M=%u device-depth=%u device-default-attribute=%u failed=%u periods=%u\n", full_rrows, full_mrows, full_device_r, full_device_stride_r, full_failed, full_period);
++    return full_failed || !full_rrows || !full_mrows || full_emitted_r + full_device_r + full_device_stride_r != full_rrows || full_emitted_m != full_mrows;
 +}
 diff --git a/dm/gfx/tests/oot2_fullwarm_harness.m b/dm/gfx/tests/oot2_fullwarm_harness.m
 new file mode 100644
-index 00000000..214f468f
+index 00000000..61af7c1e
 --- /dev/null
 +++ b/dm/gfx/tests/oot2_fullwarm_harness.m
-@@ -0,0 +1,76 @@
+@@ -0,0 +1,96 @@
 +#include "../nvn/nvn_mtl.m"
 +void *front_metal_layer(void) { return NULL; }
 +module_t *module_of(const void *p) { (void)p; return NULL; }
@@ -493,8 +510,28 @@ index 00000000..214f468f
 +    puts("PASS: typed function constants survive descriptor copy without changing the original."); return 0;
 +}
 +
++static int fixture_default_attribute(void) {
++    MTLVertexDescriptor *vd = [MTLVertexDescriptor vertexDescriptor];
++    vd.layouts[30].stepFunction = MTLVertexStepFunctionConstant;
++    vd.layouts[30].stride = 16;
++    vd.attributes[2].bufferIndex = 30;
++    for (NSNumber *format in @[@(MTLVertexFormatFloat4), @(MTLVertexFormatInt4), @(MTLVertexFormatUInt4)]) {
++        vd.attributes[2].format = format.unsignedIntegerValue;
++        vd.attributes[2].offset = 16;
++        if (!full_uses_oversize_default_attribute(vd)) return 9;
++        vd.attributes[2].offset = 0;
++        if (full_uses_oversize_default_attribute(vd)) return 10;
++    }
++    vd.attributes[2].offset = 16;
++    vd.layouts[30].stride = 32;
++    if (full_uses_oversize_default_attribute(vd)) return 11;
++    puts("PASS: only the incompatible constant attribute is deferred.");
++    return 0;
++}
++
 +int main(int argc, char **argv) { @autoreleasepool {
 +    if (argc == 3 && !strcmp(argv[1], "--fixture-rows")) return fixture_rows(@(argv[2]));
++    if (argc == 2 && !strcmp(argv[1], "--fixture-default-attribute")) return fixture_default_attribute();
 +    if (argc == 2 && !strcmp(argv[1], "--fixture-constants")) return fixture_constants();
 +    if (argc == 3 && !strcmp(argv[1], "--validate-archive")) return arch_file_ok(@(argv[2])) ? 0 : 7;
 +    if (argc != 4) return 2;

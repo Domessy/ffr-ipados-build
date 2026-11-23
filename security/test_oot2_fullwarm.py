@@ -61,6 +61,21 @@ class FullwarmTests(unittest.TestCase):
             coverage['failed_tasks'] = 1; save()
             with self.assertRaises(ValueError): fw.validate_export(root)
 
+    def test_default_attribute_rows_are_accounted_separately(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            coverage, _ = self.fixture(root)
+            coverage.update(render_rows=3, device_render_rows=1,
+                            device_render_reason='metal4_requires_fragment',
+                            device_default_attribute_rows=1)
+            report = root/'coverage.json'
+            report.write_text(json.dumps(coverage))
+            self.assertEqual(fw.validate_export(root)['device_default_attribute_rows'], 1)
+            for count in (0, 2, -1, True):
+                report.write_text(json.dumps(dict(coverage, device_default_attribute_rows=count)))
+                with self.assertRaisesRegex(ValueError, 'render coverage'):
+                    fw.validate_export(root)
+
     def test_untrusted_script_library_path_rejected(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d); _, cfg = self.fixture(root); cfg['libraries'][0]['path'] = '../escape.metallib'

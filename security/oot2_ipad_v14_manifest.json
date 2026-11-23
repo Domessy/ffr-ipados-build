@@ -20,7 +20,7 @@
   },
   "scope": "Full November 23 upstream snapshot with regenerated chain header and rebased metadata exporter",
   "gpu_runtime_validated": false,
-  "patch_sha256": "2e4c3bf8182157c4c32db489b30b469fd7d64da191fc0faddecf351ba7d4cc0b",
+  "patch_sha256": "6f7d736c69f52e524994fa770ad5c4dd02b0669b05c774f9b92b3a7a191f5d93",
   "new_files": [
     "dm/gfx/nvn/oot2_fullwarm_constants.inc",
     "dm/gfx/nvn/oot2_fullwarm_export.inc",
