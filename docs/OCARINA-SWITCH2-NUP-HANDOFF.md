@@ -1514,3 +1514,15 @@ Rendu et cadence :
 Autres nouveautés applicables à une future migration :replay CPU (a359f9e6 lookup64KB,c1bd080a streams réellement lus,e49e4814 listes de bindings,3a7e53d3 réemploi des vues,5ccb82ad réduction retain/release et0b09b66d contrôle de serial) mesuré/profilé surtout sur Bananza ; aucun gain OOT2 affirmé. **e3f2d21f / PR2610** nettoie les sorties partielles et traite ENOSPC proprement pendant l'écriture des images shader ; ne supprime pas le besoin de garde disque. Ajouts de rapports Mac/iPhone et haptics8BitDo/Pro Controller surtout Mac.
 
 Prochaine intégration suggérée :priorité mémoire/mesh/Vert+ puis cadence et réglages optionnels ; conserver les réglages de comparaison par défaut plutôt que promettre un gain global. Migration complète = nouvelle validation Apple + reconstruction de la chaîne, sans relabeller les caches v13. Aucune compilation nouvelle pour cette veille. Preuve détaillée :resultats/oot2-upstream-watch-20261123.json. Sources figées :https://github.com/seedds/nxnative/blob/ba82ccb91dab7a860fee679f1be7ac8f0775ba22/dm/games/0400486024DEC000/README.md et https://github.com/seedds/nxnative/compare/a63ca65115cbd586ccca3bedc4af89984eddf2e5...ba82ccb91dab7a860fee679f1be7ac8f0775ba22 .
+
+
+## Run v14 lancé — 23 novembre 2026 à 12 h 23 (Paris)
+
+Le run GitHub 45164778004 est en cours sur le commit 2cbe205580ef4974d32e9a8991ab8bda0ec48961. La PR 97 intègre les 137 commits amont jusqu’à ba82ccb91dab7a860fee679f1be7ac8f0775ba22, dont la gestion de la pression mémoire, les correctifs mesh et Vert+, l’échelle de rendu, la cible 40 FPS et l’adoption des archives au démarrage.
+
+L’empreinte recalculée de la chaîne shader est 108c5f92c3c4. Le fichier d’en-tête amont annonçait 1f88531870fe et a été régénéré dans la préparation. L’exporteur iOS suit les nouvelles constantes Metal de mélange et de double source. La v14 utilise un cache et des sorties dédiés. Les caches et livraisons antérieurs sont conservés.
+
+480 tests pipeline réussis et 136 tests natifs comptabilisés, dont un ignoré. La préparation depuis les sources propres, la syntaxe des workflows et la passerelle NUP/RomFS ont été vérifiées. Le contrôle Apple s’exécute dans le run avant le transfert du NUP. Après une pause avec cache confirmé, la reprise est automatique. L’assemblage final reste sur CachyOS. Les performances et la stabilité à 40 FPS et en 4:3 restent à mesurer sur le M5.
+
+- Run GitHub https://github.com/Domessy/ffr-ipados-build/actions/runs/45164778004
+- PR https://github.com/Domessy/ffr-ipados-build/pull/97
