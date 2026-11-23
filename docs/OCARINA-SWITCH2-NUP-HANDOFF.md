@@ -1533,3 +1533,10 @@ L’empreinte recalculée de la chaîne shader est 108c5f92c3c4. Le fichier d’
 Le run [45164778004](https://github.com/Domessy/ffr-ipados-build/actions/runs/45164778004) s’est arrêté au contrôle Apple avant le transfert du NUP. Le test amont `test_material_word_beside_float_bits` attendait les écritures par cible dans leur ancienne forme. Le correctif vérifie les mêmes écritures et les nouvelles conditions de double source. La chaîne shader reste `108c5f92c3c4`. Le cache v14 est vide.
 
 Les 480 tests du pipeline passent. Les suites natives ciblées ont compté 82 tests, dont 4 ignorés faute d’outils Apple sur CachyOS. La préparation depuis une copie propre a réussi. La [relance 45174506392](https://github.com/Domessy/ffr-ipados-build/actions/runs/45174506392) utilise le commit `d4ef0c3114904a3abd4c5e59a4db2efdaddd7a34`. Le test corrigé doit encore passer sur le runner Apple.
+
+
+## Deuxième relance v14
+
+Le run [45174506392](https://github.com/Domessy/ffr-ipados-build/actions/runs/45174506392) a franchi les tests Python et la compilation du moteur Mac, puis échoué sur la cible de test `t_pso_pending`, avant transfert du NUP. Le journal tronqué masquait le diagnostic initial. Le code épinglé montre trois fixtures qui assignent directement le retour `void *` de `pso_get_` à un objet Objective-C sous ARC. Elles utilisent désormais `pso_get`, qui effectue le pont explicite déjà utilisé par le moteur. Les workflows affichent désormais les diagnostics de compilation en plus de la fin du journal.
+
+La préparation propre et les 480 tests du pipeline passent. La chaîne `108c5f92c3c4` reste identique et le cache v14 est vide. La [relance 45179971400](https://github.com/Domessy/ffr-ipados-build/actions/runs/45179971400) utilise le commit `d1eae53dee7a52326eaef8083905c590bbbb3bd2`. La compilation Apple de ces changements reste à confirmer.
