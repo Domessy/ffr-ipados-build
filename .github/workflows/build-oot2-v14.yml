@@ -333,7 +333,6 @@ jobs:
           tail -c 33554432 "$RUNNER_TEMP/oot2-build.log" \
             | ssh -o ConnectTimeout=20 ffr-cachyos oot2-write-log-v14 || true
         fi
-        rm -f "$RUNNER_TEMP/oot2-nup/OcarinaOfTime.nup" "$RUNNER_TEMP/oot2_ssh_key" || true
         if [ -s "$RUNNER_TEMP/v14-archives.log" ]; then
           tail -c 33554432 "$RUNNER_TEMP/v14-archives.log" | ssh -o ConnectTimeout=20 ffr-cachyos oot2-write-archive-log-v14 || true
         fi
@@ -347,7 +346,7 @@ jobs:
         if [ -s "$RUNNER_TEMP/oot2-tailscaled.pid" ]; then
           sudo -n kill "$(cat "$RUNNER_TEMP/oot2-tailscaled.pid")" > /dev/null 2>&1 || true
         fi
-        rm -f "$RUNNER_TEMP/oot2_ssh_key" || true
+        rm -f "$RUNNER_TEMP/oot2-nup/OcarinaOfTime.nup" "$RUNNER_TEMP/oot2_ssh_key" || true
     outputs:
       state: ${{ steps.compile.outputs.state }}
   resume:
@@ -655,7 +654,6 @@ jobs:
           tail -c 33554432 "$RUNNER_TEMP/oot2-build.log" \
             | ssh -o ConnectTimeout=20 ffr-cachyos oot2-write-log-v14 || true
         fi
-        rm -f "$RUNNER_TEMP/oot2-nup/OcarinaOfTime.nup" "$RUNNER_TEMP/oot2_ssh_key" || true
         if [ -s "$RUNNER_TEMP/v14-archives.log" ]; then
           tail -c 33554432 "$RUNNER_TEMP/v14-archives.log" | ssh -o ConnectTimeout=20 ffr-cachyos oot2-write-archive-log-v14 || true
         fi
@@ -669,7 +667,7 @@ jobs:
         if [ -s "$RUNNER_TEMP/oot2-tailscaled.pid" ]; then
           sudo -n kill "$(cat "$RUNNER_TEMP/oot2-tailscaled.pid")" > /dev/null 2>&1 || true
         fi
-        rm -f "$RUNNER_TEMP/oot2_ssh_key" || true
+        rm -f "$RUNNER_TEMP/oot2-nup/OcarinaOfTime.nup" "$RUNNER_TEMP/oot2_ssh_key" || true
     outputs:
       state: ${{ steps.compile.outputs.state }}
     needs:
@@ -916,7 +914,6 @@ jobs:
           tail -c 33554432 "$RUNNER_TEMP/oot2-build.log" \
             | ssh -o ConnectTimeout=20 ffr-cachyos oot2-write-log-v14 || true
         fi
-        rm -f "$RUNNER_TEMP/oot2-nup/OcarinaOfTime.nup" "$RUNNER_TEMP/oot2_ssh_key" || true
         if [ -s "$RUNNER_TEMP/v14-archives.log" ]; then
           tail -c 33554432 "$RUNNER_TEMP/v14-archives.log" | ssh -o ConnectTimeout=20 ffr-cachyos oot2-write-archive-log-v14 || true
         fi
@@ -930,4 +927,4 @@ jobs:
         if [ -s "$RUNNER_TEMP/oot2-tailscaled.pid" ]; then
           sudo -n kill "$(cat "$RUNNER_TEMP/oot2-tailscaled.pid")" > /dev/null 2>&1 || true
         fi
-        rm -f "$RUNNER_TEMP/oot2_ssh_key" || true
+        rm -f "$RUNNER_TEMP/oot2-nup/OcarinaOfTime.nup" "$RUNNER_TEMP/oot2_ssh_key" || true
