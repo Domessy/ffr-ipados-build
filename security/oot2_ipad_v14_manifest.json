@@ -7,7 +7,10 @@
     "dm/gfx/nvn/dmsh_chain.h": "3c6590146f325bab3da8edd5bfdbdcda8419d37ac51d5f111efa4d276dff5ff9",
     "dm/gfx/tests/Makefile": "2f24ea09dfa1678e1baaab4ea846fa1deb52b0703fad5f5696be3119a3c6e1f1",
     "dm/games/0400486024DEC000/shader_map.tsv": "0e79b9ecba5cba530cffc07cf70aff6bfb72e2a1b7a4b8c98ba06f6921670970",
-    "dm/gfx/tests/test_dmsh_meshstage.py": "4648361bb89755b10c59cdbd33710f15ff3b1d996deddd510508392654bdb183"
+    "dm/gfx/tests/test_dmsh_meshstage.py": "4648361bb89755b10c59cdbd33710f15ff3b1d996deddd510508392654bdb183",
+    "dm/gfx/tests/t_pso_pending.m": "75ddfb4d9d45c72475ca6cce52cc6b1a3977400b3060617067d9a350eb79f43c",
+    "dm/gfx/tests/t_pso_msaa.m": "d2266d71a33f7bb6e3cebf2780e5cb16417a26215836e32df3c10c553c547fd3",
+    "dm/gfx/tests/t_pso_depth_stencil.m": "695c76e2db879b98b4e911ad120a2c6bdc47be853aee4c0d3cce739f6739666e"
   },
   "seed_counts": {
     "S": 16818,
@@ -17,7 +20,7 @@
   },
   "scope": "Full November 23 upstream snapshot with regenerated chain header and rebased metadata exporter",
   "gpu_runtime_validated": false,
-  "patch_sha256": "2fb6c5b7a30d66da7a1895aff7d36334349d97953de74871445614614e247264",
+  "patch_sha256": "2e4c3bf8182157c4c32db489b30b469fd7d64da191fc0faddecf351ba7d4cc0b",
   "new_files": [
     "dm/gfx/nvn/oot2_fullwarm_constants.inc",
     "dm/gfx/nvn/oot2_fullwarm_export.inc",

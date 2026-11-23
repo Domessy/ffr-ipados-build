@@ -168,7 +168,7 @@ jobs:
         git -C "$SRC" fetch -q --depth 1 origin ba82ccb91dab7a860fee679f1be7ac8f0775ba22
         git -C "$SRC" checkout -q --detach FETCH_HEAD
         python3 security/oot2_prepare_ipad_v14.py "$SRC"
-        "$RUNNER_TEMP/oot2-venv/bin/python" security/oot2_v14_public.py "$SRC" "$RUNNER_TEMP/public-v14" > "$RUNNER_TEMP/public-v14.log" 2>&1 || { tail -140 "$RUNNER_TEMP/public-v14.log"; exit 1; }
+        "$RUNNER_TEMP/oot2-venv/bin/python" security/oot2_v14_public.py "$SRC" "$RUNNER_TEMP/public-v14" > "$RUNNER_TEMP/public-v14.log" 2>&1 || { grep -nE '(^|[[:space:]])(fatal error:|error:|FAIL:|ERROR:|Undefined symbols|ld:|make: \*\*\*)' "$RUNNER_TEMP/public-v14.log" | tail -80 || true; tail -140 "$RUNNER_TEMP/public-v14.log"; exit 1; }
         tail -15 "$RUNNER_TEMP/public-v14.log"
     - name: Installer Tailscale en ligne de commande (sans action DNS)
       run: |
@@ -490,7 +490,7 @@ jobs:
         git -C "$SRC" fetch -q --depth 1 origin ba82ccb91dab7a860fee679f1be7ac8f0775ba22
         git -C "$SRC" checkout -q --detach FETCH_HEAD
         python3 security/oot2_prepare_ipad_v14.py "$SRC"
-        "$RUNNER_TEMP/oot2-venv/bin/python" security/oot2_v14_public.py "$SRC" "$RUNNER_TEMP/public-v14" > "$RUNNER_TEMP/public-v14.log" 2>&1 || { tail -140 "$RUNNER_TEMP/public-v14.log"; exit 1; }
+        "$RUNNER_TEMP/oot2-venv/bin/python" security/oot2_v14_public.py "$SRC" "$RUNNER_TEMP/public-v14" > "$RUNNER_TEMP/public-v14.log" 2>&1 || { grep -nE '(^|[[:space:]])(fatal error:|error:|FAIL:|ERROR:|Undefined symbols|ld:|make: \*\*\*)' "$RUNNER_TEMP/public-v14.log" | tail -80 || true; tail -140 "$RUNNER_TEMP/public-v14.log"; exit 1; }
         tail -15 "$RUNNER_TEMP/public-v14.log"
     - name: Installer Tailscale en ligne de commande (sans action DNS)
       run: |
@@ -814,7 +814,7 @@ jobs:
         git -C "$SRC" fetch -q --depth 1 origin ba82ccb91dab7a860fee679f1be7ac8f0775ba22
         git -C "$SRC" checkout -q --detach FETCH_HEAD
         python3 security/oot2_prepare_ipad_v14.py "$SRC"
-        "$RUNNER_TEMP/oot2-venv/bin/python" security/oot2_v14_public.py "$SRC" "$RUNNER_TEMP/public-v14" > "$RUNNER_TEMP/public-v14.log" 2>&1 || { tail -140 "$RUNNER_TEMP/public-v14.log"; exit 1; }
+        "$RUNNER_TEMP/oot2-venv/bin/python" security/oot2_v14_public.py "$SRC" "$RUNNER_TEMP/public-v14" > "$RUNNER_TEMP/public-v14.log" 2>&1 || { grep -nE '(^|[[:space:]])(fatal error:|error:|FAIL:|ERROR:|Undefined symbols|ld:|make: \*\*\*)' "$RUNNER_TEMP/public-v14.log" | tail -80 || true; tail -140 "$RUNNER_TEMP/public-v14.log"; exit 1; }
         tail -15 "$RUNNER_TEMP/public-v14.log"
     - name: Installer Tailscale en ligne de commande (sans action DNS)
       run: |
