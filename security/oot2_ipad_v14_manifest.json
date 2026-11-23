@@ -6,7 +6,8 @@
     "scripts/build_ipa_from_nsp.py": "98bcd8971d9f49cab7e7822072fa4d5020fd08158dd5333b6bba0b0841356c3e",
     "dm/gfx/nvn/dmsh_chain.h": "3c6590146f325bab3da8edd5bfdbdcda8419d37ac51d5f111efa4d276dff5ff9",
     "dm/gfx/tests/Makefile": "2f24ea09dfa1678e1baaab4ea846fa1deb52b0703fad5f5696be3119a3c6e1f1",
-    "dm/games/0400486024DEC000/shader_map.tsv": "0e79b9ecba5cba530cffc07cf70aff6bfb72e2a1b7a4b8c98ba06f6921670970"
+    "dm/games/0400486024DEC000/shader_map.tsv": "0e79b9ecba5cba530cffc07cf70aff6bfb72e2a1b7a4b8c98ba06f6921670970",
+    "dm/gfx/tests/test_dmsh_meshstage.py": "4648361bb89755b10c59cdbd33710f15ff3b1d996deddd510508392654bdb183"
   },
   "seed_counts": {
     "S": 16818,
@@ -16,7 +17,7 @@
   },
   "scope": "Full November 23 upstream snapshot with regenerated chain header and rebased metadata exporter",
   "gpu_runtime_validated": false,
-  "patch_sha256": "f0cc9ac4f4ae820c7bb152e0b6d0a9973e344df5f2e676e3649b845df9ecb9e0",
+  "patch_sha256": "2fb6c5b7a30d66da7a1895aff7d36334349d97953de74871445614614e247264",
   "new_files": [
     "dm/gfx/nvn/oot2_fullwarm_constants.inc",
     "dm/gfx/nvn/oot2_fullwarm_export.inc",
