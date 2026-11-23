@@ -1,0 +1,42 @@
+name: OOT2 v14 official public Mac and iOS gates
+'on':
+  workflow_dispatch: null
+permissions:
+  contents: read
+jobs:
+  public:
+    env:
+      OOT2_RUNTIME_VARIANT: ipad-v14
+      OOT2_IPA_LAYOUT: local-bundle
+    runs-on: xcode-27
+    timeout-minutes: 40
+    steps:
+    - name: Recuperer les scripts de cache du meme commit GitHub
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      with:
+        persist-credentials: false
+    - name: Select exact Metal toolchain
+      shell: bash
+      run: |
+        set -euo pipefail
+        sudo xcode-select -s /Applications/Xcode_27.2.app/Contents/Developer
+        xcodebuild -downloadComponent MetalToolchain
+    - name: Verifier les scripts et tests NUP avant tout transfert prive
+      run: |
+        set -euo pipefail
+        python3 -m unittest discover -s security -p 'test_oot2*.py' -q
+    - name: Validate complete official v14 source before private transfers
+      run: |
+        set -euo pipefail
+        export HOMEBREW_NO_AUTO_UPDATE=1
+        brew install xcodegen zstd spirv-cross glslang python@3.15
+        "$(brew --prefix python@3.15)/bin/python3.15" -m venv "$RUNNER_TEMP/oot2-venv"
+        "$RUNNER_TEMP/oot2-venv/bin/python" -m pip install -q lz4 'capstone>=5,<6' fonttools nsz zbic PyYAML unicorn
+        SRC="$RUNNER_TEMP/nxnative"
+        git init -q "$SRC"
+        git -C "$SRC" remote add origin https://github.com/seedds/nxnative.git
+        git -C "$SRC" fetch -q --depth 1 origin ba82ccb91dab7a860fee679f1be7ac8f0775ba22
+        git -C "$SRC" checkout -q --detach FETCH_HEAD
+        python3 security/oot2_prepare_ipad_v14.py "$SRC"
+        "$RUNNER_TEMP/oot2-venv/bin/python" security/oot2_v14_public.py "$SRC" "$RUNNER_TEMP/public-v14" > "$RUNNER_TEMP/public-v14.log" 2>&1 || { tail -140 "$RUNNER_TEMP/public-v14.log"; exit 1; }
+        tail -15 "$RUNNER_TEMP/public-v14.log"
