@@ -1526,3 +1526,10 @@ L’empreinte recalculée de la chaîne shader est 108c5f92c3c4. Le fichier d’
 
 - Run GitHub https://github.com/Domessy/ffr-ipados-build/actions/runs/45164778004
 - PR https://github.com/Domessy/ffr-ipados-build/pull/97
+
+
+## Relance v14 après correction du test Metal — 23 novembre 2026
+
+Le run [45164778004](https://github.com/Domessy/ffr-ipados-build/actions/runs/45164778004) s’est arrêté au contrôle Apple avant le transfert du NUP. Le test amont `test_material_word_beside_float_bits` attendait les écritures par cible dans leur ancienne forme. Le correctif vérifie les mêmes écritures et les nouvelles conditions de double source. La chaîne shader reste `108c5f92c3c4`. Le cache v14 est vide.
+
+Les 480 tests du pipeline passent. Les suites natives ciblées ont compté 82 tests, dont 4 ignorés faute d’outils Apple sur CachyOS. La préparation depuis une copie propre a réussi. La [relance 45174506392](https://github.com/Domessy/ffr-ipados-build/actions/runs/45174506392) utilise le commit `d4ef0c3114904a3abd4c5e59a4db2efdaddd7a34`. Le test corrigé doit encore passer sur le runner Apple.
