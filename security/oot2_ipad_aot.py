@@ -79,11 +79,12 @@ def inspect_ipa(path, expected_chain=None):
         return prefix
 
 
-def extract_inputs(slim, output):
+def extract_inputs(slim, output, *, mesh_pairs=False):
     prefix = inspect_ipa(slim)
     output = Path(output); output.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(slim) as z:
-        for name in [f'msl/b-{CHAIN}.img'] + ['dm/' + x for x in TABLES]:
+        tables = TABLES + (('mesh_pairs.tsv',) if mesh_pairs else ())
+        for name in [f'msl/b-{CHAIN}.img'] + ['dm/' + x for x in tables]:
             dest = output / name; dest.parent.mkdir(parents=True, exist_ok=True)
             with z.open(prefix + name) as src, dest.open('wb') as dst: shutil.copyfileobj(src, dst, 8 << 20)
     return output
@@ -92,11 +93,17 @@ def extract_inputs(slim, output):
 def compiler_command(root, inputs, cache):
     root, inputs, cache = map(Path, (root, inputs, cache))
     # Use the actual packed tables, including pso_pairs emitted by the split.
-    return [sys.executable, str(root / 'dm/gfx/tools/pso_offline.py'),
+    mesh_pairs = inputs / 'dm/mesh_pairs.tsv'
+    command = [sys.executable, str(root / 'dm/gfx/tools/pso_offline.py'),
             '--pairs', str(inputs / 'dm/shader_pairs.tsv'), '--pairs', str(inputs / 'dm/pso_pairs.tsv'),
             '--shader-map', str(inputs / 'dm/shader_map.tsv'), '--manifest', str(inputs / 'dm/pso_manifest.tsv'),
             '--msl', str(inputs / f'msl/b-{CHAIN}'), '--out', str(cache / 'bundle'), '--work', str(cache / 'work'),
             '--gpu', GPU, '--platform', 'ios', '--os-min', '27.0', '--depth', 'gl', '--jobs', '2']
+
+
+    if mesh_pairs.is_file():
+        command += ['--pairs', str(mesh_pairs)]
+    return command
 
 
 def check_bundle(folder):
@@ -111,9 +118,9 @@ def check_bundle(folder):
     return archive
 
 
-def compile_archive(root, slim, work):
+def compile_archive(root, slim, work, *, mesh_pairs=False):
     work = Path(work); work.mkdir(parents=True, exist_ok=True)
-    inputs = extract_inputs(slim, work / 'inputs')
+    inputs = extract_inputs(slim, work / 'inputs', mesh_pairs=mesh_pairs)
     cache = work / 'cache'; cache.mkdir(exist_ok=True)
     log = work / 'aot-private.log'
     started = time.monotonic()
@@ -126,6 +133,8 @@ def compile_archive(root, slim, work):
                 print(f'AOT iOS: elapsed={int(time.monotonic()-started)}s; cached_batches={count}; log_bytes={log.stat().st_size}', flush=True)
     if rc: raise RuntimeError('AOT compiler failed; diagnostic remains private')
     check_bundle(cache / 'bundle')
+    if mesh_pairs and not re.search(r'^mesh_bases\t[1-9][0-9]*$', (cache / 'bundle/archive.tsv').read_text(), re.M):
+        raise ValueError('AOT contains no mesh bases')
     return cache / 'bundle'
 
 
