@@ -1,0 +1,49 @@
+{
+  "base_revision": "ba82ccb91dab7a860fee679f1be7ac8f0775ba22",
+  "shader_chain": "108c5f92c3c4",
+  "originals": {
+    "dm/gfx/nvn/nvn_mtl.m": "c35e88e69cf602e0e51e091aeb9298b4cba5e330cbbd0e84496b3e413f6eeaa4",
+    "scripts/build_ipa_from_nsp.py": "98bcd8971d9f49cab7e7822072fa4d5020fd08158dd5333b6bba0b0841356c3e",
+    "dm/gfx/nvn/dmsh_chain.h": "3c6590146f325bab3da8edd5bfdbdcda8419d37ac51d5f111efa4d276dff5ff9",
+    "dm/gfx/tests/Makefile": "2f24ea09dfa1678e1baaab4ea846fa1deb52b0703fad5f5696be3119a3c6e1f1",
+    "dm/games/0400486024DEC000/shader_map.tsv": "0e79b9ecba5cba530cffc07cf70aff6bfb72e2a1b7a4b8c98ba06f6921670970",
+    "dm/gfx/tests/test_dmsh_meshstage.py": "4648361bb89755b10c59cdbd33710f15ff3b1d996deddd510508392654bdb183",
+    "dm/gfx/tests/t_pso_pending.m": "75ddfb4d9d45c72475ca6cce52cc6b1a3977400b3060617067d9a350eb79f43c",
+    "dm/gfx/tests/t_pso_msaa.m": "d2266d71a33f7bb6e3cebf2780e5cb16417a26215836e32df3c10c553c547fd3",
+    "dm/gfx/tests/t_pso_depth_stencil.m": "695c76e2db879b98b4e911ad120a2c6bdc47be853aee4c0d3cce739f6739666e"
+  },
+  "seed_counts": {
+    "S": 16818,
+    "C": 1043,
+    "R": 7138,
+    "M": 164
+  },
+  "scope": "Full November 23 upstream snapshot with regenerated chain header and rebased metadata exporter",
+  "gpu_runtime_validated": false,
+  "patch_sha256": "6f7d736c69f52e524994fa770ad5c4dd02b0669b05c774f9b92b3a7a191f5d93",
+  "new_files": [
+    "dm/gfx/nvn/oot2_fullwarm_constants.inc",
+    "dm/gfx/nvn/oot2_fullwarm_export.inc",
+    "dm/gfx/tests/oot2_fullwarm_harness.m"
+  ],
+  "index_mode": "native arch_key and arch_keys_write from identical iOS library bytes; no Mac archive copied",
+  "mesh_identity": "native normalization of NVN2 7 to host 4, deduplicated by optional task and pipeline key",
+  "memory_options": {
+    "DM_NVN_UPLOAD_IDLE_MS": "2000",
+    "DM_NVN_UPLOAD_SRC_MB": "96",
+    "device_comparison_pending": true
+  },
+  "defaults_sha256": "6dd2d30846a490c6553decd7d2b4cc6a5222e601f086bd62d8144f8e50fafcbd",
+  "registered_profile": {
+    "shader_map.tsv": "0e79b9ecba5cba530cffc07cf70aff6bfb72e2a1b7a4b8c98ba06f6921670970",
+    "shader_facts.tsv": "4aea03b4c319a07ccace9c6c95c4552ccda37e45d5f1785919152c534cf75c56",
+    "shader_pairs.tsv": "7ff90a9ce98455a2a65f814592a29133b3e6d150952de7b0254e7cc80931e14c",
+    "pso_pairs.tsv": "59a2feceaee6f6f8dd81cd781071842aca86dfe6a7e67990a1cc4b03c1d699bd",
+    "pso_manifest.tsv": "cefcec984e8b2680c6737df7c0ddbb1a6cdff8a181063c86e7e96f5c287c0962",
+    "game.tsv": "160bf683c179daacf36570512f14902b017049eaf33183dd54fcdb1c7d18229e",
+    "patches.py": "4acf79c0d5f29160718aca6d99269d76b63e6a188e856345345635993d5e385b",
+    "shape_anchor.c": "353fcad821277b461713a97417392d32e8c85ca43dc8af787f11646e99d0e930"
+  },
+  "screen_aspect_default": "upstream iOS Match screen (auto); optional 16:9 remains available after all hooks match",
+  "upstream_commits_after_v13": 137
+}

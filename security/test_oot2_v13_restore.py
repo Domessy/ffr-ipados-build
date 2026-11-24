@@ -74,7 +74,7 @@ class V13RestoreTests(unittest.TestCase):
     @unittest.skipUnless(importlib.util.find_spec('yaml'), 'DAG check runs in the public venv with PyYAML')
     def test_workflow_only_continues_from_the_correct_job_outputs(self):
         import yaml
-        root=Path(__file__).resolve().parents[1];p=root/'.github/workflows/prebake-oot2-full-v8.yml'
+        root=Path(__file__).resolve().parents[1];p=root/'.github/workflows/build-oot2-v13.yml'
         text=p.read_text();jobs=yaml.safe_load(text)['jobs']
         self.assertEqual(jobs['resume']['needs'],['build'])
         self.assertIn("needs.build.outputs.state == 'paused'",jobs['resume']['if'])
@@ -89,4 +89,3 @@ class V13RestoreTests(unittest.TestCase):
             restores=[i for i,s in enumerate(steps) if 'oot2_v13_restore.py restore' in s.get('run','')]
             nup=[i for i,s in enumerate(steps) if 'security/oot2_transfer.py nup' in s.get('run','')]
             self.assertLess(restores[0],nup[0])
-        self.assertEqual(text,p.with_name('build-oot2-v13.yml').read_text())

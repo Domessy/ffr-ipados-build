@@ -1514,3 +1514,62 @@ Rendu et cadence :
 Autres nouveautés applicables à une future migration :replay CPU (a359f9e6 lookup64KB,c1bd080a streams réellement lus,e49e4814 listes de bindings,3a7e53d3 réemploi des vues,5ccb82ad réduction retain/release et0b09b66d contrôle de serial) mesuré/profilé surtout sur Bananza ; aucun gain OOT2 affirmé. **e3f2d21f / PR2610** nettoie les sorties partielles et traite ENOSPC proprement pendant l'écriture des images shader ; ne supprime pas le besoin de garde disque. Ajouts de rapports Mac/iPhone et haptics8BitDo/Pro Controller surtout Mac.
 
 Prochaine intégration suggérée :priorité mémoire/mesh/Vert+ puis cadence et réglages optionnels ; conserver les réglages de comparaison par défaut plutôt que promettre un gain global. Migration complète = nouvelle validation Apple + reconstruction de la chaîne, sans relabeller les caches v13. Aucune compilation nouvelle pour cette veille. Preuve détaillée :resultats/oot2-upstream-watch-20261123.json. Sources figées :https://github.com/seedds/nxnative/blob/ba82ccb91dab7a860fee679f1be7ac8f0775ba22/dm/games/0400486024DEC000/README.md et https://github.com/seedds/nxnative/compare/a63ca65115cbd586ccca3bedc4af89984eddf2e5...ba82ccb91dab7a860fee679f1be7ac8f0775ba22 .
+
+
+## Run v14 lancé — 23 novembre 2026 à 12 h 23 (Paris)
+
+Le run GitHub 45164778004 est en cours sur le commit 2cbe205580ef4974d32e9a8991ab8bda0ec48961. La PR 97 intègre les 137 commits amont jusqu’à ba82ccb91dab7a860fee679f1be7ac8f0775ba22, dont la gestion de la pression mémoire, les correctifs mesh et Vert+, l’échelle de rendu, la cible 40 FPS et l’adoption des archives au démarrage.
+
+L’empreinte recalculée de la chaîne shader est 108c5f92c3c4. Le fichier d’en-tête amont annonçait 1f88531870fe et a été régénéré dans la préparation. L’exporteur iOS suit les nouvelles constantes Metal de mélange et de double source. La v14 utilise un cache et des sorties dédiés. Les caches et livraisons antérieurs sont conservés.
+
+480 tests pipeline réussis et 136 tests natifs comptabilisés, dont un ignoré. La préparation depuis les sources propres, la syntaxe des workflows et la passerelle NUP/RomFS ont été vérifiées. Le contrôle Apple s’exécute dans le run avant le transfert du NUP. Après une pause avec cache confirmé, la reprise est automatique. L’assemblage final reste sur CachyOS. Les performances et la stabilité à 40 FPS et en 4:3 restent à mesurer sur le M5.
+
+- Run GitHub https://github.com/Domessy/ffr-ipados-build/actions/runs/45164778004
+- PR https://github.com/Domessy/ffr-ipados-build/pull/97
+
+
+## Relance v14 après correction du test Metal — 23 novembre 2026
+
+Le run [45164778004](https://github.com/Domessy/ffr-ipados-build/actions/runs/45164778004) s’est arrêté au contrôle Apple avant le transfert du NUP. Le test amont `test_material_word_beside_float_bits` attendait les écritures par cible dans leur ancienne forme. Le correctif vérifie les mêmes écritures et les nouvelles conditions de double source. La chaîne shader reste `108c5f92c3c4`. Le cache v14 est vide.
+
+Les 480 tests du pipeline passent. Les suites natives ciblées ont compté 82 tests, dont 4 ignorés faute d’outils Apple sur CachyOS. La préparation depuis une copie propre a réussi. La [relance 45174506392](https://github.com/Domessy/ffr-ipados-build/actions/runs/45174506392) utilise le commit `d4ef0c3114904a3abd4c5e59a4db2efdaddd7a34`. Le test corrigé doit encore passer sur le runner Apple.
+
+
+## Deuxième relance v14
+
+Le run [45174506392](https://github.com/Domessy/ffr-ipados-build/actions/runs/45174506392) a franchi les tests Python et la compilation du moteur Mac, puis échoué sur la cible de test `t_pso_pending`, avant transfert du NUP. Le journal tronqué masquait le diagnostic initial. Le code épinglé montre trois fixtures qui assignent directement le retour `void *` de `pso_get_` à un objet Objective-C sous ARC. Elles utilisent désormais `pso_get`, qui effectue le pont explicite déjà utilisé par le moteur. Les workflows affichent désormais les diagnostics de compilation en plus de la fin du journal.
+
+La préparation propre et les 480 tests du pipeline passent. La chaîne `108c5f92c3c4` reste identique et le cache v14 est vide. La [relance 45179971400](https://github.com/Domessy/ffr-ipados-build/actions/runs/45179971400) utilise le commit `d1eae53dee7a52326eaef8083905c590bbbb3bd2`. La compilation Apple de ces changements reste à confirmer.
+
+
+## Reprise de la finition v14 depuis le checkpoint
+
+Le run [45179971400](https://github.com/Domessy/ffr-ipados-build/actions/runs/45179971400) a réussi le job build. Le journal privé confirme 42 847 bibliothèques iOS et le checkpoint vérifié sur CachyOS fait 3 115 453 447 octets (SHA-256 `a65844f2f1491a1f6bbef2a5dfb235987371e97c74ce3b42ea86598aef0ed5b9`). Le job finish a restauré ce fichier puis a échoué durant la phase render/mesh avant la première archive. La cause de l’échec du compilateur reste à établir. Le workflow supprimait la clé SSH avant d’envoyer le journal privé, ce qui explique l’absence du diagnostic détaillé sur CachyOS.
+
+Le commit `3830913` déplace le nettoyage après l’envoi des journaux privés. L’ordre et la syntaxe des étapes ont été vérifiés dans les trois jobs et les 480 tests du pipeline passent. [Run 45240857082](https://github.com/Domessy/ffr-ipados-build/actions/runs/45240857082) lancé en mode `finish` depuis le checkpoint existant. Ce mode reprend la création des archives sans transfert du NUP ni reconstruction des 42 847 shaders. Le journal privé `oot2-v14-archives.log` sera transmis avant le nettoyage. La livraison de l’IPA avec préchauffage reste à confirmer.
+
+
+## Diagnostic de la finition v14 et contrôle Apple avant relance
+
+Le run [45240857082](https://github.com/Domessy/ffr-ipados-build/actions/runs/45240857082) a transmis son journal privé. L’export des descripteurs a compté 7 138 entrées de rendu et 164 mesh, dont 13 passes de profondeur à traiter sur l’appareil, et zéro erreur d’export. Metal a rejeté le deuxième groupe pendant la compilation hors ligne iOS. Un attribut par défaut de 16 octets commence à l’offset 16 alors que le pas du tampon constant est 16.
+
+Le commit `1dd8361` comptabilise séparément ce cas précis pour le préchauffage sur l’appareil. Le filtre est limité au tampon constant 30, au pas 16, à l’offset 16 et aux formats Float4, Int4 et UInt4. Il ne modifie pas les descripteurs du moteur ni la chaîne shader. Les descripteurs archivés gardent leurs index natifs et la somme des catégories couvre toutes les lignes de rendu. Les 481 tests du pipeline passent et le checkpoint a été vérifié de nouveau. Le nombre exact de lignes concernées dans le jeu sera connu au prochain export réel. Leur compilation effective sur M5 reste à vérifier.
+
+[Contrôle Apple 45254262697](https://github.com/Domessy/ffr-ipados-build/actions/runs/45254262697) lancé sur données synthétiques. Ce contrôle couvre le filtre, la génération des archives iOS et la compilation de l’application. La finition du jeu doit attendre son résultat. Journal de l’échec conservé en privé sous `resultats/oot2-v14-archives-failed-45240857082.log`.
+
+Le contrôle Apple 45254262697 a réussi. Le code et les workflows ont été comparés à la révision testée avant le lancement de la [finition 45256485292](https://github.com/Domessy/ffr-ipados-build/actions/runs/45256485292), depuis le checkpoint vérifié. Les archives du jeu et le nombre réel de lignes à traiter sur iPad restent à confirmer.
+
+
+## Veille OOT2 du 24 novembre 2026
+
+Le main `f5c5a82305dd3b2ab4d0c85eb182df0c36862303` compte 74 commits depuis le pin v14 `ba82ccb9`. Dans le profil OOT2, la comparaison relève le README uniquement. La chaîne annoncée en amont est `8870984a02ba`, contre `108c5f92c3c4` dans notre v14. Une migration complète devra la recalculer et reconstruire les bibliothèques correspondantes.
+
+- `3b882993` (PR 3258) corrige directement le blocage de metal-tt rencontré en v14. Le tampon constant du slot 30 déclare un pas de 32 octets pour accueillir l’attribut de 16 octets à l’offset 16. L’amont a produit 13 archives sur 13 pour iPhone 17 Pro. Le temps de préparation rapporté de 446 à 3,43 s inclut un cache appareil conservé. Le correctif change le descripteur du moteur et mérite une validation cohérente de l’hôte et de l’exporteur iOS. Ne pas modifier uniquement les descripteurs exportés, dont le pas entre dans la clé d’archive.
+- `685d2aec` ajoute des bases mesh Metal 4 spécialisables et leur préchargement via mesh_pairs.tsv. L’essai à froid OOT2 amont mesure le cumul des attentes de compilation mesh à 15,85 s au départ, 6,06 s avec préchargement et 2,6 ms avec archives. Des pipelines entiers restent nécessaires pour les cas per-primitive concernés par un défaut Metal. Validation M5 iPad requise.
+- `73150dd9` déplace les additions atomiques float dans un helper non inline. Le shader de calcul OOT2 qui faisait tomber le compilateur sur M5/M5 Pro sous macOS 26.6.2 a compilé sur 16 cibles macOS/iOS hors ligne. Retest d’exécution sur le matériel affecté ouvert.
+- `be38b7da` garde les textures et le scaler MetalFX en résidence jusqu’à la fin GPU et évince la résolution la moins récemment utilisée. Cause possible des fautes GPU avec MetalFX et résolution dynamique. Essai ciblé sur M6, confirmation OOT2 en attente.
+- `d2939c1e` publie la progression des bibliothèques mesh, des images de shaders et des tables après la compilation principale. La page signale aussi des changements audio et manette propres au Mac.
+
+La finition v14 [45256485292](https://github.com/Domessy/ffr-ipados-build/actions/runs/45256485292) a réussi. L’IPA locale `ZeldaOcarinaOfTime-ipad-v14-fullwarm-livecontainer.ipa` fait 35 185 337 163 octets. Son rapport embarqué indique 29 archives, 7 101 descripteurs de rendu et 164 mesh archivés, et 37 passes de rendu à préparer sur l’iPad (24 avec attribut par défaut et 13 de profondeur). Le test iPad reste à faire. Veille effectuée sans nouveau run.
+
+[Comparaison officielle](https://github.com/seedds/nxnative/compare/ba82ccb91dab7a860fee679f1be7ac8f0775ba22...f5c5a82305dd3b2ab4d0c85eb182df0c36862303)
