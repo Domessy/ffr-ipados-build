@@ -1558,3 +1558,18 @@ Le commit `1dd8361` comptabilise séparément ce cas précis pour le préchauffa
 [Contrôle Apple 45254262697](https://github.com/Domessy/ffr-ipados-build/actions/runs/45254262697) lancé sur données synthétiques. Ce contrôle couvre le filtre, la génération des archives iOS et la compilation de l’application. La finition du jeu doit attendre son résultat. Journal de l’échec conservé en privé sous `resultats/oot2-v14-archives-failed-45240857082.log`.
 
 Le contrôle Apple 45254262697 a réussi. Le code et les workflows ont été comparés à la révision testée avant le lancement de la [finition 45256485292](https://github.com/Domessy/ffr-ipados-build/actions/runs/45256485292), depuis le checkpoint vérifié. Les archives du jeu et le nombre réel de lignes à traiter sur iPad restent à confirmer.
+
+
+## Veille OOT2 du 24 novembre 2026
+
+Le main `f5c5a82305dd3b2ab4d0c85eb182df0c36862303` compte 74 commits depuis le pin v14 `ba82ccb9`. Dans le profil OOT2, la comparaison relève le README uniquement. La chaîne annoncée en amont est `8870984a02ba`, contre `108c5f92c3c4` dans notre v14. Une migration complète devra la recalculer et reconstruire les bibliothèques correspondantes.
+
+- `3b882993` (PR 3258) corrige directement le blocage de metal-tt rencontré en v14. Le tampon constant du slot 30 déclare un pas de 32 octets pour accueillir l’attribut de 16 octets à l’offset 16. L’amont a produit 13 archives sur 13 pour iPhone 17 Pro. Le temps de préparation rapporté de 446 à 3,43 s inclut un cache appareil conservé. Le correctif change le descripteur du moteur et mérite une validation cohérente de l’hôte et de l’exporteur iOS. Ne pas modifier uniquement les descripteurs exportés, dont le pas entre dans la clé d’archive.
+- `685d2aec` ajoute des bases mesh Metal 4 spécialisables et leur préchargement via mesh_pairs.tsv. L’essai à froid OOT2 amont mesure le cumul des attentes de compilation mesh à 15,85 s au départ, 6,06 s avec préchargement et 2,6 ms avec archives. Des pipelines entiers restent nécessaires pour les cas per-primitive concernés par un défaut Metal. Validation M5 iPad requise.
+- `73150dd9` déplace les additions atomiques float dans un helper non inline. Le shader de calcul OOT2 qui faisait tomber le compilateur sur M5/M5 Pro sous macOS 26.6.2 a compilé sur 16 cibles macOS/iOS hors ligne. Retest d’exécution sur le matériel affecté ouvert.
+- `be38b7da` garde les textures et le scaler MetalFX en résidence jusqu’à la fin GPU et évince la résolution la moins récemment utilisée. Cause possible des fautes GPU avec MetalFX et résolution dynamique. Essai ciblé sur M6, confirmation OOT2 en attente.
+- `d2939c1e` publie la progression des bibliothèques mesh, des images de shaders et des tables après la compilation principale. La page signale aussi des changements audio et manette propres au Mac.
+
+La finition v14 [45256485292](https://github.com/Domessy/ffr-ipados-build/actions/runs/45256485292) a réussi. L’IPA locale `ZeldaOcarinaOfTime-ipad-v14-fullwarm-livecontainer.ipa` fait 35 185 337 163 octets. Son rapport embarqué indique 29 archives, 7 101 descripteurs de rendu et 164 mesh archivés, et 37 passes de rendu à préparer sur l’iPad (24 avec attribut par défaut et 13 de profondeur). Le test iPad reste à faire. Veille effectuée sans nouveau run.
+
+[Comparaison officielle](https://github.com/seedds/nxnative/compare/ba82ccb91dab7a860fee679f1be7ac8f0775ba22...f5c5a82305dd3b2ab4d0c85eb182df0c36862303)
