@@ -1573,3 +1573,25 @@ Le main `f5c5a82305dd3b2ab4d0c85eb182df0c36862303` compte 74 commits depuis le p
 La finition v14 [45256485292](https://github.com/Domessy/ffr-ipados-build/actions/runs/45256485292) a réussi. L’IPA locale `ZeldaOcarinaOfTime-ipad-v14-fullwarm-livecontainer.ipa` fait 35 185 337 163 octets. Son rapport embarqué indique 29 archives, 7 101 descripteurs de rendu et 164 mesh archivés, et 37 passes de rendu à préparer sur l’iPad (24 avec attribut par défaut et 13 de profondeur). Le test iPad reste à faire. Veille effectuée sans nouveau run.
 
 [Comparaison officielle](https://github.com/seedds/nxnative/compare/ba82ccb91dab7a860fee679f1be7ac8f0775ba22...f5c5a82305dd3b2ab4d0c85eb182df0c36862303)
+
+
+## Intégration v15 du 24 novembre 2026
+
+La [PR 98](https://github.com/Domessy/ffr-ipados-build/pull/98) intègre les 74 commits amont jusqu’à `f5c5a82305dd3b2ab4d0c85eb182df0c36862303`. La chaîne recalculée `8870984a02ba` correspond à l’en-tête amont. Le moteur et les archives utilisent le pas 32 officiel pour les attributs absents. Le préchauffage conserve les pipelines entiers enregistrés et fournit aussi les triplets mesh générés au compilateur des bases Metal 4. Le test synthétique exporte une entrée d’attribut absent à l’offset 16, vérifie son pas et transmet le descripteur à metal-tt pour la cible iPad.
+
+Les 500 tests pipeline et 170 tests natifs comptabilisés (8 ignorés) passent sur CachyOS. Les 42 847 shaders et quatre tables correspondent au profil officiel. Le split génère 1 286 triplets mesh uniques. Les cinq jeux de régression choisis sont OOT2, Bananza, Splatoon Raiders, BOTW et TOTK. Le banc macOS échoue au démarrage sur Linux faute de libproc.dylib. Les résultats de jeu M5 restent à mesurer.
+
+[Validation Apple 45430356996](https://github.com/Domessy/ffr-ipados-build/actions/runs/45430356996) sur `7423eb4` avant la compilation complète du jeu. Le contrôle précédent 45430290224 a été annulé après correction du chemin de la suite de tests mesh. Le point d’entrée complet est en mode build/ipad-v15/local-bundle. Le nouveau cache est vide. Le NUP et le RomFS sont disponibles et l’IPA v14 est conservée.
+
+
+Le [contrôle Apple 45430356996](https://github.com/Domessy/ffr-ipados-build/actions/runs/45430356996) a réussi sur `7423eb4`. Le journal confirme la génération d’archives iOS de rendu et mesh sur données synthétiques, la réutilisation du cache, l’édition des liens de production et les tests CPU. Le runner compile les fixtures GPU. L’exécution GPU reste à vérifier sur iPad.
+
+Le [run complet 45432822042](https://github.com/Domessy/ffr-ipados-build/actions/runs/45432822042) a été lancé le 24 novembre à 17 h 04 (Paris), sur la révision testée, en mode `build/ipad-v15/local-bundle`. Les archives du jeu, la livraison de l’IPA et le test sur M5 restent en attente.
+
+
+### Test comparatif sur iPad Pro M5
+
+1. Conserver la v14 ou sauvegarder son installation et la sauvegarde de jeu. Charger la même sauvegarde en mode Handheld avec Metal 4 pipelines activé. Garder les mêmes paramètres de résolution, d’upscaling et de fréquence pour les deux versions.
+2. Chronométrer la préparation au premier lancement puis au deuxième. Noter le nombre de pipelines indiqué, s’il est affiché.
+3. Refaire vingt minutes du même parcours, avec un passage intérieur/extérieur, une caméra fixe devant le feuillage et un changement de zone. Noter la durée des baisses de FPS et le retour éventuel du sol bleu, des bandes, de la porte surexposée ou du scintillement.
+4. En cas de fermeture, noter l’heure et le lieu en jeu, puis conserver le JetsamEvent correspondant. Relever son motif et la mémoire de LiveContainer pour comparer à la v14.
