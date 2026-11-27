@@ -51,6 +51,15 @@ def validate_render_coverage(meta):
         raise ValueError('full prewarm render coverage')
 
 
+def validate_mesh_coverage(meta):
+    archived, total = meta['emitted_mesh'], meta['mesh_rows']
+    device = meta.get('device_mesh_rows', 0)
+    if (any(type(n) is not int or n < 0 for n in (archived, total, device))
+        or not archived or archived + device != total
+        or (device and meta.get('device_mesh_reason') != 'native_fallback_fragment')):
+        raise ValueError('full prewarm mesh coverage')
+
+
 def validate_export(directory):
     directory = Path(directory)
     meta = json.loads((directory / 'coverage.json').read_text())
@@ -58,6 +67,7 @@ def validate_export(directory):
         or meta.get('pipeline_creation_used') is not False or meta.get('new_shaders_compiled') is not False):
         raise ValueError('full prewarm exporter failed coverage/identity')
     validate_render_coverage(meta)
+    validate_mesh_coverage(meta)
     scripts = sorted(directory.glob('prewarm-*.mtl4-json'))
     if len(scripts) != meta.get('periods') or not scripts: raise ValueError('full prewarm periods incomplete')
     render = mesh = 0
@@ -67,9 +77,8 @@ def validate_export(directory):
         mesh += len(descriptors.get('mesh_render_pipeline_descriptors', []))
         for lib in cfg['libraries']:
             if not re.fullmatch(r'[A-Za-z0-9_.@-]{1,180}\.metallib', lib['path']): raise ValueError('full prewarm library path')
-    if not render or not mesh or render != meta.get('emitted_render') or mesh != meta.get('mesh_rows'):
+    if not render or not mesh or render != meta.get('emitted_render') or mesh != meta.get('emitted_mesh'):
         raise ValueError('full prewarm render/mesh rows missing')
-    if render != meta.get('emitted_render') or mesh != meta.get('emitted_mesh'): raise ValueError('full prewarm counter mismatch')
     return meta
 
 

@@ -74,7 +74,7 @@ class V15RestoreTests(unittest.TestCase):
     @unittest.skipUnless(importlib.util.find_spec('yaml'), 'DAG check runs in the public venv with PyYAML')
     def test_workflow_only_continues_from_the_correct_job_outputs(self):
         import yaml
-        root=Path(__file__).resolve().parents[1];p=root/'.github/workflows/prebake-oot2-full-v8.yml'
+        root=Path(__file__).resolve().parents[1];p=root/'.github/workflows/build-oot2-v15.yml'
         text=p.read_text();jobs=yaml.safe_load(text)['jobs']
         self.assertEqual(jobs['resume']['needs'],['build'])
         self.assertIn("needs.build.outputs.state == 'paused'",jobs['resume']['if'])

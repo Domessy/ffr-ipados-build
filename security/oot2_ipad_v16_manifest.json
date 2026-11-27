@@ -1,0 +1,40 @@
+{
+  "base_revision": "f36fa59becd8b3ffc4347e6f9d58e45fe4e51bdf",
+  "shader_chain": "a05cb08bf288",
+  "originals": {
+    "dm/gfx/nvn/nvn_mtl.m": "00200a11bc68dce3cf24f25a04a8f02d43d36aa53552a7c0fc32b415b03cc9d1",
+    "dm/gfx/nvn/dmsh_chain.h": "2b02f34e02e8af044489d39650036c3b60347584b0147190b38b4e877c53dec3",
+    "dm/gfx/tests/Makefile": "d9d34b41814a3e7ca781933f81e5e3649b18198904dc7193549f342c5c40f709",
+    "scripts/build_ipa_from_nsp.py": "0bb29319bc9c74c7a2cf3bafdf9bb1cadb9293bfae1fa80a6fb2a72a73bd5223",
+    "dm/tools/tests/test_nsp_nup.py": "8686e76fa544b6de91bf55866e0fa861994280313ff27605fdcdaa473d75cb82"
+  },
+  "seed_counts": {
+    "R": 24598,
+    "C": 3527,
+    "M": 559
+  },
+  "scope": "Full November 27 upstream snapshot, generated profile tables and whole iOS mesh archives",
+  "gpu_runtime_validated": false,
+  "patch_sha256": "a51d74184b95e0c33a466705713e2a290cd1094b842f4908591874889bd9f130",
+  "new_files": [
+    "dm/gfx/nvn/oot2_fullwarm_constants.inc",
+    "dm/gfx/nvn/oot2_fullwarm_export.inc",
+    "dm/gfx/tests/oot2_fullwarm_harness.m"
+  ],
+  "index_mode": "native arch_key and arch_keys_write from identical iOS library bytes; no Mac archive copied",
+  "mesh_identity": "native normalization of NVN2 7 to host 4, deduplicated by optional task and pipeline key",
+  "memory_options": {
+    "DM_NVN_UPLOAD_IDLE_MS": "2000",
+    "DM_NVN_UPLOAD_SRC_MB": "96",
+    "device_comparison_pending": true
+  },
+  "defaults_sha256": "bb4c0769cee3728d6f471a78f7ca606386fc96e15f0840386314faba4ef3346b",
+  "registered_profile": {
+    "pso_manifest.tsv": "7735361458354b86df59859649700cff6252f6c3fba9f78f967490d283ac8bc6",
+    "game.tsv": "160bf683c179daacf36570512f14902b017049eaf33183dd54fcdb1c7d18229e",
+    "patches.py": "7025b89dfcfbf67da7eaa4f803db1d60bd8394985f7cf9358c8e51a5220a92aa",
+    "shape_anchor.c": "353fcad821277b461713a97417392d32e8c85ca43dc8af787f11646e99d0e930"
+  },
+  "screen_aspect_default": "upstream iOS Match screen (auto); optional 16:9 remains available after all hooks match",
+  "upstream_commits_after_v15": 383
+}
