@@ -125,7 +125,7 @@ def group_key(configuration, toolchain):
     return hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()
 
 
-def compile_lists(root, image, scripts, cache, bundle):
+def compile_lists(root, image, scripts, cache, bundle, *, link_archives=False):
     root, image, scripts, cache, bundle = map(Path, (root, image, scripts, cache, bundle))
     coverage = validate_export(scripts)
     sys.path.insert(0, str(root.resolve() / 'dm/gfx/tools')); import pso_offline as po
@@ -159,7 +159,15 @@ def compile_lists(root, image, scripts, cache, bundle):
         shutil.rmtree(work / 'libraries')
         name = f'{GPU}-prewarm-{index:05d}.mtl4a'
         target = bundle / name
-        shutil.copyfile(archive, target)
+        if link_archives:
+            # A v16 finish keeps its cache and bundle on the same volume.
+            # The archive cache publishes new inodes atomically on rebuild.
+            temporary = target.with_suffix('.partial')
+            temporary.unlink(missing_ok=True)
+            os.link(archive, temporary)
+            os.replace(temporary, target)
+        else:
+            shutil.copyfile(archive, target)
         archives[name] = {'bytes': target.stat().st_size, 'sha256': digest(target), 'key': key}
         progress(index+1)
         print(f'Full prewarm: groups={index+1}/{coverage["periods"]}; progress={100*(index+1)/coverage["periods"]:.1f}%', flush=True)

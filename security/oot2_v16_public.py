@@ -48,8 +48,8 @@ def main(root,work):
         raise ValueError('v16 fixture did not exercise an absent vertex attribute')
     if 'pullmain' not in descriptor_names:raise ValueError('v16 reflected pulling entry missing from exported descriptors')
     image=work/f'fixture/msl/b-{CHAIN}'
-    first=full.compile_lists(root,image,work/'scripts',work/'cache',work/'bundle')
-    again=full.compile_lists(root,image,work/'scripts',work/'cache',work/'bundle')
+    first=full.compile_lists(root,image,work/'scripts',work/'cache',work/'bundle',link_archives=True)
+    again=full.compile_lists(root,image,work/'scripts',work/'cache',work/'bundle',link_archives=True)
     if again['reused_groups']!=first['coverage']['periods']:raise ValueError('v16 archive cache reuse')
     from oot2_v16_official import install_indexes
     install_indexes(work/'scripts',work/'bundle')

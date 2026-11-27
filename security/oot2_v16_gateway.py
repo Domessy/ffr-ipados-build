@@ -110,7 +110,7 @@ def dispatch(command,parent,root,output,nup_identity):
         elif command=='oot2-write-archive-log-v16':parent.receive_file('oot2-v16-archives.log',32<<20)
         elif command=='oot2-write-log-v16':parent.receive_file('oot2-v16-build.log',32<<20)
         else:
-            uploaded=output/'ZeldaOcarinaOfTime-v16-upload.ipa';parent.receive_file(uploaded.name,16<<30)
+            uploaded=output/'ZeldaOcarinaOfTime-v16-upload.ipa';parent.receive_file(uploaded.name,32<<30)
             validate_slim(uploaded)
             slim=output/'ZeldaOcarinaOfTime-v16-slim.ipa';preserve(slim);uploaded.rename(slim)
             final=output/'ZeldaOcarinaOfTime-ipad-v16-fullwarm-livecontainer.ipa';preserve(final)

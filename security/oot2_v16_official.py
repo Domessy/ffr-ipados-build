@@ -127,7 +127,7 @@ def build(root,slim,work):
     full.build_exporter(root)
     scripts=work/'descriptors';full.export(root,inputs,scripts)
     bundle=work/'bundle'
-    full.compile_lists(root,inputs/f'msl/b-{CHAIN}.img',scripts,work/'full-cache',bundle)
+    full.compile_lists(root,inputs/f'msl/b-{CHAIN}.img',scripts,work/'full-cache',bundle,link_archives=True)
     install_indexes(scripts,bundle)
     base=aot.compile_archive(root,slim,work/'base')
     for p in base.iterdir():shutil.copyfile(p,bundle/p.name)
@@ -163,7 +163,14 @@ def monitored(args):
                         detail=f"; R/M={progress['completed']}/{progress['total']} ({progress['percent']}%); R/M output={progress['gib']} GiB"
                 except (OSError,ValueError,KeyError):pass
                 print(f'V16 offline pipelines: phase={phase}; elapsed={int(time.monotonic()-started)}s; private log={log.stat().st_size} bytes; completed archives={len(list(work.rglob("*.mtl4a")))}'+detail,flush=True)
-    if rc:raise RuntimeError('v16 offline build failed; detailed diagnostic remains private on CachyOS')
+    if rc:
+        base_log = work / 'base/aot-private.log'
+        if base_log.is_file():
+            with base_log.open('rb') as source, log.open('ab') as destination:
+                source.seek(max(0,base_log.stat().st_size - (16 << 20)))
+                destination.write(b'\n--- Offline base/compute compiler ---\n')
+                shutil.copyfileobj(source,destination)
+        raise RuntimeError('v16 offline build failed; detailed diagnostic remains private on CachyOS')
     print('PASS: v16 offline archives and final packed resources validated.',flush=True)
 if __name__=='__main__':
     if sys.argv[1:2]==['--worker']:build(*sys.argv[2:])
