@@ -119,6 +119,28 @@ class BuildkitTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'profile'):
                 kit.collect(self.root)
 
+    def derived_profile(self):
+        profile = self.root / 'oot2-work/profile' / kit.TITLE
+        profile.mkdir(parents=True)
+        (profile / 'game.tsv').write_text('generated profile')
+        (profile / 'c1_full.tsv').write_bytes((self.gen / 'dm/c1_full.tsv').read_bytes())
+        return profile
+
+    def test_derived_profile_rejects_external_or_chained_patches_symlink(self):
+        profile = self.derived_profile()
+        patches = profile / 'patches.py'
+        unrelated = self.root / 'oot2-work/extract/v131072/RomFS.img'
+        canonical = self.source / 'dm/games' / kit.TITLE / 'patches.py'
+        with patch.object(kit.subprocess, 'check_output', return_value=kit.PIN):
+            patches.symlink_to(unrelated)
+            with self.assertRaisesRegex(ValueError, 'symlink'):
+                kit.collect(self.root)
+            patches.unlink()
+            canonical.symlink_to(unrelated)
+            patches.symlink_to(canonical)
+            with self.assertRaisesRegex(ValueError, 'symlink'):
+                kit.collect(self.root)
+
     def test_symlink_and_total_bound_fail_closed(self):
         (self.gen / 'dm/link.txt').symlink_to(self.root / 'oot2-work/extract/v131072/RomFS.img')
         with patch.object(kit.subprocess, 'check_output', return_value=kit.PIN):
@@ -154,12 +176,20 @@ class BuildkitTests(unittest.TestCase):
     @unittest.skipUnless(shutil.which('zstd'), 'zstd unavailable; input filtering tests still run')
     def test_real_archive_contains_checked_manifest_and_exact_bytes(self):
         out = self.root / 'kit.tar.zst'
+        profile = self.derived_profile()
+        patches = self.source / 'dm/games' / kit.TITLE / 'patches.py'
+        patches.write_bytes(b'# synthetic registered rewriter')
+        (profile / 'patches.py').symlink_to(patches)
         with patch.object(kit.subprocess, 'check_output', return_value=kit.PIN):
             kit.export(self.root, out)
         proc = subprocess.Popen(['zstd', '-q', '-d', '-c', str(out)], stdout=subprocess.PIPE)
         try:
             with tarfile.open(fileobj=proc.stdout, mode='r|') as archive:
-                data = {m.name: archive.extractfile(m).read() for m in archive}
+                data = {}
+                for member in archive:
+                    self.assertTrue(member.isfile())
+                    data[member.name] = archive.extractfile(member).read()
+                self.assertEqual(data[f'profile/{kit.TITLE}/patches.py'], patches.read_bytes())
         finally:
             proc.stdout.close()
             self.assertEqual(proc.wait(), 0)

@@ -1595,3 +1595,31 @@ Le [run complet 45432822042](https://github.com/Domessy/ffr-ipados-build/actions
 2. Chronométrer la préparation au premier lancement puis au deuxième. Noter le nombre de pipelines indiqué, s’il est affiché.
 3. Refaire vingt minutes du même parcours, avec un passage intérieur/extérieur, une caméra fixe devant le feuillage et un changement de zone. Noter la durée des baisses de FPS et le retour éventuel du sol bleu, des bandes, de la porte surexposée ou du scintillement.
 4. En cas de fermeture, noter l’heure et le lieu en jeu, puis conserver le JetsamEvent correspondant. Relever son motif et la mémoire de LiveContainer pour comparer à la v14.
+
+## Intégration v16 du 27 novembre 2026
+
+La branche `experimental/oot2-v16-complete-upstream-20261127` et la [PR 99](https://github.com/Domessy/ffr-ipados-build/pull/99) reprennent intégralement l’amont `f36fa59b` (383 commits depuis la v15, chaîne `a05cb08bf288`). Le workflow vérifie le profil versionné et consomme les tables produites par le split. Le build d’archives utilise les descripteurs mesh complets du moteur. Une passe mesh sans fragment et 13 passes de rendu de profondeur sont identifiées localement pour le chemin natif sur l’appareil. L’export doit comptabiliser ces passes et vérifier le nombre de pipelines archivés.
+
+Le split du RomFS v131072 a parcouru 186 583 fichiers et renouvelé les tables de 42 847 shaders sans erreur. Le parseur natif vérifie 24 598 entrées de rendu, 3 527 de calcul et 559 mesh, sans clé périmée ni doublon après normalisation. Les 519 tests du pipeline passent. Sur CachyOS, la suite amont exécutée compte 575 tests dont 176 ignorés. Les tests nécessitant le binaire Apple SPIRV-Cross et le banc mémoire Mac font partie du contrôle Apple. La fixture NUP de Mario a été ajustée au comportement amont des profils sans tables versionnées.
+
+La passerelle locale a confirmé le NUP, la disponibilité du RomFS et l’absence de cache v16 existant. Les caches et l’IPA v15 sont conservés. Le plafond de livraison de l’IPA réduite v16 passe à 32 Gio. Les groupes archivés partagent leurs fichiers entre le cache de finition et le dossier de livraison pour économiser l’espace du runner. [Contrôle Apple 46068919338](https://github.com/Domessy/ffr-ipados-build/actions/runs/46068919338) lancé sur `3195a9e`. Le contrôle précédent a été annulé après l’ajustement du budget et des fichiers d’archives.
+
+### Lancement du 28 novembre
+
+Le [contrôle Apple 46068919338](https://github.com/Domessy/ffr-ipados-build/actions/runs/46068919338) a réussi sur `3195a9e`. Le journal confirme la génération d’archives iOS de rendu et de mesh à partir de données synthétiques, la réutilisation des archives, les tests CPU et la compilation du projet iOS de production. Le test local du profil généré a aussi confirmé les modules de v131072 et la reprise des correctifs et du manifeste de préchauffage.
+
+Le [run v16 46089154557](https://github.com/Domessy/ffr-ipados-build/actions/runs/46089154557) a été lancé le 28 novembre à 1 h 40 (Paris) sur la révision testée en mode `build/ipad-v16/local-bundle`. La nouvelle chaîne démarre avec son propre cache. L’IPA est assemblée sur CachyOS après réception des archives vérifiées. La finition et l’essai sur iPad restent en attente.
+
+Comparer la v16 à la v15 sur la même sauvegarde et avec les mêmes réglages. Chronométrer les deux premiers démarrages et répéter le parcours de vingt minutes avec la caméra immobile devant le feuillage, une porte et un changement de zone. Relever les baisses de FPS et leur durée. En cas de fermeture, conserver le rapport à l’heure du test pour distinguer mémoire et incident GPU.
+
+## Correction des checkpoints v16 en cours de build
+
+Le 28 novembre, le [run 46089154557](https://github.com/Domessy/ffr-ipados-build/actions/runs/46089154557) continuait à compiler malgré les échecs répétés des sauvegardes intermédiaires. Le dernier journal reçu avant intervention indiquait 32 264 shaders sur 42 847 (75 %). La route de réception appelait `receive_cache`, méthode simulée par le test et absente du lanceur réel. Elle appelle désormais `write_cache`, déjà utilisé par les autres routes de cache. Le correctif serveur a été publié atomiquement sans annuler ni relancer le build.
+
+Les reçus de disponibilité RomFS et de checkpoint v16 suivent désormais le format historique V12 attendu par les deux workflows. Les commandes, le cache, les fichiers et la validation de chaîne restent propres à la v16. Le test lance la vraie commande forcée dans un dossier isolé, vérifie un premier import et un réimport identique, et contrôle la conservation du cache précédent. Les 520 tests du pipeline passent.
+
+### Checkpoint v16 reçu et export du kit de reconstruction corrigé
+
+Le [run 46089154557](https://github.com/Domessy/ffr-ipados-build/actions/runs/46089154557) a réussi le job build et la réception du checkpoint de l’IPA compilée. La finition a démarré depuis ce checkpoint. L’export optionnel du kit de reconstruction a échoué parce que le nouveau profil de shaders généré par nxnative contient un lien `patches.py` vers le profil versionné.
+
+L’exporteur accepte ce seul lien s’il pointe directement vers le fichier attendu dans la révision contrôlée, puis stocke les octets du fichier régulier dans l’archive. Les autres liens restent refusés. Le test d’archive compressée vérifie le contenu exact et le test négatif couvre les destinations externes et les liens en chaîne. Les 521 tests du pipeline passent. Le correctif est disponible pour les prochains runs. Le kit de ce build reste absent et le workflow de finition poursuit sa propre reprise.

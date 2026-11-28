@@ -36,6 +36,10 @@ try:
     from .oot2_v15_gateway import ROUTES as V15_ROUTES
 except ImportError:
     from oot2_v15_gateway import ROUTES as V15_ROUTES
+try:
+    from .oot2_v16_gateway import ROUTES as V16_ROUTES
+except ImportError:
+    from oot2_v16_gateway import ROUTES as V16_ROUTES
 
 try:
     from .oot2_v13_gateway import ROUTES as V13_ROUTES
@@ -81,7 +85,7 @@ ROUTES = frozenset({
     "oot2-write-host-kit-v8", "oot2-write-slim-v8", "oot2-local-bundle-v8-ready",
     "oot2-write-host-kit-v1",
     "oot2-write-host-kit-v5", "oot2-write-host-kit-v6", "oot2-write-slim-v6", "oot2-local-bundle-v6-ready",
-}) | V9_ROUTES | V10_ROUTES | V11_ROUTES | V12_ROUTES | V13_ROUTES | V14_ROUTES | V15_ROUTES
+}) | V9_ROUTES | V10_ROUTES | V11_ROUTES | V12_ROUTES | V13_ROUTES | V14_ROUTES | V15_ROUTES | V16_ROUTES
 
 
 def nup_file():
@@ -164,6 +168,12 @@ def dispatch(command, parent):
         except ImportError:
             from oot2_v15_gateway import dispatch as v15_dispatch
         return v15_dispatch(command,parent,ROOT,OUTPUT,lambda:release_identity(nup_file()))
+    if command in V16_ROUTES:
+        try:
+            from .oot2_v16_gateway import dispatch as v16_dispatch
+        except ImportError:
+            from oot2_v16_gateway import dispatch as v16_dispatch
+        return v16_dispatch(command,parent,ROOT,OUTPUT,lambda:release_identity(nup_file()))
     if command in V14_ROUTES:
         try:
             from .oot2_v14_gateway import dispatch as v14_dispatch

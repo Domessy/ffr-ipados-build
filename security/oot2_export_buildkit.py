@@ -27,7 +27,7 @@ def build_identity():
     variant = os.environ.get('OOT2_RUNTIME_VARIANT', 'upstream-v4')
     if variant == 'upstream-v4':
         return PIN, CHAIN, None
-    if variant in ('ipad-v5', 'ipad-v6', 'ipad-v7', 'ipad-v8', 'ipad-v9', 'ipad-v10', 'ipad-v11', 'ipad-v12', 'ipad-v13', 'ipad-v14', 'ipad-v15'):
+    if variant in ('ipad-v5', 'ipad-v6', 'ipad-v7', 'ipad-v8', 'ipad-v9', 'ipad-v10', 'ipad-v11', 'ipad-v12', 'ipad-v13', 'ipad-v14', 'ipad-v15', 'ipad-v16'):
         data = Path(__file__).with_name(f'oot2_{variant.replace("-", "_")}_manifest.json').read_bytes()
         manifest = json.loads(data)
         return manifest['base_revision'], manifest['shader_chain'], hashlib.sha256(data).hexdigest()
@@ -45,7 +45,8 @@ def collect(temp):
     gen = source / 'dm/ios/Gen'
     if not (patched / 'main.patched.bin').is_file() or not (gen / 'dm/c1_full.tsv').is_file():
         raise ValueError('buildkit inputs incomplete')
-    profiles = [work / 'profile' / TITLE, source / 'dm/games' / TITLE]
+    registered_profile = source / 'dm/games' / TITLE
+    profiles = [work / 'profile' / TITLE, registered_profile]
     profile = next((p for p in profiles if (p / 'game.tsv').is_file()
                     and (p / 'c1_full.tsv').is_file()
                     and (p / 'c1_full.tsv').read_bytes() == (gen / 'dm/c1_full.tsv').read_bytes()), None)
@@ -72,7 +73,16 @@ def collect(temp):
     add(gen / 'Info.plist', 'Gen/Info.plist')
     for p in sorted(profile.iterdir()):
         if p.suffix == '.tsv' or p.name == 'patches.py':
-            add(p, 'profile/' + TITLE + '/' + p.name)
+            member = 'profile/' + TITLE + '/' + p.name
+            if p.name == 'patches.py' and p.is_symlink() and profile == profiles[0]:
+                # The shader-only profile refers to the registered rewriter.
+                # Package that regular file under the generated profile's name.
+                canonical = registered_profile / p.name
+                if (any(parent.is_symlink() for parent in p.parents)
+                        or Path(os.path.abspath(p.parent / p.readlink())) != canonical):
+                    raise ValueError('buildkit symlink')
+                p = canonical
+            add(p, member)
     header = source / 'dm/host/gen' / TITLE / 'game_profile.h'
     add(header, 'generated/game_profile.h')
     if 'patched/main.fixups.tsv' not in files or sum(p.stat().st_size for p in files.values()) > LIMIT:

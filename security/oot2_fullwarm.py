@@ -51,6 +51,15 @@ def validate_render_coverage(meta):
         raise ValueError('full prewarm render coverage')
 
 
+def validate_mesh_coverage(meta):
+    archived, total = meta['emitted_mesh'], meta['mesh_rows']
+    device = meta.get('device_mesh_rows', 0)
+    if (any(type(n) is not int or n < 0 for n in (archived, total, device))
+        or not archived or archived + device != total
+        or (device and meta.get('device_mesh_reason') != 'native_fallback_fragment')):
+        raise ValueError('full prewarm mesh coverage')
+
+
 def validate_export(directory):
     directory = Path(directory)
     meta = json.loads((directory / 'coverage.json').read_text())
@@ -58,6 +67,7 @@ def validate_export(directory):
         or meta.get('pipeline_creation_used') is not False or meta.get('new_shaders_compiled') is not False):
         raise ValueError('full prewarm exporter failed coverage/identity')
     validate_render_coverage(meta)
+    validate_mesh_coverage(meta)
     scripts = sorted(directory.glob('prewarm-*.mtl4-json'))
     if len(scripts) != meta.get('periods') or not scripts: raise ValueError('full prewarm periods incomplete')
     render = mesh = 0
@@ -67,9 +77,8 @@ def validate_export(directory):
         mesh += len(descriptors.get('mesh_render_pipeline_descriptors', []))
         for lib in cfg['libraries']:
             if not re.fullmatch(r'[A-Za-z0-9_.@-]{1,180}\.metallib', lib['path']): raise ValueError('full prewarm library path')
-    if not render or not mesh or render != meta.get('emitted_render') or mesh != meta.get('mesh_rows'):
+    if not render or not mesh or render != meta.get('emitted_render') or mesh != meta.get('emitted_mesh'):
         raise ValueError('full prewarm render/mesh rows missing')
-    if render != meta.get('emitted_render') or mesh != meta.get('emitted_mesh'): raise ValueError('full prewarm counter mismatch')
     return meta
 
 
@@ -116,7 +125,7 @@ def group_key(configuration, toolchain):
     return hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()
 
 
-def compile_lists(root, image, scripts, cache, bundle):
+def compile_lists(root, image, scripts, cache, bundle, *, link_archives=False):
     root, image, scripts, cache, bundle = map(Path, (root, image, scripts, cache, bundle))
     coverage = validate_export(scripts)
     sys.path.insert(0, str(root.resolve() / 'dm/gfx/tools')); import pso_offline as po
@@ -150,7 +159,15 @@ def compile_lists(root, image, scripts, cache, bundle):
         shutil.rmtree(work / 'libraries')
         name = f'{GPU}-prewarm-{index:05d}.mtl4a'
         target = bundle / name
-        shutil.copyfile(archive, target)
+        if link_archives:
+            # A v16 finish keeps its cache and bundle on the same volume.
+            # The archive cache publishes new inodes atomically on rebuild.
+            temporary = target.with_suffix('.partial')
+            temporary.unlink(missing_ok=True)
+            os.link(archive, temporary)
+            os.replace(temporary, target)
+        else:
+            shutil.copyfile(archive, target)
         archives[name] = {'bytes': target.stat().st_size, 'sha256': digest(target), 'key': key}
         progress(index+1)
         print(f'Full prewarm: groups={index+1}/{coverage["periods"]}; progress={100*(index+1)/coverage["periods"]:.1f}%', flush=True)

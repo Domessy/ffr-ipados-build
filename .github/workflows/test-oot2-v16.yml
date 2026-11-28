@@ -1,0 +1,42 @@
+name: OOT2 v16 official public Mac and iOS gates
+'on':
+  workflow_dispatch: null
+permissions:
+  contents: read
+jobs:
+  public:
+    env:
+      OOT2_RUNTIME_VARIANT: ipad-v16
+      OOT2_IPA_LAYOUT: local-bundle
+    runs-on: xcode-27
+    timeout-minutes: 40
+    steps:
+    - name: Recuperer les scripts de cache du meme commit GitHub
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      with:
+        persist-credentials: false
+    - name: Select exact Metal toolchain
+      shell: bash
+      run: |
+        set -euo pipefail
+        sudo xcode-select -s /Applications/Xcode_27.2.app/Contents/Developer
+        xcodebuild -downloadComponent MetalToolchain
+    - name: Verifier les scripts et tests NUP avant tout transfert prive
+      run: |
+        set -euo pipefail
+        python3 -m unittest discover -s security -p 'test_oot2*.py' -q
+    - name: Validate complete official v16 source before private transfers
+      run: |
+        set -euo pipefail
+        export HOMEBREW_NO_AUTO_UPDATE=1
+        brew install xcodegen zstd spirv-cross glslang python@3.15
+        "$(brew --prefix python@3.15)/bin/python3.15" -m venv "$RUNNER_TEMP/oot2-venv"
+        "$RUNNER_TEMP/oot2-venv/bin/python" -m pip install -q lz4 'capstone>=5,<6' fonttools nsz zbic PyYAML unicorn
+        SRC="$RUNNER_TEMP/nxnative"
+        git init -q "$SRC"
+        git -C "$SRC" remote add origin https://github.com/seedds/nxnative.git
+        git -C "$SRC" fetch -q --depth 1 origin f36fa59becd8b3ffc4347e6f9d58e45fe4e51bdf
+        git -C "$SRC" checkout -q --detach FETCH_HEAD
+        python3 security/oot2_prepare_ipad_v16.py "$SRC"
+        "$RUNNER_TEMP/oot2-venv/bin/python" security/oot2_v16_public.py "$SRC" "$RUNNER_TEMP/public-v16" > "$RUNNER_TEMP/public-v16.log" 2>&1 || { grep -nE '(^|[[:space:]])(fatal error:|error:|FAIL:|ERROR:|Undefined symbols|ld:|make: \*\*\*)' "$RUNNER_TEMP/public-v16.log" | tail -80 || true; tail -140 "$RUNNER_TEMP/public-v16.log"; exit 1; }
+        tail -15 "$RUNNER_TEMP/public-v16.log"
