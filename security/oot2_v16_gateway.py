@@ -14,6 +14,11 @@ except ImportError:
     from oot2_local_bundle import bundle, identity, regular, validate_zip_headers
     from oot2_fullwarm import validate_render_coverage
 GPU='applegpu_g17g'
+# The v16 Actions workflow uses the v12 checkpoint receipt protocol.
+# Command names, paths and shader chain checks still scope these receipts to v16.
+CHECKPOINT_SAVED = 'OOT2_V12_CHECKPOINT_SAVED'
+CHECKPOINT_INFO = 'OOT2_V12_CHECKPOINT_V1'
+LOCAL_READY = 'OOT2_LOCAL_BUNDLE_READY_V12'
 ROUTES={'oot2-write-slim-v16','oot2-write-host-kit-v16','oot2-local-bundle-v16-ready','oot2-write-log-v16','oot2-write-checkpoint-v16','oot2-write-archive-log-v16','oot2-checkpoint-v16-info','oot2-read-checkpoint-v16'}
 ROUTES |= {'oot2-write-cache-v16', 'oot2-cache-v16-info', 'oot2-read-cache-v16'}
 
@@ -59,7 +64,7 @@ def dispatch(command,parent,root,output,nup_identity):
             saved = parent.CACHE, parent.CONFLICTS
             try:
                 parent.CACHE, parent.CONFLICTS = root/'shader-cache-v16', root/'shader-cache-conflicts-v16'
-                parent.receive_cache()
+                parent.write_cache()
             finally:
                 parent.CACHE, parent.CONFLICTS = saved
         elif command in ('oot2-cache-v16-info', 'oot2-read-cache-v16'):
@@ -75,14 +80,14 @@ def dispatch(command,parent,root,output,nup_identity):
         elif command=='oot2-local-bundle-v16-ready':
             image=root/'local-bundle-v6/extract/v131072/RomFS.img';meta=root/'local-bundle-v6/romfs-manifest.json';regular(image);regular(meta);m=json.loads(meta.read_text())
             if m['source_identity']!=nup_identity() or list(identity(image))!=m['identity']:raise ValueError('v16 local RomFS identity')
-            print('OOT2_LOCAL_BUNDLE_READY_V16',image.stat().st_size)
+            print(LOCAL_READY,image.stat().st_size)
         elif command in ('oot2-checkpoint-v16-info','oot2-read-checkpoint-v16'):
             checkpoint=output/'ZeldaOcarinaOfTime-v16-unwarmed-checkpoint.ipa'
             regular(checkpoint);meta=output/'v16-checkpoint.json';regular(meta)
             record=json.loads(meta.read_text())
             if record.get('chain')!=CHAIN or record.get('bytes')!=checkpoint.stat().st_size or record.get('sha256')!=digest(checkpoint) or record.get('fullwarm_validated') is not False:
                 raise ValueError('v16 checkpoint identity')
-            if command=='oot2-checkpoint-v16-info':print('OOT2_V16_CHECKPOINT_V1',record['bytes'],record['sha256'])
+            if command=='oot2-checkpoint-v16-info':print(CHECKPOINT_INFO,record['bytes'],record['sha256'])
             else:parent.send_file(checkpoint)
         elif command=='oot2-write-checkpoint-v16':
             try:
@@ -104,7 +109,7 @@ def dispatch(command,parent,root,output,nup_identity):
             preserve(checkpoint);uploaded.rename(checkpoint)
             record={'chain':CHAIN,'bytes':checkpoint.stat().st_size,'sha256':digest(checkpoint),'fullwarm_validated':False}
             (output/'v16-checkpoint.json').write_text(json.dumps(record,indent=2)+'\n')
-            print('OOT2_V16_CHECKPOINT_SAVED',record['bytes'])
+            print(CHECKPOINT_SAVED,record['bytes'])
         elif command=='oot2-write-host-kit-v16':
             preserve(output/'OOT2HostKit-v16.tar.zst');parent.receive_file('OOT2HostKit-v16.tar.zst',1<<30)
         elif command=='oot2-write-archive-log-v16':parent.receive_file('oot2-v16-archives.log',32<<20)

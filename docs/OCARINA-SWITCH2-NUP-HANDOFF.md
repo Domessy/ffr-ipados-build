@@ -1611,3 +1611,9 @@ Le [contrôle Apple 46068919338](https://github.com/Domessy/ffr-ipados-build/act
 Le [run v16 46089154557](https://github.com/Domessy/ffr-ipados-build/actions/runs/46089154557) a été lancé le 28 novembre à 1 h 40 (Paris) sur la révision testée en mode `build/ipad-v16/local-bundle`. La nouvelle chaîne démarre avec son propre cache. L’IPA est assemblée sur CachyOS après réception des archives vérifiées. La finition et l’essai sur iPad restent en attente.
 
 Comparer la v16 à la v15 sur la même sauvegarde et avec les mêmes réglages. Chronométrer les deux premiers démarrages et répéter le parcours de vingt minutes avec la caméra immobile devant le feuillage, une porte et un changement de zone. Relever les baisses de FPS et leur durée. En cas de fermeture, conserver le rapport à l’heure du test pour distinguer mémoire et incident GPU.
+
+## Correction des checkpoints v16 en cours de build
+
+Le 28 novembre, le [run 46089154557](https://github.com/Domessy/ffr-ipados-build/actions/runs/46089154557) continuait à compiler malgré les échecs répétés des sauvegardes intermédiaires. Le dernier journal reçu avant intervention indiquait 32 264 shaders sur 42 847 (75 %). La route de réception appelait `receive_cache`, méthode simulée par le test et absente du lanceur réel. Elle appelle désormais `write_cache`, déjà utilisé par les autres routes de cache. Le correctif serveur a été publié atomiquement sans annuler ni relancer le build.
+
+Les reçus de disponibilité RomFS et de checkpoint v16 suivent désormais le format historique V12 attendu par les deux workflows. Les commandes, le cache, les fichiers et la validation de chaîne restent propres à la v16. Le test lance la vraie commande forcée dans un dossier isolé, vérifie un premier import et un réimport identique, et contrôle la conservation du cache précédent. Les 520 tests du pipeline passent.

@@ -7,6 +7,9 @@ import json
 import os
 from pathlib import Path
 import sqlite3
+import subprocess
+import sys
+import tarfile
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -59,7 +62,7 @@ class V16RestoreTests(unittest.TestCase):
                 self.assertEqual(parent.CACHE,root/'shader-cache-v16')
                 self.assertEqual(parent.CONFLICTS,root/'shader-cache-conflicts-v16')
                 (parent.CACHE/'index').mkdir(parents=True);(parent.CACHE/'index/a.json').write_bytes(b'index')
-            parent.receive_cache=receive
+            parent.write_cache=receive
             with patch.object(top,'ROOT',root),patch.object(top,'OUTPUT',output):
                 with redirect_stdout(io.StringIO()) as text:self.assertEqual(top.dispatch('oot2-cache-v16-info',parent),0)
                 self.assertEqual(text.getvalue().strip(),'OOT2_V16_CACHE_EMPTY')
@@ -70,6 +73,37 @@ class V16RestoreTests(unittest.TestCase):
                 with redirect_stdout(io.StringIO()) as text:g.dispatch('oot2-cache-v16-info',parent,root,output,None)
                 self.assertEqual(r.parse_info(text.getvalue())['sha256'],hashlib.sha256(archive.read_bytes()).hexdigest())
                 snap.assert_called_once_with(root/'shader-cache-v16',root/'cache-transfer-v16',translations=True)
+
+    def test_forced_command_imports_a_real_cache_tar(self):
+        launcher = Path(__file__).with_name('ffr_ssh_gate.py').resolve()
+        code = (
+            'from pathlib import Path; import runpy,sys; '
+            'Path.home = classmethod(lambda cls: Path(sys.argv[1])); '
+            'sys.path.insert(0, str(Path(sys.argv[2]).parent)); '
+            'runpy.run_path(sys.argv[2], run_name="__main__")'
+        )
+        archive = io.BytesIO()
+        entry = 'index/' + 'a' * 16 + '.json'
+        payload = b'{"synthetic":true}'
+        with tarfile.open(fileobj=archive, mode='w:gz') as tar:
+            member = tarfile.TarInfo(entry)
+            member.size = len(payload)
+            tar.addfile(member, io.BytesIO(payload))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / 'portage-ipados' / 'oot-switch2'
+            root.mkdir(parents=True)
+            previous = root / 'shader-cache-v15' / entry
+            previous.parent.mkdir(parents=True)
+            previous.write_bytes(b'previous cache')
+            for expected in (b'FFR_CACHE_NEW=1 FFR_CACHE_REUSED=0', b'FFR_CACHE_NEW=0 FFR_CACHE_REUSED=1'):
+                result = subprocess.run(
+                    [sys.executable, '-c', code, directory, str(launcher)],
+                    env=dict(os.environ, SSH_ORIGINAL_COMMAND='oot2-write-cache-v16'),
+                    input=archive.getvalue(), capture_output=True, check=True,
+                )
+                self.assertIn(expected, result.stdout)
+            self.assertEqual((root / 'shader-cache-v16' / entry).read_bytes(), payload)
+            self.assertEqual(previous.read_bytes(), b'previous cache')
 
     @unittest.skipUnless(importlib.util.find_spec('yaml'), 'DAG check runs in the public venv with PyYAML')
     def test_workflow_only_continues_from_the_correct_job_outputs(self):
@@ -85,8 +119,11 @@ class V16RestoreTests(unittest.TestCase):
             steps=jobs[name]['steps'];compile_step=next(s for s in steps if s.get('id')=='compile')
             self.assertEqual(compile_step['env']['OOT2_ALLOW_PAUSE'],allow)
             checkpoint=next(s for s in steps if s['name']=='Save exact v16 compiled checkpoint and require receipt')
+            self.assertIn(g.CHECKPOINT_SAVED,checkpoint['run'])
+            self.assertIn(g.LOCAL_READY,next(s['run'] for s in steps if 'oot2-space-v1' in s.get('run','')))
             self.assertEqual(checkpoint['if'],"steps.compile.outputs.state == 'ready'")
             restores=[i for i,s in enumerate(steps) if 'oot2_v16_restore.py restore' in s.get('run','')]
             nup=[i for i,s in enumerate(steps) if 'security/oot2_transfer.py nup' in s.get('run','')]
             self.assertLess(restores[0],nup[0])
+        self.assertIn(g.CHECKPOINT_INFO,next(s['run'] for s in jobs['finish']['steps'] if 'oot2-checkpoint-v16-info' in s.get('run','')))
         self.assertEqual(text,p.with_name('build-oot2-v16.yml').read_text())
